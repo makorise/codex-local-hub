@@ -17,6 +17,7 @@
   "scripts": {
     "start": "node src/index.mjs",
     "dev": "node --watch src/index.mjs",
+    "docs:preview": "node scripts/docs-preview.mjs",
     "build:mac": "zsh scripts/build-macos-app.sh",
     "package:mac": "zsh scripts/package-macos.sh",
     "test": "node --test",

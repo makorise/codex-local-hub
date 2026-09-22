@@ -14,6 +14,21 @@ Codex Local Hub 是一个开源的 **Codex 手机控制台、任务监控器和 
 
 > 本项目是独立开源项目，与 OpenAI 没有隶属或官方背书关系。
 
+## 运行效果
+
+<table>
+  <tr>
+    <td width="78%"><img src="docs/assets/screenshots/desktop-dashboard.zh-CN.png" width="100%" alt="Codex 随身工作台电脑端界面，展示任务列表、进度、用量、最近消息、目标状态和输入框"></td>
+    <td width="22%"><img src="docs/assets/screenshots/mobile-dashboard.zh-CN.png" width="100%" alt="Codex 随身工作台手机界面，展示当前用量和任务状态"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>电脑端工作区</strong>：任务列表与对话进度同时可见</td>
+    <td align="center"><strong>手机端工作台</strong>：适合单手操作的紧凑布局</td>
+  </tr>
+</table>
+
+以上为真实产品界面截图，使用的是脱敏示例数据，不包含私人任务内容、配对密钥或可用二维码。
+
 ## 能做什么
 
 - 同步 Codex 任务、项目、进度与最近 20 条可见消息
@@ -34,13 +49,24 @@ Codex Local Hub 是一个开源的 **Codex 手机控制台、任务监控器和 
 - 在手机上检查截图和视觉交付结果，再决定是否验收
 - 保持本地优先，不把完整对话复制到第三方托管面板
 
+## 工作原理
+
+![Codex 随身工作台工作原理图：安装到 Mac、读取本地 Codex 状态、通过局域网同步，并从手机双向控制](docs/assets/how-it-works.zh-CN.svg)
+
+1. **安装宿主程序。** macOS 原生外壳会在 Mac 上启动内置的 Node.js 服务，并显示手机访问地址和一次性配对二维码。
+2. **读取 Codex 本地数据。** 服务从本机 `~/.codex` 数据库读取任务、项目、队列、目标、用量和最近可见消息；恢复任务、管理队列和 steer 操作通过 Codex 命令行与 app-server 控制通道完成，不会抓取 ChatGPT 网页界面。
+3. **在局域网内同步。** 手机扫码配对后获得 HttpOnly 会话 Cookie。经过认证的接口提供当前状态，实时事件会在任务变化时刷新手机页面。
+4. **从手机反向控制。** 新提示词和队列操作会回传到 Mac，再交给指定的 Codex 任务。系统只保留用于监控的少量最近内容，不会建立第二份完整聊天档案。
+
+当前版本只在局域网内工作，数据只在 Mac 与同一可信 Wi-Fi 下的已配对设备之间传输，不经过 Codex Local Hub 的公网中继。
+
 ## 安装
 
 首个经过 Apple 公证的公开 DMG 正在准备中。在 GitHub Releases 提供之前，请先按照下面的开发者步骤从源码构建。未来发布包会内置 Apple Silicon 与 Intel 版本的 Node.js，普通用户不需要单独安装 Node 或打开终端。详细说明见[安装指南](docs/INSTALL.md)和[兼容性说明](docs/COMPATIBILITY.md)。
 
 开发者构建：
 
-环境要求：macOS 13+、Node.js 22+、本机已安装并使用 Codex。
+环境要求：macOS 15+、Node.js 22+、本机已安装并使用 Codex。
 
 ```bash
 git clone https://github.com/brandonwang001/codex-local-hub.git
