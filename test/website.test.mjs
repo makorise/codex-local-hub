@@ -65,16 +65,16 @@ test('product website localizes, animates and copies the one-message installer',
   const { document } = dom.window;
   assert.equal(document.documentElement.lang, 'zh-CN');
   assert.match(document.title, /瞭望台/);
-  assert.match(document.querySelector('h1').textContent, /Mac 继续运行/);
+  assert.match(document.querySelector('h1').textContent, /离开电脑/);
   assert.match(document.querySelector('[data-product-image="desktop"]').src, /desktop-dashboard\.zh-CN\.png$/);
   assert.equal(document.querySelectorAll('.reveal:not(.visible)').length, 0);
   assert.equal(observers[0].options.threshold, 0.12);
   assert.ok(observers[0].unobserved.length > 0);
 
-  document.querySelector('.language-toggle').click();
+  document.querySelector('.language-button').click();
   assert.equal(document.documentElement.lang, 'en');
   assert.equal(dom.window.localStorage.getItem('codex-lookout-language'), 'en');
-  assert.match(document.querySelector('h1').textContent, /Your Mac runs Codex/);
+  assert.match(document.querySelector('h1').textContent, /Step away from your Mac/);
   assert.match(document.querySelector('[data-product-image="mobile"]').src, /mobile-conversation\.en\.png$/);
 
   document.querySelector('[data-copy-prompt]').click();
@@ -94,7 +94,7 @@ test('product website localizes, animates and copies the one-message installer',
   assert.equal(module.preferredLanguage('', ''), 'en');
   assert.equal(module.preferredLanguage('zh-CN', 'en-US'), 'zh-CN');
 
-  document.querySelector('.language-toggle').click();
+  document.querySelector('.language-button').click();
   assert.equal(document.documentElement.lang, 'zh-CN');
   assert.match(document.querySelector('[data-install-prompt]').textContent, /使用 \$skill-installer/);
   module.applyLanguage('zh-TW');
