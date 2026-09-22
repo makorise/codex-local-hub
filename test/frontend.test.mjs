@@ -115,6 +115,7 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.equal(dom.window.location.search, '');
   ui.stripTokenFromUrl();
   assert.equal(document.querySelectorAll('.task-card').length, 1);
+  assert.equal(document.querySelector('#detail-pane').classList.contains('is-open'), true);
   assert.equal(document.querySelector('#usage-summary').textContent, '周窗口剩余 80%');
   assert.equal(document.querySelectorAll('.delivery-thumb').length, 2);
   assert.equal(document.querySelector('#delivery-inbox').hidden, false);

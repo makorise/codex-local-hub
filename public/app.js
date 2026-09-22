@@ -216,6 +216,7 @@ function updateTasks(payload) {
   if (!state.selectedId && location.hash) state.selectedId = location.hash.slice(1);
   renderList();
   const current = state.tasks.find((task) => task.id === state.selectedId);
+  if (current && location.hash.slice(1) === current.id) detailPane.classList.add('is-open');
   const changed = taskViewChanged(previous, current);
   if (changed) renderDetail();
   if (current && changed) {
