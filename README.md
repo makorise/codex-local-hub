@@ -16,6 +16,11 @@ Codex Local Hub is an open-source **Codex mobile dashboard, task monitor, and ph
 
 ## See it in action
 
+<p align="center">
+  <img src="docs/assets/screenshots/mac-host.en.png" width="720" alt="Codex Local Hub macOS host app showing service status, safe pairing placeholder, LAN address, and launch controls">
+</p>
+<p align="center"><strong>Mac host app</strong> — start the local service, pair the phone, and open the dashboard</p>
+
 <table>
   <tr>
     <td width="78%"><img src="docs/assets/screenshots/desktop-dashboard.en.png" width="100%" alt="Codex Local Hub desktop dashboard showing tasks, progress, usage, recent messages, goal status, and the prompt composer"></td>
@@ -27,7 +32,7 @@ Codex Local Hub is an open-source **Codex mobile dashboard, task monitor, and ph
   </tr>
 </table>
 
-These are real screenshots of the production interface rendered with sanitized demo data. No private task content, pairing token, or active QR code is included.
+These are real product-interface screenshots with sanitized demo data. The active pairing QR code and private LAN address in the host screenshot were replaced with a non-scannable placeholder and example address; no private task content or credential is included.
 
 ## How it works
 

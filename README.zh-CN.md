@@ -16,6 +16,11 @@ Codex Local Hub 是一个开源的 **Codex 手机控制台、任务监控器和 
 
 ## 运行效果
 
+<p align="center">
+  <img src="docs/assets/screenshots/mac-host.zh-CN.png" width="720" alt="Codex 随身工作台 Mac 宿主程序，展示服务状态、安全配对占位图、局域网地址和启动控制">
+</p>
+<p align="center"><strong>Mac 宿主程序</strong>：启动本地服务、配对手机并打开工作台</p>
+
 <table>
   <tr>
     <td width="78%"><img src="docs/assets/screenshots/desktop-dashboard.zh-CN.png" width="100%" alt="Codex 随身工作台电脑端界面，展示任务列表、进度、用量、最近消息、目标状态和输入框"></td>
@@ -27,7 +32,7 @@ Codex Local Hub 是一个开源的 **Codex 手机控制台、任务监控器和 
   </tr>
 </table>
 
-以上为真实产品界面截图，使用的是脱敏示例数据，不包含私人任务内容、配对密钥或可用二维码。
+以上为真实产品界面截图，使用的是脱敏示例数据。宿主程序截图中的有效配对二维码和私人局域网地址已经替换为不可扫描的占位图与示例地址，不包含私人任务内容或访问凭据。
 
 ## 工作原理
 
