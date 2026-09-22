@@ -4,7 +4,7 @@ import { networkInterfaces } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CodexRepository } from './repository.mjs';
-import { CodexControlClient } from './control.mjs';
+import { CodexAppToolsClient, CodexControlClient } from './control.mjs';
 import { DeliveryInbox } from './deliveries.mjs';
 import { createBridgeServer, resolveRuntimeInfo } from './server.mjs';
 import { createUsageReader, requestRateLimits } from './usage.mjs';
@@ -15,9 +15,13 @@ const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || '0.0.0.0';
 const requirePairing = process.env.BRIDGE_REQUIRE_PAIRING === '1';
 const codexBin = process.env.CODEX_BIN || '/Applications/ChatGPT.app/Contents/Resources/codex';
+const appTools = new CodexAppToolsClient({
+  codexBin,
+});
 const control = new CodexControlClient({
   codexBin,
   socketPath: process.env.CODEX_APP_SERVER_SOCKET || '',
+  appTools,
 });
 
 if (!home) throw new Error('HOME 环境变量不可用');

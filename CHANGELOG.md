@@ -2,6 +2,12 @@
 
 All notable changes to Codex Local Hub will be documented in this file.
 
+## 0.2.7 - 2026-09-22
+
+- Fixed `steer` failing with `thread not found` by sending the prompt through the running Codex desktop app that owns the task, instead of starting a competing app-server process.
+- Automatically discovers the Codex desktop message channel after the Hub or Codex app restarts; failed sends keep the queued message intact.
+- Added desktop-channel, protocol, timeout, and stale-task regression coverage.
+
 ## 0.2.6 - 2026-09-22
 
 - Disabled both double-tap and two-finger page zoom across the phone dashboard while preserving normal vertical scrolling and horizontal image swiping.
