@@ -4,6 +4,14 @@
   "private": true,
   "type": "module",
   "description": "Local-first mobile dashboard for monitoring and controlling Codex tasks.",
+  "homepage": "https://github.com/brandonwang001/codex-local-hub#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brandonwang001/codex-local-hub.git"
+  },
+  "bugs": {
+    "url": "https://github.com/brandonwang001/codex-local-hub/issues"
+  },
   "keywords": ["codex", "openai", "mobile-dashboard", "local-network", "task-monitor", "macos", "pwa"],
   "license": "MIT",
   "scripts": {

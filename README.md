@@ -3,6 +3,7 @@
 **A local-first mobile dashboard for monitoring and controlling Codex tasks from your phone.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-2563eb.svg)](LICENSE)
+[![CI](https://github.com/brandonwang001/codex-local-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/brandonwang001/codex-local-hub/actions/workflows/ci.yml)
 ![macOS 15+](https://img.shields.io/badge/macOS-15%2B-111827.svg)
 ![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-16a34a.svg)
 ![Test coverage](https://img.shields.io/badge/coverage-100%25-16a34a.svg)
@@ -60,6 +61,8 @@ The first public notarized DMG is being prepared. Until it is available in GitHu
 For development:
 
 ```bash
+git clone https://github.com/brandonwang001/codex-local-hub.git
+cd codex-local-hub
 npm install
 npm run build:mac
 open "dist/Codex Local Hub.app"

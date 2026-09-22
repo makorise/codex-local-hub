@@ -5,6 +5,7 @@
 **把 Mac 上的 Codex 任务变成一个可在手机上查看和控制的本地工作台。**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-2563eb.svg)](LICENSE)
+[![CI](https://github.com/brandonwang001/codex-local-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/brandonwang001/codex-local-hub/actions/workflows/ci.yml)
 ![macOS 15+](https://img.shields.io/badge/macOS-15%2B-111827.svg)
 ![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-16a34a.svg)
 ![测试覆盖率](https://img.shields.io/badge/coverage-100%25-16a34a.svg)
@@ -42,6 +43,8 @@ Codex Local Hub 是一个开源的 **Codex 手机控制台、任务监控器和 
 环境要求：macOS 13+、Node.js 22+、本机已安装并使用 Codex。
 
 ```bash
+git clone https://github.com/brandonwang001/codex-local-hub.git
+cd codex-local-hub
 npm install
 npm run build:mac
 open "dist/Codex Local Hub.app"
