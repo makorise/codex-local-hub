@@ -9,7 +9,7 @@ import { promisify } from 'node:util';
 
 const execute = promisify(execFile);
 const script = fileURLToPath(new URL('../.agents/skills/deliver-to-codex-local-hub/scripts/deliver-image.sh', import.meta.url));
-const runSkill = (args, options) => execute('/bin/zsh', [script, ...args], options);
+const runSkill = (args, options) => execute('/bin/sh', [script, ...args], options);
 
 test('delivery skill stages a supported image without changing its source', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'local-hub-skill-'));

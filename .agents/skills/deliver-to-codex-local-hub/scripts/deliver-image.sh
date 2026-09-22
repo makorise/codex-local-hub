@@ -1,7 +1,7 @@
-#!/bin/zsh
-set -euo pipefail
+#!/bin/sh
+set -eu
 
-script_dir="${0:A:h}"
+script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 case "$(/usr/bin/uname -m)" in
   arm64) runtime_name="node-arm64" ;;
   x86_64) runtime_name="node-x64" ;;
@@ -9,7 +9,7 @@ case "$(/usr/bin/uname -m)" in
 esac
 
 if [[ -n "$runtime_name" ]]; then
-  for application_dir in "/Applications" "$HOME/Applications"; do
+  for application_dir in "/Applications" "${HOME:-}/Applications"; do
     bundled_node="$application_dir/Codex Local Hub.app/Contents/Resources/runtime/$runtime_name"
     if [[ -x "$bundled_node" ]]; then
       exec "$bundled_node" "$script_dir/deliver-image.mjs" "$@"
