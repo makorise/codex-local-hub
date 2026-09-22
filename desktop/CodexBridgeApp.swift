@@ -288,6 +288,8 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         environment["HOST"] = "0.0.0.0"
         environment["BRIDGE_REQUIRE_PAIRING"] = "0"
         environment["CODEX_BIN"] = "/Applications/ChatGPT.app/Contents/Resources/codex"
+        environment["CODEX_LOCAL_HUB_VERSION"] = coreStore.effectiveVersion()
+        environment["CODEX_LOCAL_HUB_CORE_SOURCE"] = resourceRoot == bundledRoot ? "bundled" : "hot-update"
         process.environment = environment
 
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in

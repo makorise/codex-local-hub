@@ -1,5 +1,5 @@
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { createServer as nodeCreateServer } from 'node:http';
 import { isAuthorized, safeJson, validateMessageInput } from './core.mjs';
@@ -12,6 +12,26 @@ const MIME = {
   '.png': 'image/png',
   '.webmanifest': 'application/manifest+json; charset=utf-8',
 };
+
+function cleanRuntimeValue(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+export async function resolveRuntimeInfo({
+  root = process.cwd(),
+  env = process.env,
+  readManifest = (path) => readFile(path, 'utf8'),
+} = {}) {
+  try {
+    const manifest = JSON.parse(await readManifest(join(root, 'core-manifest.json')));
+    const version = cleanRuntimeValue(manifest.version);
+    if (version) return { version, source: 'hot-update' };
+  } catch {}
+  return {
+    version: cleanRuntimeValue(env.CODEX_LOCAL_HUB_VERSION) || 'unknown',
+    source: cleanRuntimeValue(env.CODEX_LOCAL_HUB_CORE_SOURCE) || 'bundled',
+  };
+}
 
 export async function readJsonBody(request, limit = 64 * 1024) {
   let body = '';
@@ -65,6 +85,7 @@ export function createBridgeServer({
   deliveryInbox = { list: async () => [], open: async () => null },
   createServer = nodeCreateServer,
   pollMs = 1500,
+  runtimeInfo = { version: 'unknown', source: 'bundled' },
 }) {
   const clients = new Set();
   let cachedTasks = [];
@@ -108,7 +129,7 @@ export function createBridgeServer({
     }
     try {
       if (request.method === 'GET' && url.pathname === '/api/health') {
-        return json(response, 200, { ok: true, clients: clients.size });
+        return json(response, 200, { ok: true, clients: clients.size, ...runtimeInfo });
       }
       if (request.method === 'GET' && url.pathname === '/api/tasks') {
         const tasks = await refresh();

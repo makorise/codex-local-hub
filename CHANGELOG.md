@@ -2,6 +2,12 @@
 
 All notable changes to Codex Local Hub will be documented in this file.
 
+## 0.2.4 - 2026-09-22
+
+- Added active core version and runtime source to `/api/health`, so a manual hot update can be verified independently from the desktop prompt.
+- Made both bundled and hot-updated cores identify themselves consistently, including when a new core is installed by an older compatible host.
+- Added full branch coverage for version detection, missing manifests, and bundled fallbacks.
+
 ## 0.2.3 - 2026-09-22
 
 - Published the first stable GitHub Release channel for checksum-verified core hot updates from `0.2.2`.

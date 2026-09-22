@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { get } from 'node:http';
 import { Readable } from 'node:stream';
-import { createBridgeServer, readJsonBody } from '../src/server.mjs';
+import { createBridgeServer, readJsonBody, resolveRuntimeInfo } from '../src/server.mjs';
 
 async function request(base, path, options = {}) {
   const response = await fetch(`${base}${path}`, options);
@@ -20,6 +20,32 @@ test('JSON body reader accepts valid and rejects invalid or oversized payloads',
   assert.deepEqual(await readJsonBody(chunks(['{"a":', '1}'])), { a: 1 });
   await assert.rejects(readJsonBody(chunks(['{'])), (error) => error.statusCode === 400);
   await assert.rejects(readJsonBody(chunks(['12345']), 2), (error) => error.statusCode === 413);
+});
+
+test('runtime info identifies hot updates and safe bundled fallbacks', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'bridge-runtime-'));
+  await writeFile(join(root, 'core-manifest.json'), JSON.stringify({ version: '0.2.4' }));
+  assert.deepEqual(await resolveRuntimeInfo({ root }), { version: '0.2.4', source: 'hot-update' });
+  await rm(root, { recursive: true });
+  assert.deepEqual(await resolveRuntimeInfo({
+    root: '/active-core',
+    readManifest: async (path) => {
+      assert.equal(path, '/active-core/core-manifest.json');
+      return JSON.stringify({ version: ' 0.2.4 ' });
+    },
+  }), { version: '0.2.4', source: 'hot-update' });
+  assert.deepEqual(await resolveRuntimeInfo({
+    env: { CODEX_LOCAL_HUB_VERSION: ' 0.2.4 ', CODEX_LOCAL_HUB_CORE_SOURCE: ' bundled ' },
+    readManifest: async () => JSON.stringify({ version: 204 }),
+  }), { version: '0.2.4', source: 'bundled' });
+  assert.deepEqual(await resolveRuntimeInfo({
+    env: {},
+    readManifest: async () => { throw new Error('missing'); },
+  }), { version: 'unknown', source: 'bundled' });
+  assert.deepEqual(await resolveRuntimeInfo({
+    env: {},
+    readManifest: async () => JSON.stringify({ version: '   ' }),
+  }), { version: 'unknown', source: 'bundled' });
 });
 
 test('bridge server serves authenticated API, static files, SSE and messages', async (t) => {
@@ -44,13 +70,13 @@ test('bridge server serves authenticated API, static files, SSE and messages', a
     list: async () => [{ id: 'image.png', title: '交付图', createdAt: 1, size: 3, mime: 'image/png', url: '/api/deliveries/files/image.png' }],
     open: async (id) => id === 'image.png' ? { mime: 'image/png', size: 3, stream: () => Readable.from(Buffer.from('png')) } : null,
   };
-  const bridge = createBridgeServer({ repository, token: 'secret', requirePairing: true, publicDir, deliveryInbox, pollMs: 60_000 });
+  const bridge = createBridgeServer({ repository, token: 'secret', requirePairing: true, publicDir, deliveryInbox, pollMs: 60_000, runtimeInfo: { version: '0.2.4', source: 'hot-update' } });
   await new Promise((resolve) => bridge.server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${bridge.server.address().port}`;
   t.after(async () => { bridge.server.closeAllConnections(); await new Promise((resolve) => bridge.server.close(resolve)); await rm(publicDir, { recursive: true }); });
 
   assert.equal((await request(base, '/api/health')).status, 401);
-  assert.deepEqual((await request(base, '/api/health?token=secret')).body, { ok: true, clients: 0 });
+  assert.deepEqual((await request(base, '/api/health?token=secret')).body, { ok: true, clients: 0, version: '0.2.4', source: 'hot-update' });
   assert.equal((await request(base, '/api/tasks', { headers: { authorization: 'Bearer secret' } })).body.tasks.length, 1);
   assert.deepEqual((await request(base, '/api/usage?token=secret')).body.usage, { available: false, limits: [] });
   assert.equal((await request(base, '/api/deliveries?token=secret')).body.deliveries[0].title, '交付图');
