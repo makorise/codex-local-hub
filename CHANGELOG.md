@@ -2,6 +2,13 @@
 
 All notable changes to Codex Local Hub will be documented in this file.
 
+## 0.2.3 - 2026-09-22
+
+- Published the first stable GitHub Release channel for checksum-verified core hot updates from `0.2.2`.
+- Kept lists of five or fewer tasks flat and project-adjacent, while larger lists group by project with persistent, accessible collapse controls.
+- Improved the bilingual project documentation, screenshots, architecture explanation, installation prompts, and GitHub discoverability.
+- Added an explicitly named unsigned universal DMG preview while keeping it outside the trusted automatic host-update path.
+
 ## 0.2.2 - 2026-09-22
 
 - Added a native macOS update checker that checks GitHub Releases at most once every 24 hours.
@@ -13,7 +20,6 @@ All notable changes to Codex Local Hub will be documented in this file.
 - Added cached update availability, manual checks, six-hour wake-up polling, and offline-safe failure handling.
 - Added a tag-driven GitHub Release workflow that publishes both core and universal-DMG assets: unsigned builds become prereleases, while Developer ID credentials produce notarized stable releases.
 - Added macOS update-checker and core activation tests alongside the existing 100% JavaScript coverage gate.
-- Kept lists of five or fewer tasks flat and project-adjacent, while larger lists group by project with persistent, accessible collapse controls that continue to respect status filters.
 
 ## 0.2.1 - 2026-09-22
 

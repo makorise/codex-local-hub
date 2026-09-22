@@ -157,7 +157,7 @@ Keep Codex Local Hub running. The image appears in **Delivery inbox** on the nex
 
 For most users, the **Install with one message to Codex** flow near the top of this README is the recommended path.
 
-The first public notarized DMG is being prepared. Until it is available in GitHub Releases, the one-message setup builds from source with the user's existing Node.js 22.22.2+. It checks the version but never installs, upgrades, relinks, or changes that Node environment. The built app contains its own Apple silicon and Intel runtimes. See the [installation guide](docs/INSTALL.md) and [macOS compatibility matrix](docs/COMPATIBILITY.md).
+Stable GitHub Releases now provide checksum-verified core hot updates for existing installations. The attached universal DMG preview is not yet Apple-notarized, so new users should still prefer the one-message setup: it builds from source with the user's existing Node.js 22.22.2+ without installing, upgrading, relinking, or changing that Node environment. The built app contains its own Apple silicon and Intel runtimes. See the [installation guide](docs/INSTALL.md) and [macOS compatibility matrix](docs/COMPATIBILITY.md).
 
 The Mac app checks the latest stable GitHub Release at most once per day—no Codex Local Hub update server is required. A strictly newer version normally installs as a small, checksum-verified core hot update containing only the local service and web UI. The app switches versions atomically, restarts the service, and rolls back automatically if the new core cannot start. A full universal DMG is used only when the native Mac host must change. Drafts, prereleases, equal versions, and downgrades are ignored. **Check for updates** also supports a manual refresh.
 

@@ -1,8 +1,12 @@
 # Installing Codex Local Hub on macOS
 
-## Recommended: notarized DMG
+## Recommended installation
 
-The public release should be a universal, Developer ID-signed, Apple-notarized DMG.
+Existing installations should use the app's checksum-verified core updater. Until a Developer ID-signed and Apple-notarized DMG is published, new users should use the one-message Codex setup in the README; it builds and verifies the app locally without changing the user's Node.js installation.
+
+The GitHub Release also includes an explicitly named `unsigned-preview.dmg` for developer testing. It is not accepted as an automatic host update and should not be presented as a notarized installer.
+
+Once a notarized DMG is available:
 
 1. Download `Codex-Local-Hub-<version>-universal.dmg` from GitHub Releases.
 2. Open the DMG.
@@ -75,9 +79,9 @@ npm run package:mac
 
 The release script enables hardened runtime, signs the embedded Node runtimes with JIT entitlements, signs the app and DMG, submits the DMG to Apple, staples the ticket, and verifies the result.
 
-GitHub Releases themselves do not require an Apple account. A tag matching `package.json` triggers the release workflow. Without Developer ID secrets the workflow publishes an explicitly marked prerelease for testing; with signing and notarization secrets it publishes a stable release that the in-app updater can discover.
+GitHub Releases themselves do not require an Apple account. A tag matching `package.json` triggers the release workflow. Without Developer ID secrets the workflow publishes a stable, checksum-verified core update plus an explicitly named unsigned DMG preview; with signing and notarization secrets it publishes a stable notarized DMG alongside the core update.
 
-For a stable automated release, configure these GitHub Actions secrets: `MACOS_CERTIFICATE_BASE64`, `MACOS_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_TEAM_ID`, and `APPLE_APP_SPECIFIC_PASSWORD`. The first value is a base64-encoded Developer ID Application `.p12`; the password is an app-specific Apple password, not the normal Apple Account password. Creating a GitHub prerelease requires none of these Apple credentials.
+For a notarized automated release, configure these GitHub Actions secrets: `MACOS_CERTIFICATE_BASE64`, `MACOS_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_TEAM_ID`, and `APPLE_APP_SPECIFIC_PASSWORD`. The first value is a base64-encoded Developer ID Application `.p12`; the password is an app-specific Apple password, not the normal Apple Account password. Publishing the core update and unsigned preview requires none of these Apple credentials.
 
 ## Homebrew
 

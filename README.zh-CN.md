@@ -148,7 +148,7 @@ Codex 通常会自动发现新 Skill；如果没有出现，请重启 Codex。�
 
 对大多数用户，推荐直接使用 README 开头的“复制一句话，让 Codex 完成安装”。
 
-首个经过 Apple 公证的公开 DMG 正在准备中。在 GitHub Releases 提供之前，一句话安装会使用用户电脑上已有的 Node.js 22.22.2+ 从源码构建。它只检查版本，不会安装、升级、重连或修改原有 Node 环境；编译出的 App 会内置 Apple Silicon 与 Intel 版 Node.js。详细说明见[安装指南](docs/INSTALL.md)和[兼容性说明](docs/COMPATIBILITY.md)。
+GitHub 正式版现已为已有安装提供经过 SHA-256 校验的核心热升级。Release 中附带的通用 DMG 预览目前尚未经过 Apple 公证，因此新用户仍建议使用“一句话安装”：它会使用电脑上已有的 Node.js 22.22.2+ 从源码构建，不会安装、升级、重连或修改原有 Node 环境；编译出的 App 会内置 Apple Silicon 与 Intel 版 Node.js。详细说明见[安装指南](docs/INSTALL.md)和[兼容性说明](docs/COMPATIBILITY.md)。
 
 Mac 程序每天最多检查一次最新的 GitHub 正式版，不需要 Codex Local Hub 自建更新服务器。只有远端语义版本严格高于当前版本时才会提示。普通更新只下载经过 SHA-256 校验的核心包（本地服务与网页），原子切换后重启服务；新核心无法启动时会自动回退。只有 Swift 宿主必须变化时才使用完整通用 DMG。草稿、预发布版、相同版本和降级版本都会被忽略，也可以随时点击“检查更新”手动检查。
 
