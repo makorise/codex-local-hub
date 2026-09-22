@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
 
 const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+const styles = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
 
 function response(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -45,7 +46,7 @@ class FakeEventSource {
   close() { this.closed = true; }
 }
 
-async function setup({ failing = new Map(), empty = false } = {}) {
+async function setup({ failing = new Map(), empty = false, taskCount = 1 } = {}) {
   const dom = new JSDOM(html, { url: 'http://127.0.0.1:8787/?token=secret#11111111-1111-1111-1111-111111111111', pretendToBeVisual: true });
   dom.window.localStorage.setItem('codex-local-hub-language-choice', 'zh-CN');
   const previous = {};
@@ -67,11 +68,17 @@ async function setup({ failing = new Map(), empty = false } = {}) {
   let messageMode = 'started';
   const deliveryTimestamp = Date.now();
   const calls = [];
+  const availableTasks = Array.from({ length: taskCount }, (_, index) => task(index === 0 ? {} : {
+    id: `${String(index + 1).padStart(8, '0')}-1111-4111-8111-${String(index + 1).padStart(12, '0')}`,
+    title: `同步任务 ${index + 1}`,
+    project: `project-${(index % 4) + 1}`,
+    updatedAt: Date.now() - index * 60_000,
+  }));
   globalThis.fetch = async (input, options = {}) => {
     const url = new URL(String(input));
     calls.push([url.pathname, options.method || 'GET']);
     if (failing.has(url.pathname)) return response({ error: failing.get(url.pathname) }, 500);
-    if (url.pathname === '/api/tasks') return response({ tasks: empty ? [] : [task()], syncedAt: Date.now() });
+    if (url.pathname === '/api/tasks') return response({ tasks: empty ? [] : availableTasks, syncedAt: Date.now() });
     if (url.pathname === '/api/usage') return response({ usage: empty ? { available: false, limits: [] } : { planType: 'pro', limits: [{ label: '周', usedPercent: 20, remainingPercent: 80, resetsAt: Date.now() + 60_000 }] } });
     if (url.pathname === '/api/deliveries') return response({ deliveries: empty ? [] : [
       { id: 'one.png', title: '首页截图', createdAt: deliveryTimestamp, size: 200, mime: 'image/png', url: '/api/deliveries/files/one.png' },
@@ -106,6 +113,16 @@ async function setup({ failing = new Map(), empty = false } = {}) {
   };
   return { dom, module, calls, failing, setMessageMode: (mode) => { messageMode = mode; }, cleanup };
 }
+
+test('task pane renders a long list with desktop and mobile scrolling enabled', async (t) => {
+  const { dom, cleanup } = await setup({ taskCount: 24 });
+  t.after(cleanup);
+
+  assert.equal(dom.window.document.querySelectorAll('.task-card').length, 24);
+  assert.match(styles, /\.app-shell \{[^}]*height: 100dvh;[^}]*overflow: hidden;/);
+  assert.match(styles, /\.task-pane \{[^}]*overflow-y: auto;[^}]*overscroll-behavior-y: contain;[^}]*-webkit-overflow-scrolling: touch;/);
+  assert.match(styles, /@media \(max-width: 760px\)[\s\S]*\.task-pane \{[^}]*height: 100%;[^}]*overflow-y: auto;[^}]*touch-action: pan-y;/);
+});
 
 test('frontend renders tasks, details, usage and every queue interaction', async (t) => {
   const failures = new Map();

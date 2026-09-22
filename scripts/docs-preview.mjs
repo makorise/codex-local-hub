@@ -8,6 +8,7 @@ const port = Number(process.env.DOCS_PREVIEW_PORT || 8791);
 const host = '127.0.0.1';
 const taskId = '11111111-2222-4333-8444-555555555555';
 const now = Date.now();
+const requestedTaskCount = Math.max(3, Math.min(80, Number(process.env.DOCS_PREVIEW_TASK_COUNT) || 3));
 
 const tasks = [
   {
@@ -49,6 +50,24 @@ const tasks = [
     goal: null,
   },
 ];
+
+const previewStates = [
+  { activity: 'Updating files', queuedCount: 0, progress: { state: 'running', label: 'Running', tone: 'blue' } },
+  { activity: 'Queued', queuedCount: 2, progress: { state: 'queued', label: 'Queued', tone: 'violet' } },
+  { activity: 'Completed', queuedCount: 0, progress: { state: 'done', label: 'Completed', tone: 'green' } },
+];
+for (let index = tasks.length; index < requestedTaskCount; index += 1) {
+  const sample = previewStates[index % previewStates.length];
+  tasks.push({
+    id: `${String(index + 1).padStart(8, '0')}-3333-4333-8333-${String(index + 1).padStart(12, '0')}`,
+    title: `Task list scrolling check ${index + 1}`,
+    project: `sample-${(index % 4) + 1}`,
+    updatedAt: now - index * 180_000,
+    latestTask: `Verify that task ${index + 1} remains reachable with desktop and touch scrolling.`,
+    goal: null,
+    ...sample,
+  });
+}
 
 const detail = {
   ...tasks[0],
@@ -99,19 +118,19 @@ const detail = {
 
 const tasksZhCN = tasks.map((task, index) => ({
   ...task,
-  title: ['完善手机端引导体验', '检查发布安全清单', '准备发布说明'][index],
-  project: ['随身工作台', '桌面客户端', '项目文档'][index],
-  activity: ['正在更新文件', '已排队', '已完成'][index],
+  title: index < 3 ? ['完善手机端引导体验', '检查发布安全清单', '准备发布说明'][index] : `任务列表滚动测试 ${index + 1}`,
+  project: index < 3 ? ['随身工作台', '桌面客户端', '项目文档'][index] : `示例项目 ${(index % 4) + 1}`,
+  activity: ['正在更新文件', '已排队', '已完成'][index % 3],
   latestTask: [
     '完成响应式布局，检查无障碍体验，并准备发布截图。',
     '检查局域网直连、网络边界和任务同步。',
     '说明安装方式和本地优先的工作原理。',
-  ][index],
+  ][index % 3],
   progress: [
     { state: 'running', label: '进行中', tone: 'blue' },
     { state: 'queued', label: '已排队', tone: 'violet' },
     { state: 'done', label: '已完成', tone: 'green' },
-  ][index],
+  ][index % 3],
   goal: index === 0 ? {
     ...task.goal,
     objective: '交付稳定、清晰并适合单手操作的手机任务工作台。',
