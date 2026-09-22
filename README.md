@@ -29,6 +29,17 @@ Codex Local Hub is an open-source **Codex mobile dashboard, task monitor, and ph
 
 These are real screenshots of the production interface rendered with sanitized demo data. No private task content, pairing token, or active QR code is included.
 
+## How it works
+
+![Architecture diagram showing how Codex Local Hub is installed on a Mac, reads local Codex state, synchronizes over local Wi-Fi, and supports two-way control from a phone](docs/assets/how-it-works.svg)
+
+1. **Install the host app.** The native macOS wrapper starts its bundled Node.js service on the Mac and shows the phone address and a one-time pairing QR code.
+2. **Read local Codex data.** The service reads task, project, queue, goal, usage, and recent visible-message state from the local `~/.codex` databases. It uses the Codex CLI and app-server control channel for resume, queue, and steer actions; it does not scrape the ChatGPT web interface.
+3. **Synchronize on the LAN.** After QR pairing, the phone receives an HttpOnly session cookie. Authenticated JSON endpoints provide current state, while server-sent events refresh the dashboard when work changes.
+4. **Control work from the phone.** Prompts and queue actions travel back to the Mac, where they are delivered to the selected Codex task. The service keeps only a small recent view for monitoring instead of building a second full chat archive.
+
+The current release is local-network only. The data path stays between the Mac and paired devices on the same trusted Wi-Fi; no hosted Codex Local Hub relay is involved.
+
 ## Why Codex Local Hub?
 
 - **Phone-first monitoring** — see running, queued, paused, failed, and completed tasks.
@@ -48,17 +59,6 @@ These are real screenshots of the production interface rendered with sanitized d
 - Reorder queued prompts and steer urgent work into the active turn.
 - Review screenshots and visual results before accepting a UI implementation.
 - Keep Codex task history local instead of copying full conversations into a hosted dashboard.
-
-## How it works
-
-![Architecture diagram showing how Codex Local Hub is installed on a Mac, reads local Codex state, synchronizes over local Wi-Fi, and supports two-way control from a phone](docs/assets/how-it-works.svg)
-
-1. **Install the host app.** The native macOS wrapper starts its bundled Node.js service on the Mac and shows the phone address and a one-time pairing QR code.
-2. **Read local Codex data.** The service reads task, project, queue, goal, usage, and recent visible-message state from the local `~/.codex` databases. It uses the Codex CLI and app-server control channel for resume, queue, and steer actions; it does not scrape the ChatGPT web interface.
-3. **Synchronize on the LAN.** After QR pairing, the phone receives an HttpOnly session cookie. Authenticated JSON endpoints provide current state, while server-sent events refresh the dashboard when work changes.
-4. **Control work from the phone.** Prompts and queue actions travel back to the Mac, where they are delivered to the selected Codex task. The service keeps only a small recent view for monitoring instead of building a second full chat archive.
-
-The current release is local-network only. The data path stays between the Mac and paired devices on the same trusted Wi-Fi; no hosted Codex Local Hub relay is involved.
 
 ## Enable the visual delivery skill
 
