@@ -24,6 +24,12 @@ Use $skill-installer to install the setup skill from https://github.com/brandonw
 
 This one message asks Codex to install the reusable [`setup-codex-local-hub`](.agents/skills/setup-codex-local-hub) skill and immediately complete the setup. The skill keeps Gatekeeper enabled, preserves existing files, runs the test suite, verifies the application, installs the companion image-delivery skill, and stops instead of exposing the service to the public internet.
 
+If Codex reports that the selected model is at capacity, wait while the task is still working. If it stops, choose another available model and send this in the same task:
+
+```text
+Continue with $setup-codex-local-hub from the last verified setup stage. Reuse the existing checkpoint and files; do not restart completed work. Finish installation, launch, and phone-access verification.
+```
+
 ## See it in action
 
 ### 1. Start the host on your Mac

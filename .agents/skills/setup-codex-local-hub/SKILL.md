@@ -7,6 +7,14 @@ description: Install, update, launch, and verify Codex Local Hub on a Mac, inclu
 
 Set up the official project from `https://github.com/brandonwang001/codex-local-hub` as a user-level macOS application. Treat invocation as authorization to download this repository, install or update **Codex Local Hub**, install its bundled `deliver-to-codex-local-hub` skill, launch the app, and run local verification. It does not authorize disabling Gatekeeper, changing firewall or router settings, exposing port `8787` to the internet, deleting user data, or configuring an unrequested remote relay.
 
+## Resume safely after an interruption
+
+Make every stage idempotent. At the start of a run, inspect the managed checkout, built application, installed application, companion skill, and running service before repeating work. If an earlier run stopped because the selected model was unavailable, the task was cancelled, or a command timed out, resume from the first unverified stage instead of restarting or overwriting completed work.
+
+Maintain a non-secret checkpoint at `~/Library/Application Support/Codex Local Hub/setup-state.json`. After each verified stage, atomically record its name, timestamp, source commit or release version, source path, and application path. Useful stages are `preflight`, `source-ready`, `tests-passed`, `app-built`, `app-installed`, `delivery-skill-installed`, `launched`, and `verified`. Never store pairing tokens, cookies, conversation content, or private IP addresses. Treat the checkpoint as a hint: confirm the corresponding files or service state before skipping a stage.
+
+When the user asks to continue or invokes this skill again, reuse the checkpoint and existing clean artifacts. A model-capacity message is not an installation failure; if the task is no longer running, tell the user to select another available model and resume with the same skill.
+
 ## Choose the installation source
 
 1. Confirm the host is macOS 15 or newer. Report a clear blocker on another operating system; do not attempt to install the Mac app there.
