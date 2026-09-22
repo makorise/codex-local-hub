@@ -44,7 +44,7 @@ test('bridge server serves authenticated API, static files, SSE and messages', a
     list: async () => [{ id: 'image.png', title: '交付图', createdAt: 1, size: 3, mime: 'image/png', url: '/api/deliveries/files/image.png' }],
     open: async (id) => id === 'image.png' ? { mime: 'image/png', size: 3, stream: () => Readable.from(Buffer.from('png')) } : null,
   };
-  const bridge = createBridgeServer({ repository, token: 'secret', publicDir, deliveryInbox, pollMs: 60_000 });
+  const bridge = createBridgeServer({ repository, token: 'secret', requirePairing: true, publicDir, deliveryInbox, pollMs: 60_000 });
   await new Promise((resolve) => bridge.server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${bridge.server.address().port}`;
   t.after(async () => { bridge.server.closeAllConnections(); await new Promise((resolve) => bridge.server.close(resolve)); await rm(publicDir, { recursive: true }); });
@@ -135,6 +135,26 @@ test('bridge server serves authenticated API, static files, SSE and messages', a
   tasks = [{ ...tasks[0], title: 'Changed' }];
   await bridge.refresh();
   await new Promise((resolve) => setTimeout(resolve, 2));
+});
+
+test('bridge server allows direct trusted-LAN access by default', async (t) => {
+  const publicDir = await mkdtemp(join(tmpdir(), 'bridge-direct-'));
+  await writeFile(join(publicDir, 'index.html'), '<h1>direct</h1>');
+  const repository = {
+    listTasks: async () => [{ id: '1234567890abcdef1234', title: 'Visible' }],
+  };
+  const bridge = createBridgeServer({ repository, publicDir, pollMs: 60_000 });
+  await new Promise((resolve) => bridge.server.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${bridge.server.address().port}`;
+  t.after(async () => {
+    bridge.server.closeAllConnections();
+    await new Promise((resolve) => bridge.server.close(resolve));
+    await rm(publicDir, { recursive: true });
+  });
+
+  assert.equal((await request(base, '/api/health')).status, 200);
+  assert.equal((await request(base, '/api/tasks')).body.tasks[0].title, 'Visible');
+  assert.equal((await request(base, '/pair/anything', { redirect: 'manual' })).status, 404);
 });
 
 test('bridge reports repository and message failures and closes active streams', async (t) => {

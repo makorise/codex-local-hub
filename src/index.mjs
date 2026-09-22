@@ -13,6 +13,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const home = process.env.HOME;
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || '0.0.0.0';
+const requirePairing = process.env.BRIDGE_REQUIRE_PAIRING === '1';
 const codexBin = process.env.CODEX_BIN || '/Applications/ChatGPT.app/Contents/Resources/codex';
 const control = new CodexControlClient({
   codexBin,
@@ -22,7 +23,7 @@ const control = new CodexControlClient({
 if (!home) throw new Error('HOME 环境变量不可用');
 
 const secretPath = process.env.BRIDGE_TOKEN_FILE || join(home, 'Library', 'Application Support', 'Codex Task Bridge', 'session-secret');
-const token = process.env.BRIDGE_TOKEN || await loadOrCreateSecret(secretPath);
+const token = requirePairing ? (process.env.BRIDGE_TOKEN || await loadOrCreateSecret(secretPath)) : '';
 const deliveryDirectory = process.env.CODEX_TASK_DESK_INBOX || (process.platform === 'darwin'
   ? join(home, 'Library', 'Application Support', 'Codex Task Bridge', 'deliveries')
   : join(home, '.local', 'share', 'codex-task-desk', 'deliveries'));
@@ -41,7 +42,7 @@ const repository = new CodexRepository({
   startTurn: (threadId, message, cwd) => control.resume(threadId, message, cwd),
 });
 const usageReader = createUsageReader({ request: () => requestRateLimits({ codexBin }) });
-const { server } = createBridgeServer({ repository, token, publicDir: join(root, 'public'), usageReader, deliveryInbox });
+const { server } = createBridgeServer({ repository, token, requirePairing, publicDir: join(root, 'public'), usageReader, deliveryInbox });
 
 server.listen(port, host, () => {
   const addresses = lanAddresses().map((address) => `http://${address}:${port}/`);
@@ -49,7 +50,7 @@ server.listen(port, host, () => {
   console.log(`本机：http://127.0.0.1:${port}/`);
   for (const address of addresses) {
     console.log(`手机：${address}`);
-    console.log(`配对：${address}pair/${encodeURIComponent(token)}`);
+    if (requirePairing) console.log(`配对：${address}pair/${encodeURIComponent(token)}`);
   }
   console.log('按 Ctrl+C 停止\n');
 });

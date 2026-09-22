@@ -24,6 +24,6 @@ Every public release should be tested on a clean macOS 15 or newer account with 
 1. Gatekeeper accepts the downloaded DMG.
 2. Drag-to-Applications installation succeeds without administrator access.
 3. The Local Network prompt contains the expected explanation.
-4. QR pairing works and leaves a clean browser URL.
+4. The QR code opens the plain LAN URL and the task and event APIs respond without a pairing step.
 5. Locking the screen does not stop synchronization.
 6. Denying and later re-enabling Local Network access produces a recoverable state.

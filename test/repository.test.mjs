@@ -5,7 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { CodexRepository, escapeSqlite, parseHistoryMessage } from '../src/repository.mjs';
+import { CodexRepository, escapeSqlite, isOptionalDataUnavailable, parseHistoryMessage } from '../src/repository.mjs';
 
 const execFile = promisify(nodeExecFile);
 
@@ -32,6 +32,45 @@ test('repository lists, caches details and escapes database paths', async () => 
   assert.match(calls[0][1][2], /history''s\.db/);
   assert.match(calls[0][1][2], /goals''s\.db/);
   assert.equal(escapeSqlite("a'b"), "a''b");
+});
+
+test('repository falls back when optional Codex databases are not initialized', async () => {
+  const calls = [];
+  const optionalError = Object.assign(new Error('query failed'), { stderr: 'Error: no such table: history_db.thread_items' });
+  const repository = new CodexRepository({
+    stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals',
+    execFile: async (_command, args) => {
+      calls.push(args);
+      if (calls.length === 1) throw optionalError;
+      return { stdout: JSON.stringify([row]) };
+    },
+  });
+  assert.equal((await repository.listTasks())[0].title, 'Task');
+  assert.match(calls[1][2], /NULL AS latest_user/);
+
+  repository.execFile = async () => { throw Object.assign(new Error('unable to open database file'), { stderr: '' }); };
+  assert.deepEqual(await repository.loadMessages(row.id), []);
+  assert.deepEqual(await repository.loadQueuedTasks(row.id), []);
+  repository.details.set(row.id, { cwd: '/work' });
+  repository.startTurn = async (...args) => args;
+  assert.deepEqual((await repository.sendMessage(row.id, 'continue')).result, [row.id, 'continue', '/work']);
+
+  assert.equal(isOptionalDataUnavailable(optionalError), true);
+  assert.equal(isOptionalDataUnavailable({ stderr: 'no such table: main.queued_items' }), true);
+  assert.equal(isOptionalDataUnavailable(new Error('database is locked')), false);
+  assert.equal(isOptionalDataUnavailable(), false);
+});
+
+test('repository does not hide real database failures', async () => {
+  const failure = new Error('database is locked');
+  const repository = new CodexRepository({
+    stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals',
+    execFile: async () => { throw failure; },
+  });
+  await assert.rejects(repository.listTasks(), failure);
+  await assert.rejects(repository.loadMessages(row.id), failure);
+  await assert.rejects(repository.loadQueuedTasks(row.id), failure);
+  await assert.rejects(repository.sendMessage(row.id, 'hello'), failure);
 });
 
 test('repository handles empty lists, misses and queue stdout or stderr', async () => {

@@ -58,7 +58,8 @@ export async function serveStatic(response, publicDir, pathname, extraHeaders = 
 
 export function createBridgeServer({
   repository,
-  token,
+  token = '',
+  requirePairing = false,
   publicDir,
   usageReader = async () => ({ available: false, limits: [] }),
   deliveryInbox = { list: async () => [], open: async () => null },
@@ -90,7 +91,7 @@ export function createBridgeServer({
   const server = createServer(async (request, response) => {
     const url = new URL(request.url, 'http://localhost');
     const pairingMatch = request.method === 'GET' && url.pathname.match(/^\/pair\/([^/]+)$/);
-    if (pairingMatch) {
+    if (requirePairing && pairingMatch) {
       let pairingToken = '';
       try { pairingToken = decodeURIComponent(pairingMatch[1]); } catch { pairingToken = ''; }
       if (pairingToken !== token) return json(response, 403, { error: '配对链接无效' });
@@ -102,7 +103,7 @@ export function createBridgeServer({
       response.end();
       return;
     }
-    if (url.pathname.startsWith('/api/') && !isAuthorized(url, request.headers, token)) {
+    if (requirePairing && url.pathname.startsWith('/api/') && !isAuthorized(url, request.headers, token)) {
       return json(response, 401, { error: '访问口令无效' });
     }
     try {

@@ -11,7 +11,7 @@ Set up the official project from `https://github.com/brandonwang001/codex-local-
 
 Make every stage idempotent. At the start of a run, inspect the managed checkout, built application, installed application, companion skill, and running service before repeating work. If an earlier run stopped because the selected model was unavailable, the task was cancelled, or a command timed out, resume from the first unverified stage instead of restarting or overwriting completed work.
 
-Maintain a non-secret checkpoint at `~/Library/Application Support/Codex Local Hub/setup-state.json`. After each verified stage, atomically record its name, timestamp, source commit or release version, source path, and application path. Useful stages are `preflight`, `source-ready`, `tests-passed`, `app-built`, `app-installed`, `delivery-skill-installed`, `launched`, and `verified`. Never store pairing tokens, cookies, conversation content, or private IP addresses. Treat the checkpoint as a hint: confirm the corresponding files or service state before skipping a stage.
+Maintain a non-secret checkpoint at `~/Library/Application Support/Codex Local Hub/setup-state.json`. After each verified stage, atomically record its name, timestamp, source commit or release version, source path, and application path. Useful stages are `preflight`, `source-ready`, `tests-passed`, `app-built`, `app-installed`, `delivery-skill-installed`, `launched`, and `verified`. Never store conversation content or private IP addresses. Treat the checkpoint as a hint: confirm the corresponding files or service state before skipping a stage.
 
 When the user asks to continue or invokes this skill again, reuse the checkpoint and existing clean artifacts. A model-capacity message is not an installation failure; if the task is no longer running, tell the user to select another available model and resume with the same skill.
 
@@ -36,13 +36,13 @@ Do not bypass a failed security check with `xattr`, `spctl --master-disable`, ad
 
 ## Install the companion delivery skill
 
-Copy the checkout's `.agents/skills/deliver-to-codex-local-hub` directory into `${CODEX_HOME:-$HOME/.codex}/skills/deliver-to-codex-local-hub`. Preserve an existing modified copy; replace only an identical or older project-provided copy, making a timestamped backup when uncertain. Validate the installed skill with the available `quick_validate.py` from the Codex skill-creator package when present.
+Copy the checkout's `.agents/skills/deliver-to-codex-local-hub` directory into `${CODEX_HOME:-$HOME/.codex}/skills/deliver-to-codex-local-hub`. Preserve an existing modified copy; replace only an identical or older project-provided copy, making a timestamped backup when uncertain. When `quick_validate.py` and all of its existing dependencies are available, use it to validate the installed skill. Validation is best-effort: do not install Python packages just for this check, and never delay or block app installation because an optional validator dependency such as PyYAML is absent. Always verify that the installed `SKILL.md` and its referenced script exist.
 
 ## Launch and verify
 
 1. Launch the installed application with `open` and leave it running.
-2. Confirm the local dashboard responds at `http://127.0.0.1:8787/`. Do not print or copy the private pairing token into logs or the final response.
-3. Confirm the app presents a phone address or pairing QR code. Explain that the Mac and phone must use the same trusted Wi-Fi and that macOS may request Local Network permission.
+2. Confirm the local dashboard, `/api/health`, and `/api/tasks` respond at `http://127.0.0.1:8787/` without a token or pairing cookie.
+3. Confirm the app presents a phone address and that its QR code contains that same plain LAN URL. Explain that scanning it opens the browser directly, the Mac and phone must use the same trusted Wi-Fi, and macOS may request Local Network permission.
 4. If verification fails, inspect the app's visible status and process output, attempt only safe in-scope fixes, and report the exact remaining blocker.
 
 Finish with a concise summary containing the installed version or commit, application path, local dashboard URL, delivery-skill status, test and signature results, and the single next action: scan the QR code from the Mac app. Do not claim remote internet access is configured.

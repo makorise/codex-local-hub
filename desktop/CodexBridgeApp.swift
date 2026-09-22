@@ -18,7 +18,6 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var serverProcess: Process?
     private var outputBuffer = ""
     private var bestAddressScore = -1
-    private var pairingAddress = ""
     private var shouldRestart = true
     private var restartAttempts = 0
     private var restartWorkItem: DispatchWorkItem?
@@ -82,7 +81,7 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         title.textColor = .white
         title.alignment = .center
 
-        let subtitle = NSTextField(wrappingLabelWithString: text("在同一 Wi-Fi 下扫描二维码，即可查看 Codex 任务、继续对话并接收图片结果。访问口令由程序自动管理。", "Scan the QR code on the same Wi-Fi to monitor Codex tasks, continue conversations, and review visual results. Access credentials are managed automatically."))
+        let subtitle = NSTextField(wrappingLabelWithString: text("Mac 与手机连接同一个可信 Wi-Fi，扫描二维码即可直接打开工作台。", "Keep your Mac and phone on the same trusted Wi-Fi, then scan the QR code to open the workspace directly."))
         subtitle.font = .systemFont(ofSize: 14, weight: .regular)
         subtitle.textColor = NSColor(calibratedWhite: 0.68, alpha: 1)
         subtitle.alignment = .center
@@ -213,7 +212,6 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         shouldRestart = true
         restartWorkItem?.cancel()
         bestAddressScore = -1
-        pairingAddress = ""
         outputBuffer = ""
         addressLabel.stringValue = text("正在获取局域网地址", "Finding your local network address")
         statusLabel.stringValue = text("正在启动本机服务…", "Starting the local service…")
@@ -230,6 +228,7 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         var environment = ProcessInfo.processInfo.environment
         environment["PORT"] = "8787"
         environment["HOST"] = "0.0.0.0"
+        environment["BRIDGE_REQUIRE_PAIRING"] = "0"
         environment["CODEX_BIN"] = "/Applications/ChatGPT.app/Contents/Resources/codex"
         process.environment = environment
 
@@ -270,17 +269,13 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 statusLabel.stringValue = text("服务运行中 · 任务正在实时同步", "Service online · tasks are syncing live")
                 statusDot.layer?.backgroundColor = NSColor.systemGreen.cgColor
             }
-            if let pairingMarker = line.range(of: "配对：") {
-                pairingAddress = String(line[pairingMarker.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-                qrImageView.image = makeQRCode(pairingAddress)
-                continue
-            }
             guard let marker = line.range(of: "手机：") else { continue }
             let address = String(line[marker.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
             let score = addressScore(address)
             if score > bestAddressScore {
                 bestAddressScore = score
                 addressLabel.stringValue = address
+                qrImageView.image = makeQRCode(address)
                 openButton.isEnabled = true
                 copyButton.isEnabled = true
             }
@@ -347,7 +342,7 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc private func copyAddress() {
         guard addressLabel.stringValue.hasPrefix("http") else { return }
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(pairingAddress.isEmpty ? addressLabel.stringValue : pairingAddress, forType: .string)
+        NSPasteboard.general.setString(addressLabel.stringValue, forType: .string)
         hintLabel.stringValue = text("已复制，在手机浏览器中粘贴打开", "Copied. Paste it into your phone browser")
     }
 

@@ -32,7 +32,7 @@ const tasks = [
     project: 'desktop-client',
     updatedAt: now - 240_000,
     activity: 'Queued',
-    latestTask: 'Validate pairing, local-network boundaries, and secret storage.',
+    latestTask: 'Validate direct LAN access, network boundaries, and task synchronization.',
     queuedCount: 1,
     progress: { state: 'queued', label: 'Queued', tone: 'violet' },
     goal: null,
@@ -104,7 +104,7 @@ const tasksZhCN = tasks.map((task, index) => ({
   activity: ['正在更新文件', '已排队', '已完成'][index],
   latestTask: [
     '完成响应式布局，检查无障碍体验，并准备发布截图。',
-    '检查设备配对、局域网边界和密钥存储。',
+    '检查局域网直连、网络边界和任务同步。',
     '说明安装方式和本地优先的工作原理。',
   ][index],
   progress: [

@@ -26,6 +26,20 @@ WHERE t.archived = 0 AND t.preview <> '' AND t.thread_source = 'user'
 ORDER BY t.is_pinned DESC, t.recency_at_ms DESC
 LIMIT 80;`;
 
+const BASIC_TASK_SQL = `
+SELECT t.id, t.name, t.title, t.preview, t.cwd, t.model, t.is_pinned,
+       t.updated_at_ms, t.recency_at_ms, t.rollout_path,
+       NULL AS project_name, NULL AS section_name,
+       0 AS queued_count, NULL AS queued_message,
+       NULL AS turn_status, NULL AS last_item_type, NULL AS last_activity_at,
+       NULL AS latest_user, NULL AS latest_assistant,
+       NULL AS goal_id, NULL AS goal_objective, NULL AS goal_status,
+       NULL AS goal_time_used_seconds
+FROM threads t
+WHERE t.archived = 0 AND t.preview <> '' AND t.thread_source = 'user'
+ORDER BY t.is_pinned DESC, t.recency_at_ms DESC
+LIMIT 80;`;
+
 export class CodexRepository {
   constructor({
     stateDb,
@@ -52,7 +66,13 @@ export class CodexRepository {
 
   async listTasks() {
     const attach = `ATTACH DATABASE '${escapeSqlite(this.queueDb)}' AS queue_db; ATTACH DATABASE '${escapeSqlite(this.historyDb)}' AS history_db; ATTACH DATABASE '${escapeSqlite(this.goalsDb)}' AS goal_db; ${TASK_SQL}`;
-    const { stdout } = await this.execFile('sqlite3', ['-json', this.stateDb, attach], { maxBuffer: 8 * 1024 * 1024 });
+    let stdout;
+    try {
+      ({ stdout } = await this.execFile('sqlite3', ['-json', this.stateDb, attach], { maxBuffer: 8 * 1024 * 1024 }));
+    } catch (error) {
+      if (!isOptionalDataUnavailable(error)) throw error;
+      ({ stdout } = await this.execFile('sqlite3', ['-json', this.stateDb, BASIC_TASK_SQL], { maxBuffer: 8 * 1024 * 1024 }));
+    }
     const rows = stdout.trim() ? JSON.parse(stdout) : [];
     const tasks = rows.map((row) => {
       const task = presentTask(row, {}, this.now());
@@ -72,14 +92,26 @@ export class CodexRepository {
 
   async loadMessages(threadId) {
     const sql = `SELECT created_at_ms, item_type, item_json, 0 AS pending FROM thread_items WHERE thread_id = '${escapeSqlite(threadId)}' AND item_type IN ('userMessage', 'agentMessage') ORDER BY rollout_ordinal DESC LIMIT 24;`;
-    const { stdout } = await this.execFile('sqlite3', ['-json', this.historyDb, sql], { maxBuffer: 4 * 1024 * 1024 });
+    let stdout;
+    try {
+      ({ stdout } = await this.execFile('sqlite3', ['-json', this.historyDb, sql], { maxBuffer: 4 * 1024 * 1024 }));
+    } catch (error) {
+      if (isOptionalDataUnavailable(error)) return [];
+      throw error;
+    }
     const rows = stdout.trim() ? JSON.parse(stdout) : [];
     return rows.reverse().map(parseHistoryMessage).filter(Boolean).slice(-20);
   }
 
   async loadQueuedTasks(threadId) {
     const sql = `SELECT qi.id AS queue_item_id, qi.created_at_ms, qi.queue_order, COALESCE(qr.revision, 0) AS queue_revision, 'queuedMessage' AS item_type, qi.payload_json AS item_json, 1 AS pending FROM queued_items qi LEFT JOIN queued_thread_revisions qr ON qr.thread_id = qi.thread_id WHERE qi.thread_id = '${escapeSqlite(threadId)}' ORDER BY qi.queue_order ASC LIMIT 50;`;
-    const { stdout } = await this.execFile('sqlite3', ['-json', this.queueDb, sql], { maxBuffer: 2 * 1024 * 1024 });
+    let stdout;
+    try {
+      ({ stdout } = await this.execFile('sqlite3', ['-json', this.queueDb, sql], { maxBuffer: 2 * 1024 * 1024 }));
+    } catch (error) {
+      if (isOptionalDataUnavailable(error)) return [];
+      throw error;
+    }
     const rows = stdout.trim() ? JSON.parse(stdout) : [];
     return rows.map(parseHistoryMessage).filter(Boolean);
   }
@@ -149,7 +181,12 @@ SELECT valid FROM mutation_guard;`;
 
   async sendMessage(threadId, message) {
     const activeSql = `SELECT turn_id FROM thread_turns WHERE thread_id = '${escapeSqlite(threadId)}' AND status = 'inProgress' ORDER BY rollout_ordinal DESC LIMIT 1;`;
-    const { stdout: activeOutput = '' } = await this.execFile('sqlite3', ['-json', this.historyDb, activeSql], { maxBuffer: 1024 * 1024 });
+    let activeOutput = '';
+    try {
+      ({ stdout: activeOutput = '' } = await this.execFile('sqlite3', ['-json', this.historyDb, activeSql], { maxBuffer: 1024 * 1024 }));
+    } catch (error) {
+      if (!isOptionalDataUnavailable(error)) throw error;
+    }
     const activeTurn = activeOutput.trim() ? JSON.parse(activeOutput)[0]?.turn_id : null;
     if (!activeTurn) {
       try {
@@ -199,4 +236,10 @@ export function parseHistoryMessage(row) {
 
 export function escapeSqlite(value) {
   return String(value).replaceAll("'", "''");
+}
+
+export function isOptionalDataUnavailable(error) {
+  const detail = `${error?.message || ''}\n${error?.stderr || ''}`;
+  return /no such table: (?:queue_db\.|history_db\.|goal_db\.|main\.)?(?:queued_items|queued_thread_revisions|thread_turns|thread_items|thread_goals|projects|thread_sections)\b/i.test(detail)
+    || /unable to open database(?: file)?/i.test(detail);
 }

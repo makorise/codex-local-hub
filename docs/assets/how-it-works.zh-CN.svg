@@ -63,11 +63,11 @@
       <circle cx="126" cy="65" r="7" fill="url(#green)"/>
       <path d="M126 13v14m0 76v14M74 65H60m132 0h-14M89 28l10 10m54 54 10 10m0-74-10 10M99 92l-10 10" stroke="#7990b0" stroke-width="2" stroke-linecap="round"/>
       <text x="0" y="144" fill="#f2f5fb" font-size="19" font-weight="700">通过局域网同步</text>
-      <text x="0" y="178" fill="#9aa6ba" font-size="14.5">经过配对的接口和实时事件</text>
+      <text x="0" y="178" fill="#9aa6ba" font-size="14.5">局域网接口和实时事件</text>
       <text x="0" y="202" fill="#9aa6ba" font-size="14.5">会在状态变化时刷新手机</text>
       <text x="0" y="226" fill="#9aa6ba" font-size="14.5">工作台。</text>
       <rect x="0" y="252" width="156" height="28" rx="14" fill="#5fe2ac" fill-opacity=".09" stroke="#5fe2ac" stroke-opacity=".18"/>
-      <text x="14" y="271" fill="#8ee9c3" font-size="12" font-weight="650">配对设备会话</text>
+      <text x="14" y="271" fill="#8ee9c3" font-size="12" font-weight="650">可信局域网网址</text>
     </g>
 
     <g transform="translate(1017 166)">

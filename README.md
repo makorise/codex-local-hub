@@ -35,9 +35,9 @@ Continue with $setup-codex-local-hub from the last verified setup stage. Reuse t
 ### 1. Start the host on your Mac
 
 <p align="center">
-  <img src="docs/assets/screenshots/mac-host.en.png" width="720" alt="Codex Local Hub macOS host app showing service status, safe pairing placeholder, LAN address, and launch controls">
+  <img src="docs/assets/screenshots/mac-host.en.png" width="720" alt="Codex Local Hub macOS host app showing service status, a demo QR code, LAN address, and launch controls">
 </p>
-<p align="center"><strong>Mac host app</strong> — start the local service, pair the phone, and open the dashboard</p>
+<p align="center"><strong>Mac host app</strong> — start the local service, scan the LAN URL, and open the dashboard</p>
 
 ### 2. See every task at a glance
 
@@ -66,18 +66,18 @@ Continue with $setup-codex-local-hub from the last verified setup stage. Reuse t
   </tr>
 </table>
 
-These are real product-interface screenshots with sanitized demo data. The active pairing QR code and private LAN address in the host screenshot were replaced with a non-scannable placeholder and example address; no private task content or credential is included.
+These are real product-interface screenshots with sanitized demo data. The working QR code and private LAN address in the host screenshot were replaced with a non-scannable placeholder and example address; no private task content is included.
 
 ## How it works
 
 ![Architecture diagram showing how Codex Local Hub is installed on a Mac, reads local Codex state, synchronizes over local Wi-Fi, and supports two-way control from a phone](docs/assets/how-it-works.svg)
 
-1. **Install the host app.** The native macOS wrapper starts its bundled Node.js service on the Mac and shows the phone address and a one-time pairing QR code.
+1. **Install the host app.** The native macOS wrapper starts its bundled Node.js service on the Mac and shows a QR code containing the plain phone address.
 2. **Read local Codex data.** The service reads task, project, queue, goal, usage, and recent visible-message state from the local `~/.codex` databases. It uses the Codex CLI and app-server control channel for resume, queue, and steer actions; it does not scrape the ChatGPT web interface.
-3. **Synchronize on the LAN.** After QR pairing, the phone receives an HttpOnly session cookie. Authenticated JSON endpoints provide current state, while server-sent events refresh the dashboard when work changes.
+3. **Synchronize on the LAN.** Scanning the QR code opens the dashboard directly. JSON endpoints provide current state, while server-sent events refresh it when work changes.
 4. **Control work from the phone.** Prompts and queue actions travel back to the Mac, where they are delivered to the selected Codex task. The service keeps only a small recent view for monitoring instead of building a second full chat archive.
 
-The current release is local-network only. The data path stays between the Mac and paired devices on the same trusted Wi-Fi; no hosted Codex Local Hub relay is involved.
+The current release is local-network only. The data path stays between the Mac and devices on the same trusted Wi-Fi; no hosted Codex Local Hub relay is involved.
 
 ## Why Codex Local Hub?
 
@@ -156,15 +156,14 @@ Then:
 
 Use `npm start` for the browser-only development server. Use `npm run package:mac` to create a self-contained universal DMG.
 
-The default port is `8787`. Environment overrides include `PORT`, `HOST`, `BRIDGE_TOKEN`, `CODEX_BIN`, `CODEX_TASK_DESK_INBOX`, and `CODEX_TASK_DESK_OUTBOX`.
+The default port is `8787`. Environment overrides include `PORT`, `HOST`, `BRIDGE_REQUIRE_PAIRING`, `BRIDGE_TOKEN`, `CODEX_BIN`, `CODEX_TASK_DESK_INBOX`, and `CODEX_TASK_DESK_OUTBOX`.
 
 ## Security and privacy
 
 - The dashboard is designed for a **trusted local network**.
-- A random 256-bit secret is generated and stored with owner-only permissions.
-- New phones pair through the QR code; visiting the bare LAN URL does not authorize a new device.
-- API access uses an HttpOnly, SameSite cookie.
-- The URL shown after pairing contains no token.
+- The default QR code contains the plain LAN URL and opens the dashboard directly—there is no token for users to copy or manage.
+- Anyone who can reach the Mac on that trusted LAN can use the dashboard, including its control actions. Use it only on a network you trust.
+- Advanced browser-only deployments can opt into the legacy cookie gate with `BRIDGE_REQUIRE_PAIRING=1`; a random 256-bit secret is then stored with owner-only permissions.
 - Raw chain-of-thought, hidden reasoning, and complete conversation archives are not exposed.
 - Do **not** forward port `8787` directly to the public internet.
 
