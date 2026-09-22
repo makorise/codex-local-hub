@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-2563eb.svg)](LICENSE)
 [![CI](https://github.com/brandonwang001/codex-local-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/brandonwang001/codex-local-hub/actions/workflows/ci.yml)
 ![macOS 15+](https://img.shields.io/badge/macOS-15%2B-111827.svg)
-![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-16a34a.svg)
+![Node.js 22.22.2+](https://img.shields.io/badge/Node.js-22.22.2%2B-16a34a.svg)
 ![Test coverage](https://img.shields.io/badge/coverage-100%25-16a34a.svg)
 
 [简体中文](README.zh-CN.md) · English
@@ -127,7 +127,7 @@ Keep Codex Local Hub running. The image appears in **Delivery inbox** on the nex
 ## Requirements
 
 - macOS 15 or newer
-- Node.js 22 or newer when building from source; release DMGs bundle Node.js 24 LTS
+- Node.js 22.22.2 or newer when building from source; the installed app bundles isolated Apple silicon and Intel runtimes
 - Codex available through the ChatGPT desktop installation and local `~/.codex` state
 - A phone and Mac connected to the same trusted Wi-Fi network
 
@@ -135,7 +135,7 @@ Keep Codex Local Hub running. The image appears in **Delivery inbox** on the nex
 
 For most users, the **Install with one message to Codex** flow near the top of this README is the recommended path.
 
-The first public notarized DMG is being prepared. Until it is available in GitHub Releases, build from source using the development steps below. Future release DMGs will include Node.js for Apple silicon and Intel Macs, so end users will not need Node.js or Terminal. See the [installation guide](docs/INSTALL.md) and [macOS compatibility matrix](docs/COMPATIBILITY.md).
+The first public notarized DMG is being prepared. Until it is available in GitHub Releases, the one-message setup builds from source with the user's existing Node.js 22.22.2+. It checks the version but never installs, upgrades, relinks, or changes that Node environment. The built app contains its own Apple silicon and Intel runtimes. See the [installation guide](docs/INSTALL.md) and [macOS compatibility matrix](docs/COMPATIBILITY.md).
 
 For development:
 
@@ -143,9 +143,11 @@ For development:
 git clone https://github.com/brandonwang001/codex-local-hub.git
 cd codex-local-hub
 npm install
-npm run build:mac
+BUNDLE_NODE=1 npm run build:mac
 open "dist/Codex Local Hub.app"
 ```
+
+The build uses the current Node.js only for repository-local install, tests, and compilation. It does not install global packages or change the developer's Node configuration; the resulting app runs with its own bundled Node.js.
 
 Then:
 

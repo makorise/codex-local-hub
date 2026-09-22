@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-2563eb.svg)](LICENSE)
 [![CI](https://github.com/brandonwang001/codex-local-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/brandonwang001/codex-local-hub/actions/workflows/ci.yml)
 ![macOS 15+](https://img.shields.io/badge/macOS-15%2B-111827.svg)
-![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-16a34a.svg)
+![Node.js 22.22.2+](https://img.shields.io/badge/Node.js-22.22.2%2B-16a34a.svg)
 ![测试覆盖率](https://img.shields.io/badge/coverage-100%25-16a34a.svg)
 
 Codex Local Hub 是一个开源的 **Codex 手机控制台、任务监控器和 macOS 远程助手**。打开 Mac 客户端，扫描二维码，即可在同一局域网内查看任务进度、最近对话、长程目标和图片交付结果，并从手机继续发送提示词。
@@ -128,19 +128,21 @@ Codex 通常会自动发现新 Skill；如果没有出现，请重启 Codex。�
 
 对大多数用户，推荐直接使用 README 开头的“复制一句话，让 Codex 完成安装”。
 
-首个经过 Apple 公证的公开 DMG 正在准备中。在 GitHub Releases 提供之前，请先按照下面的开发者步骤从源码构建。未来发布包会内置 Apple Silicon 与 Intel 版本的 Node.js，普通用户不需要单独安装 Node 或打开终端。详细说明见[安装指南](docs/INSTALL.md)和[兼容性说明](docs/COMPATIBILITY.md)。
+首个经过 Apple 公证的公开 DMG 正在准备中。在 GitHub Releases 提供之前，一句话安装会使用用户电脑上已有的 Node.js 22.22.2+ 从源码构建。它只检查版本，不会安装、升级、重连或修改原有 Node 环境；编译出的 App 会内置 Apple Silicon 与 Intel 版 Node.js。详细说明见[安装指南](docs/INSTALL.md)和[兼容性说明](docs/COMPATIBILITY.md)。
 
 开发者构建：
 
-环境要求：macOS 15+、Node.js 22+、本机已安装并使用 Codex。
+环境要求：macOS 15+、Node.js 22.22.2+、本机已安装并使用 Codex。Node 只用于源码编译，安装后的程序会使用自己内置的运行时。
 
 ```bash
 git clone https://github.com/brandonwang001/codex-local-hub.git
 cd codex-local-hub
 npm install
-npm run build:mac
+BUNDLE_NODE=1 npm run build:mac
 open "dist/Codex Local Hub.app"
 ```
+
+编译过程只在仓库内安装依赖和生成产物，不安装全局 npm 包，也不修改 Shell、包管理器、普通 `node` 命令或开发者原有项目。生成的 App 运行时使用自己的内置 Node.js。
 
 然后让手机与 Mac 连接同一个可信 Wi-Fi，使用相机扫描 Mac 程序里的二维码即可。二维码内容就是普通局域网网址，扫描后直接用浏览器打开，不需要输入或管理 Token。
 

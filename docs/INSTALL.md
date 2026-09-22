@@ -10,7 +10,7 @@ The public release should be a universal, Developer ID-signed, Apple-notarized D
 4. Open the app and allow Local Network access when macOS asks.
 5. Scan the QR code with your phone while both devices use the same Wi-Fi.
 
-The release DMG bundles Node.js for both Apple silicon and Intel Macs. End users do not install Node.js and do not use Terminal.
+The release DMG bundles isolated Node.js runtimes for both Apple silicon and Intel Macs. End users do not install Node.js and do not use Terminal. The app chooses its bundled runtime first and never replaces, relinks, or configures a developer's existing Node installation.
 
 ## Why DMG instead of PKG?
 
@@ -20,11 +20,13 @@ Codex Local Hub is a user-level app. It does not install system extensions, priv
 
 ```bash
 npm install
-npm run build:mac
+BUNDLE_NODE=1 npm run build:mac
 open "dist/Codex Local Hub.app"
 ```
 
-This development build may use the locally installed Node.js runtime. To produce the self-contained installer:
+Source builds use the developer's existing Node.js 22.22.2+ only for repository-local dependency installation, tests, and compilation. The setup does not install or upgrade Node, change shell startup files or the persistent `PATH`, or touch global npm packages. The resulting app contains its own runtimes and does not depend on that build toolchain.
+
+To produce the self-contained installer:
 
 ```bash
 npm run package:mac

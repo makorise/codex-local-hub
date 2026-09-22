@@ -8,6 +8,8 @@ All notable changes to Codex Local Hub will be documented in this file.
 - Fixed `401` responses for task synchronization and server-sent events when opening the displayed phone address.
 - Added graceful task-list and recent-message fallbacks when optional Codex databases have not been initialized yet.
 - Made optional delivery-skill validation dependencies non-blocking during one-message installation.
+- Source setup now uses the developer's existing Node.js without installing, upgrading, relinking, or changing global packages; the built app still carries isolated runtimes for both Mac architectures.
+- Removed the unused `ws` package and made CI verify that distributable app artifacts contain both bundled Node.js runtimes.
 - Increased the test suite to 36 tests while retaining 100% line, branch, and function coverage.
 
 ## 0.2.0 - 2026-09-22

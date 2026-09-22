@@ -24,12 +24,9 @@
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=100 --test-coverage-include=src/control.mjs --test-coverage-include=src/core.mjs --test-coverage-include=src/deliveries.mjs --test-coverage-include=src/rollout.mjs --test-coverage-include=src/repository.mjs --test-coverage-include=src/server.mjs --test-coverage-include=src/usage.mjs --test-coverage-include=public/app.js --test-coverage-include=public/i18n.js"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.2"
   },
   "devDependencies": {
     "jsdom": "^30.1.0"
-  },
-  "dependencies": {
-    "ws": "^8.21.3"
   }
 }

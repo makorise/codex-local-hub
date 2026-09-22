@@ -29,7 +29,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run build:mac
+      - run: BUNDLE_NODE=1 npm run build:mac
+      - run: test -x "dist/Codex Local Hub.app/Contents/Resources/runtime/node-arm64"
+      - run: test -x "dist/Codex Local Hub.app/Contents/Resources/runtime/node-x64"
       - run: lipo -info "dist/Codex Local Hub.app/Contents/MacOS/CodexLocalHub"
       - run: codesign --verify --deep --strict --verbose=2 "dist/Codex Local Hub.app"
       - uses: actions/upload-artifact@v7

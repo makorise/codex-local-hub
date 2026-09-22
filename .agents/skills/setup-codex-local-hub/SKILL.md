@@ -27,10 +27,12 @@ For a release build, mount the DMG, copy `Codex Local Hub.app` into `/Applicatio
 
 For a source build:
 
-1. Require Git, Xcode Command Line Tools with `swiftc`, and Node.js 22 or newer. If one is absent, install it only through an already available trusted package manager or report the single concrete blocker that needs user action.
-2. Run `npm ci`, `npm run test:coverage`, and `BUNDLE_NODE=1 npm run build:mac` from the selected checkout.
+1. Require Git, Xcode Command Line Tools with `swiftc`, and the user's existing Node.js 22.22.2 or newer. Inspect the current `node` path and version without changing it. If Node is absent or incompatible, report that single blocker instead of installing, upgrading, relinking, uninstalling, or globally configuring Node.js, npm, Homebrew, nvm, Volta, asdf, or the user's shell profile.
+2. Run `npm ci`, `npm run test:coverage`, and `BUNDLE_NODE=1 npm run build:mac` from the selected checkout. These commands may create only repository-local dependencies and build output; do not install global npm packages.
 3. Verify the built application with `codesign --verify --deep --strict` and confirm the executable contains both `arm64` and `x86_64` slices using `lipo -info`.
 4. Install the verified app into `/Applications` when writable or `~/Applications` otherwise. If an older app is present, quit it cleanly and move it to a timestamped sibling backup before replacing it. Do not remove the backup until the replacement launches successfully.
+
+The installed application must contain its own official Node runtime for both Apple silicon and Intel. The app always selects its bundled architecture-specific runtime before looking at any system path, so launching Codex Local Hub must not depend on or alter the user's development toolchain. Confirm that the user's original `node` path and version are unchanged afterward.
 
 Do not bypass a failed security check with `xattr`, `spctl --master-disable`, ad-hoc trust changes, or similar workarounds. A locally built app may use the repository's ad-hoc signature; a downloaded release must pass normal Gatekeeper assessment.
 

@@ -12,6 +12,7 @@
 
 - The app executable is a universal Mach-O containing `arm64` and `x86_64` slices.
 - The DMG bundles separate official Node.js 24 LTS runtimes for Apple silicon and Intel.
+- Bundled runtimes are private to the application; existing Homebrew, nvm, Volta, asdf, system Node.js, and global npm packages are neither modified nor used at runtime.
 - `NSLocalNetworkUsageDescription` is localized for macOS local-network privacy prompts.
 - Release builds use hardened runtime, Developer ID signing, Apple notarization, and stapling.
 - CI builds and validates the app on the GitHub `macos-15` runner.
