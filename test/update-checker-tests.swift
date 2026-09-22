@@ -100,9 +100,11 @@ struct UpdateCheckerTests {
         StubURLProtocol.handler = { _ in
             (HTTPURLResponse(url: endpoint, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
         }
-        if case .upToDate = waitForCheck(checker, force: true) { expect(true, "404 means there is no published stable release") }
-        else { expect(false, "404 should be treated as up to date") }
+        if case .noRelease = waitForCheck(checker, force: true) { expect(true, "404 means there is no published stable release") }
+        else { expect(false, "404 should be shown as no published stable release") }
         expect(checker.cachedUpdate() == nil, "clears a stale cached update after a successful no-release response")
+        if case .noRelease = waitForCheck(checker) { expect(true, "remembers the no-release state during the daily throttle") }
+        else { expect(false, "throttled checks should preserve the no-release state") }
 
         StubURLProtocol.handler = { _ in throw URLError(.notConnectedToInternet) }
         if case .failed = waitForCheck(checker, force: true) { expect(true, "offline failures are reported without changing versions") }

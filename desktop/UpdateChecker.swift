@@ -73,6 +73,7 @@ private struct GitHubReleasePayload: Decodable {
 enum UpdateCheckResult {
     case available(UpdateRelease)
     case upToDate
+    case noRelease
     case skipped(UpdateRelease?)
     case failed(String)
 }
@@ -91,6 +92,7 @@ final class GitHubUpdateChecker {
         static let installerURL = "CodexLocalHubUpdateInstallerURL"
         static let installerName = "CodexLocalHubUpdateInstallerName"
         static let installerSHA256 = "CodexLocalHubUpdateInstallerSHA256"
+        static let noStableRelease = "CodexLocalHubNoStableRelease"
     }
 
     private let currentVersion: SemanticVersion
@@ -165,7 +167,9 @@ final class GitHubUpdateChecker {
     func check(force: Bool = false, completion: @escaping (UpdateCheckResult) -> Void) {
         let checkedAt = defaults.object(forKey: Key.checkedAt) as? Date
         guard Self.shouldCheck(lastCheckedAt: checkedAt, now: now(), force: force) else {
-            completion(.skipped(cachedUpdate()))
+            if let cached = cachedUpdate() { completion(.skipped(cached)) }
+            else if defaults.bool(forKey: Key.noStableRelease) { completion(.noRelease) }
+            else { completion(.skipped(nil)) }
             return
         }
 
@@ -185,8 +189,8 @@ final class GitHubUpdateChecker {
                 return
             }
             if response.statusCode == 404 {
-                self.recordSuccessfulCheck(update: nil)
-                completion(.upToDate)
+                self.recordSuccessfulCheck(update: nil, noStableRelease: true)
+                completion(.noRelease)
                 return
             }
             guard (200..<300).contains(response.statusCode), let data else {
@@ -194,13 +198,14 @@ final class GitHubUpdateChecker {
                 return
             }
             let update = Self.release(from: data, currentVersion: self.currentVersion)
-            self.recordSuccessfulCheck(update: update)
+            self.recordSuccessfulCheck(update: update, noStableRelease: false)
             completion(update.map(UpdateCheckResult.available) ?? .upToDate)
         }.resume()
     }
 
-    private func recordSuccessfulCheck(update: UpdateRelease?) {
+    private func recordSuccessfulCheck(update: UpdateRelease?, noStableRelease: Bool) {
         defaults.set(now(), forKey: Key.checkedAt)
+        defaults.set(noStableRelease, forKey: Key.noStableRelease)
         if let update {
             defaults.set(update.version, forKey: Key.version)
             defaults.set(update.pageURL.absoluteString, forKey: Key.pageURL)

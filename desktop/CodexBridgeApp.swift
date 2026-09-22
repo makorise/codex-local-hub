@@ -458,6 +458,9 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 case .upToDate:
                     self.availableUpdate = nil
                     self.showUpToDateState()
+                case .noRelease:
+                    self.availableUpdate = nil
+                    self.showNoReleaseState()
                 case .failed:
                     if self.availableUpdate == nil { self.showUpdateCheckFailed() }
                 }
@@ -509,6 +512,13 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let version = coreStore.effectiveVersion()
         versionLabel.stringValue = text("当前 v\(version) · 暂时无法获取最新版本", "Current v\(version) · latest version unavailable")
         updateButton.title = text("重试检查更新", "Retry update check")
+        updateButton.isEnabled = true
+    }
+
+    private func showNoReleaseState() {
+        let version = coreStore.effectiveVersion()
+        versionLabel.stringValue = text("当前 v\(version) · 暂无已发布的正式版", "Current v\(version) · no stable release published")
+        updateButton.title = text("重新检查更新", "Check again")
         updateButton.isEnabled = true
     }
 
