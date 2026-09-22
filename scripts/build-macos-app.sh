@@ -14,14 +14,19 @@ runtime_dir="$resources_dir/runtime"
 
 mkdir -p "$contents_dir/MacOS" "$server_dir/src" "$server_dir/public" "$iconset_dir" "$dist_dir"
 cp "$project_dir/desktop/Info.plist" "$contents_dir/Info.plist"
+package_version="$(cd "$project_dir" && node -p "require('./package.json').version")"
+version_parts=("${(@s:.:)package_version}")
+bundle_version=$((version_parts[1] * 10000 + version_parts[2] * 100 + version_parts[3]))
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $package_version" "$contents_dir/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $bundle_version" "$contents_dir/Info.plist"
 for localization in "$project_dir/desktop/"*.lproj; do
   [[ -d "$localization" ]] && /bin/cp -R "$localization" "$resources_dir/"
 done
 cp "$project_dir/src/"*.mjs "$server_dir/src/"
 cp "$project_dir/public/"* "$server_dir/public/"
 
-/usr/bin/swiftc -parse-as-library -O -target arm64-apple-macos13 -framework AppKit -framework CoreImage "$project_dir/desktop/CodexBridgeApp.swift" -o "$stage_dir/CodexLocalHub-arm64"
-/usr/bin/swiftc -parse-as-library -O -target x86_64-apple-macos13 -framework AppKit -framework CoreImage "$project_dir/desktop/CodexBridgeApp.swift" -o "$stage_dir/CodexLocalHub-x64"
+/usr/bin/swiftc -parse-as-library -O -target arm64-apple-macos13 -framework AppKit -framework CoreImage -framework CryptoKit "$project_dir/desktop/UpdateChecker.swift" "$project_dir/desktop/CoreUpdateManager.swift" "$project_dir/desktop/CodexBridgeApp.swift" -o "$stage_dir/CodexLocalHub-arm64"
+/usr/bin/swiftc -parse-as-library -O -target x86_64-apple-macos13 -framework AppKit -framework CoreImage -framework CryptoKit "$project_dir/desktop/UpdateChecker.swift" "$project_dir/desktop/CoreUpdateManager.swift" "$project_dir/desktop/CodexBridgeApp.swift" -o "$stage_dir/CodexLocalHub-x64"
 /usr/bin/lipo -create "$stage_dir/CodexLocalHub-arm64" "$stage_dir/CodexLocalHub-x64" -output "$contents_dir/MacOS/CodexLocalHub"
 /usr/bin/swiftc -O -framework AppKit "$project_dir/desktop/IconGenerator.swift" -o "$stage_dir/icon-generator"
 "$stage_dir/icon-generator" "$stage_dir/icon-1024.png"

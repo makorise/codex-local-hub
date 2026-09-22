@@ -29,6 +29,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: zsh scripts/test-macos-update.sh
       - run: BUNDLE_NODE=1 npm run build:mac
       - run: test -x "dist/Codex Local Hub.app/Contents/Resources/runtime/node-arm64"
       - run: test -x "dist/Codex Local Hub.app/Contents/Resources/runtime/node-x64"

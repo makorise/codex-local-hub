@@ -24,6 +24,12 @@ Use $skill-installer to install the setup skill from https://github.com/brandonw
 
 This one message asks Codex to install the reusable [`setup-codex-local-hub`](.agents/skills/setup-codex-local-hub) skill and immediately complete the setup. The skill keeps Gatekeeper enabled, preserves existing files, runs the test suite, verifies the application, installs the companion image-delivery skill, and stops instead of exposing the service to the public internet.
 
+If the source repository already exists on the Mac, use this shorter follow-up; the same skill will preserve changes and choose an in-place source upgrade or a clean fallback checkout:
+
+```text
+Use $setup-codex-local-hub to update my existing Codex Local Hub source checkout and installed app. Fast-forward only if the checkout is clean; preserve every local change, run the full test suite, build the self-contained universal app, back up the installed version, replace it, relaunch it, and verify phone access. Do not ask me to download an installer manually.
+```
+
 If Codex reports that the selected model is at capacity, wait while the task is still working. If it stops, choose another available model and send this in the same task:
 
 ```text
@@ -136,6 +142,10 @@ Keep Codex Local Hub running. The image appears in **Delivery inbox** on the nex
 For most users, the **Install with one message to Codex** flow near the top of this README is the recommended path.
 
 The first public notarized DMG is being prepared. Until it is available in GitHub Releases, the one-message setup builds from source with the user's existing Node.js 22.22.2+. It checks the version but never installs, upgrades, relinks, or changes that Node environment. The built app contains its own Apple silicon and Intel runtimes. See the [installation guide](docs/INSTALL.md) and [macOS compatibility matrix](docs/COMPATIBILITY.md).
+
+The Mac app checks the latest stable GitHub Release at most once per day—no Codex Local Hub update server is required. A strictly newer version normally installs as a small, checksum-verified core hot update containing only the local service and web UI. The app switches versions atomically, restarts the service, and rolls back automatically if the new core cannot start. A full universal DMG is used only when the native Mac host must change. Drafts, prereleases, equal versions, and downgrades are ignored. **Check for updates** also supports a manual refresh.
+
+If you want Codex to perform a full install or host upgrade without manually downloading anything, use the same setup skill shown above. It prefers a notarized release package and can also safely fast-forward an existing clean source checkout, run all tests, rebuild, back up the installed app, replace it, and verify phone access. Local source changes are never overwritten.
 
 For development:
 

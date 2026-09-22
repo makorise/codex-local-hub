@@ -2,6 +2,18 @@
 
 All notable changes to Codex Local Hub will be documented in this file.
 
+## 0.2.2 - 2026-09-22
+
+- Added a native macOS update checker that checks GitHub Releases at most once every 24 hours.
+- Added semantic-version protection against reinstalling the same version or downgrading.
+- Added checksum-verified core hot updates for the Node service and web UI, stored outside the signed app bundle and switched atomically.
+- Added automatic rollback to the previous core when a newly activated service cannot start.
+- Added a visible update button and one-time prompt; updates prefer the small core package and fall back to the full DMG only when the native host must change.
+- Added an always-visible version line showing the current version, latest status, and `current → new` comparison before the user upgrades.
+- Added cached update availability, manual checks, six-hour wake-up polling, and offline-safe failure handling.
+- Added a tag-driven GitHub Release workflow that publishes both core and universal-DMG assets: unsigned builds become prereleases, while Developer ID credentials produce notarized stable releases.
+- Added macOS update-checker and core activation tests alongside the existing 100% JavaScript coverage gate.
+
 ## 0.2.1 - 2026-09-22
 
 - Changed the default QR code to the plain LAN URL so phones open the dashboard directly without pairing or token management.

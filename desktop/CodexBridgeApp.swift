@@ -7,11 +7,47 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private static var retainedDelegate: CodexBridgeApp?
 
     static func main() {
+        if runCommandLineMode() { return }
         let delegate = CodexBridgeApp()
         retainedDelegate = delegate
         let application = NSApplication.shared
         application.delegate = delegate
         application.run()
+    }
+
+    private static func runCommandLineMode() -> Bool {
+        let arguments = CommandLine.arguments
+        guard arguments.count > 1 else { return false }
+        let hostVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
+        let store = CoreUpdateStore(hostVersion: hostVersion)
+        switch arguments[1] {
+        case "--effective-version":
+            print(store.effectiveVersion())
+            return true
+        case "--restore-bundled-core":
+            store.restore(directoryName: nil)
+            print(hostVersion)
+            return true
+        case "--install-core-update":
+            guard arguments.count == 5 else {
+                fputs("Usage: CodexLocalHub --install-core-update <archive.zip> <version> <sha256>\n", stderr)
+                exit(64)
+            }
+            do {
+                let activation = try store.install(
+                    archive: URL(fileURLWithPath: arguments[2]),
+                    expectedVersion: arguments[3],
+                    expectedSHA256: arguments[4]
+                )
+                print(activation.version)
+                return true
+            } catch {
+                fputs("Core update failed: \(error.localizedDescription)\n", stderr)
+                exit(1)
+            }
+        default:
+            return false
+        }
     }
 
     private var window: NSWindow!
@@ -21,6 +57,14 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var shouldRestart = true
     private var restartAttempts = 0
     private var restartWorkItem: DispatchWorkItem?
+    private var updateTimer: Timer?
+    private var availableUpdate: UpdateRelease?
+    private var updateChecker: GitHubUpdateChecker!
+    private var pendingCoreActivation: CoreActivation?
+    private var isSwitchingCore = false
+    private var coreStartupWorkItem: DispatchWorkItem?
+    private lazy var hostVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
+    private lazy var coreStore = CoreUpdateStore(hostVersion: hostVersion)
 
     private var isChinese: Bool { Locale.preferredLanguages.first?.lowercased().hasPrefix("zh") == true }
     private func text(_ zh: String, _ en: String) -> String { isChinese ? zh : en }
@@ -33,11 +77,14 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let openButton = NSButton(title: "", target: nil, action: nil)
     private let copyButton = NSButton(title: "", target: nil, action: nil)
     private let toggleButton = NSButton(title: "", target: nil, action: nil)
+    private let updateButton = NSButton(title: "", target: nil, action: nil)
+    private let versionLabel = NSTextField(labelWithString: "")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         buildWindow()
         startServer()
+        configureUpdateChecks()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -47,6 +94,8 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         shouldRestart = false
         restartWorkItem?.cancel()
+        coreStartupWorkItem?.cancel()
+        updateTimer?.invalidate()
         stopServer()
     }
 
@@ -93,6 +142,11 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         openButton.title = text("在 Mac 上打开", "Open on this Mac")
         copyButton.title = text("复制手机地址", "Copy phone address")
         toggleButton.title = text("停止服务", "Stop service")
+        updateButton.title = text("检查是否有新版本", "Check for a new version")
+        versionLabel.stringValue = text("当前版本 v\(coreStore.effectiveVersion())", "Current version v\(coreStore.effectiveVersion())")
+        versionLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        versionLabel.textColor = NSColor(calibratedWhite: 0.62, alpha: 1)
+        versionLabel.alignment = .center
 
         statusDot.wantsLayer = true
         statusDot.layer?.cornerRadius = 5
@@ -142,6 +196,7 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         configurePrimaryButton(copyButton, action: #selector(copyAddress))
         configureSecondaryButton(openButton, action: #selector(openDashboard))
         configureSecondaryButton(toggleButton, action: #selector(toggleServer))
+        configureSecondaryButton(updateButton, action: #selector(checkForUpdatesManually))
         openButton.isEnabled = false
         copyButton.isEnabled = false
 
@@ -156,7 +211,7 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         footer.alignment = .center
         footer.maximumNumberOfLines = 2
 
-        let stack = NSStackView(views: [badge, title, subtitle, statusRow, addressCard, mainActions, toggleButton, footer])
+        let stack = NSStackView(views: [badge, title, subtitle, statusRow, addressCard, mainActions, toggleButton, versionLabel, updateButton, footer])
         stack.orientation = .vertical
         stack.spacing = 15
         stack.alignment = .centerX
@@ -183,6 +238,8 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
             mainActions.heightAnchor.constraint(equalToConstant: 42),
             toggleButton.widthAnchor.constraint(equalTo: stack.widthAnchor),
             toggleButton.heightAnchor.constraint(equalToConstant: 38),
+            updateButton.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            updateButton.heightAnchor.constraint(equalToConstant: 32),
         ])
     }
 
@@ -203,11 +260,12 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func startServer() {
         guard serverProcess?.isRunning != true else { return }
-        guard let resourceRoot = Bundle.main.resourceURL?.appendingPathComponent("server"),
+        guard let bundledRoot = Bundle.main.resourceURL?.appendingPathComponent("server"),
               let nodePath = locateNode() else {
             updateStopped(text("未找到 Node.js，请先安装 Node.js 22 或更高版本", "Node.js 22 or newer is required"))
             return
         }
+        let resourceRoot = coreStore.activeServerRoot() ?? bundledRoot
 
         shouldRestart = true
         restartWorkItem?.cancel()
@@ -242,6 +300,17 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 guard let self, self.serverProcess === process else { return }
                 pipe.fileHandleForReading.readabilityHandler = nil
                 self.serverProcess = nil
+                if self.isSwitchingCore {
+                    self.isSwitchingCore = false
+                    self.shouldRestart = true
+                    self.restartAttempts = 0
+                    self.startServer()
+                    return
+                }
+                if self.pendingCoreActivation != nil {
+                    self.rollbackCoreUpdate()
+                    return
+                }
                 if self.shouldRestart && self.restartAttempts < 5 {
                     self.scheduleRestart()
                 } else {
@@ -253,8 +322,18 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         do {
             try process.run()
             serverProcess = process
+            if pendingCoreActivation != nil {
+                coreStartupWorkItem?.cancel()
+                let work = DispatchWorkItem { [weak self, weak process] in
+                    guard let self, let process, self.pendingCoreActivation != nil, self.serverProcess === process else { return }
+                    process.terminate()
+                }
+                coreStartupWorkItem = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + 12, execute: work)
+            }
         } catch {
-            if shouldRestart && restartAttempts < 5 { scheduleRestart() }
+            if pendingCoreActivation != nil { rollbackCoreUpdate() }
+            else if shouldRestart && restartAttempts < 5 { scheduleRestart() }
             else { updateStopped(text("启动失败：\(error.localizedDescription)", "Could not start: \(error.localizedDescription)")) }
         }
     }
@@ -268,6 +347,15 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 restartAttempts = 0
                 statusLabel.stringValue = text("服务运行中 · 任务正在实时同步", "Service online · tasks are syncing live")
                 statusDot.layer?.backgroundColor = NSColor.systemGreen.cgColor
+                if let activation = pendingCoreActivation {
+                    coreStartupWorkItem?.cancel()
+                    coreStartupWorkItem = nil
+                    pendingCoreActivation = nil
+                    availableUpdate = nil
+                    updateChecker = GitHubUpdateChecker(currentVersion: coreStore.effectiveVersion())
+                    updateButton.isEnabled = true
+                    showTemporaryUpdateStatus(text("已热升级到 v\(activation.version)", "Hot-updated to v\(activation.version)"))
+                }
             }
             guard let marker = line.range(of: "手机：") else { continue }
             let address = String(line[marker.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -339,6 +427,205 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         copyButton.isEnabled = false
     }
 
+    private func configureUpdateChecks() {
+        updateChecker = GitHubUpdateChecker(currentVersion: coreStore.effectiveVersion())
+        if let cached = updateChecker.cachedUpdate() { showAvailableUpdate(cached, prompt: false) }
+        checkForUpdates(force: false)
+        updateTimer = Timer.scheduledTimer(withTimeInterval: 6 * 60 * 60, repeats: true) { [weak self] _ in
+            self?.checkForUpdates(force: false)
+        }
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.checkForUpdates(force: false)
+        }
+    }
+
+    private func checkForUpdates(force: Bool) {
+        if force {
+            updateButton.isEnabled = false
+            updateButton.title = text("正在检查更新…", "Checking for updates…")
+            versionLabel.stringValue = text("当前 v\(coreStore.effectiveVersion()) · 正在获取最新版本", "Current v\(coreStore.effectiveVersion()) · checking latest")
+        }
+        updateChecker.check(force: force) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.updateButton.isEnabled = true
+                switch result {
+                case .available(let update):
+                    self.showAvailableUpdate(update, prompt: true)
+                case .skipped(let cached):
+                    if let cached { self.showAvailableUpdate(cached, prompt: false) }
+                    else { self.showUpToDateState() }
+                case .upToDate:
+                    self.availableUpdate = nil
+                    self.showUpToDateState()
+                case .failed:
+                    if self.availableUpdate == nil { self.showUpdateCheckFailed() }
+                }
+            }
+        }
+    }
+
+    private func showAvailableUpdate(_ update: UpdateRelease, prompt: Bool) {
+        availableUpdate = update
+        let canHotUpdate = update.coreAsset != nil
+        versionLabel.stringValue = text(
+            "当前 v\(coreStore.effectiveVersion())  →  新版 v\(update.version)",
+            "Current v\(coreStore.effectiveVersion())  →  New v\(update.version)"
+        )
+        updateButton.title = canHotUpdate
+            ? text("核心热升级到 v\(update.version)", "Hot-update core to v\(update.version)")
+            : text("完整升级到 v\(update.version)", "Full update to v\(update.version)")
+        guard prompt else { return }
+        let promptKey = "CodexLocalHubLastPromptedUpdateVersion"
+        guard UserDefaults.standard.string(forKey: promptKey) != update.version else { return }
+        UserDefaults.standard.set(update.version, forKey: promptKey)
+        let alert = NSAlert()
+        alert.messageText = text("Codex Local Hub 有新版本", "A Codex Local Hub update is available")
+        alert.informativeText = canHotUpdate
+            ? text("v\(update.version) 已发布。核心更新可以在后台完成，不需要重新安装程序。", "Version \(update.version) is ready. Its core can update in place without reinstalling the app.")
+            : text("v\(update.version) 需要更新 Mac 宿主程序，将下载并打开完整安装包。", "Version \(update.version) requires a newer Mac host. The full installer will be downloaded and opened.")
+        alert.addButton(withTitle: canHotUpdate ? text("立即热升级", "Update Now") : text("下载完整更新", "Download Full Update"))
+        alert.addButton(withTitle: text("稍后", "Later"))
+        if alert.runModal() == .alertFirstButtonReturn { applyAvailableUpdate() }
+    }
+
+    private func showTemporaryUpdateStatus(_ value: String) {
+        updateButton.title = value
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard let self else { return }
+            if let update = self.availableUpdate { self.showAvailableUpdate(update, prompt: false) }
+            else { self.showUpToDateState() }
+        }
+    }
+
+    private func showUpToDateState() {
+        let version = coreStore.effectiveVersion()
+        versionLabel.stringValue = text("当前 v\(version) · 已是最新正式版", "Current v\(version) · latest stable")
+        updateButton.title = text("重新检查更新", "Check again")
+        updateButton.isEnabled = true
+    }
+
+    private func showUpdateCheckFailed() {
+        let version = coreStore.effectiveVersion()
+        versionLabel.stringValue = text("当前 v\(version) · 暂时无法获取最新版本", "Current v\(version) · latest version unavailable")
+        updateButton.title = text("重试检查更新", "Retry update check")
+        updateButton.isEnabled = true
+    }
+
+    private func applyAvailableUpdate() {
+        guard let update = availableUpdate else {
+            checkForUpdates(force: true)
+            return
+        }
+        if let coreAsset = update.coreAsset {
+            downloadCoreUpdate(update: update, asset: coreAsset)
+        } else {
+            downloadInstaller(update: update)
+        }
+    }
+
+    private func downloadCoreUpdate(update: UpdateRelease, asset: UpdateAsset) {
+        updateButton.isEnabled = false
+        updateButton.title = text("正在下载核心更新…", "Downloading core update…")
+        URLSession.shared.downloadTask(with: asset.url) { [weak self] temporaryURL, _, error in
+            guard let self else { return }
+            guard error == nil, let temporaryURL else {
+                DispatchQueue.main.async {
+                    self.updateButton.isEnabled = true
+                    self.showTemporaryUpdateStatus(self.text("热升级下载失败", "Core update download failed"))
+                }
+                return
+            }
+            do {
+                let activation = try self.coreStore.install(archive: temporaryURL, expectedVersion: update.version, expectedSHA256: asset.sha256)
+                DispatchQueue.main.async { self.activateCoreUpdate(activation) }
+            } catch CoreUpdateError.incompatibleHost {
+                DispatchQueue.main.async {
+                    self.updateButton.isEnabled = true
+                    self.downloadInstaller(update: update)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.updateButton.isEnabled = true
+                    self.showTemporaryUpdateStatus(self.text("核心校验失败，已取消升级", "Core verification failed. Update cancelled"))
+                }
+            }
+        }.resume()
+    }
+
+    private func activateCoreUpdate(_ activation: CoreActivation) {
+        pendingCoreActivation = activation
+        updateButton.isEnabled = false
+        updateButton.title = text("正在切换到 v\(activation.version)…", "Switching to v\(activation.version)…")
+        restartAttempts = 0
+        if serverProcess?.isRunning == true {
+            isSwitchingCore = true
+            shouldRestart = false
+            stopServer()
+        } else {
+            shouldRestart = true
+            startServer()
+        }
+    }
+
+    private func rollbackCoreUpdate() {
+        guard let activation = pendingCoreActivation else { return }
+        coreStore.restore(directoryName: activation.previousDirectoryName)
+        pendingCoreActivation = nil
+        isSwitchingCore = false
+        coreStartupWorkItem?.cancel()
+        coreStartupWorkItem = nil
+        shouldRestart = true
+        restartAttempts = 0
+        updateButton.isEnabled = true
+        showTemporaryUpdateStatus(text("新核心启动失败，已自动回退", "New core failed to start. Rolled back automatically"))
+        startServer()
+    }
+
+    private func downloadInstaller(update: UpdateRelease) {
+        guard let asset = update.installerAsset else {
+            NSWorkspace.shared.open(update.pageURL)
+            return
+        }
+        updateButton.isEnabled = false
+        updateButton.title = text("正在下载安装包…", "Downloading installer…")
+        URLSession.shared.downloadTask(with: asset.url) { [weak self] temporaryURL, _, error in
+            guard let self else { return }
+            guard error == nil, let temporaryURL else {
+                DispatchQueue.main.async {
+                    self.updateButton.isEnabled = true
+                    self.showTemporaryUpdateStatus(self.text("下载失败，请稍后重试", "Download failed. Try again later"))
+                }
+                return
+            }
+            guard self.coreStore.verify(file: temporaryURL, expectedSHA256: asset.sha256) else {
+                DispatchQueue.main.async {
+                    self.updateButton.isEnabled = true
+                    self.showTemporaryUpdateStatus(self.text("安装包校验失败，已取消下载", "Installer verification failed. Download cancelled"))
+                }
+                return
+            }
+            do {
+                let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
+                var destination = downloads.appendingPathComponent(asset.name)
+                if FileManager.default.fileExists(atPath: destination.path) {
+                    destination = downloads.appendingPathComponent("Codex-Local-Hub-\(update.version)-\(Int(Date().timeIntervalSince1970)).dmg")
+                }
+                try FileManager.default.moveItem(at: temporaryURL, to: destination)
+                DispatchQueue.main.async {
+                    self.updateButton.isEnabled = true
+                    self.updateButton.title = self.text("安装包已打开", "Installer opened")
+                    NSWorkspace.shared.open(destination)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.updateButton.isEnabled = true
+                    self.showTemporaryUpdateStatus(self.text("无法保存安装包", "Could not save installer"))
+                }
+            }
+        }.resume()
+    }
+
     @objc private func copyAddress() {
         guard addressLabel.stringValue.hasPrefix("http") else { return }
         NSPasteboard.general.clearContents()
@@ -359,5 +646,10 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
             shouldRestart = true
             startServer()
         }
+    }
+
+    @objc private func checkForUpdatesManually() {
+        if availableUpdate != nil { applyAvailableUpdate() }
+        else { checkForUpdates(force: true) }
     }
 }

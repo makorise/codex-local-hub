@@ -12,6 +12,18 @@ The public release should be a universal, Developer ID-signed, Apple-notarized D
 
 The release DMG bundles isolated Node.js runtimes for both Apple silicon and Intel Macs. End users do not install Node.js and do not use Terminal. The app chooses its bundled runtime first and never replaces, relinks, or configures a developer's existing Node installation.
 
+## Updates
+
+The Mac app checks the repository's latest stable GitHub Release at most once every 24 hours. It also checks when the app becomes active and every six hours while running, but the 24-hour throttle prevents unnecessary GitHub requests. When a strictly newer semantic version is available, the app shows an update button and a one-time prompt.
+
+The host window always shows the active version. After a check it displays either `Current vX · latest stable`, `Current vX → New vY`, or a retryable availability error. The update button explicitly says whether the offered action is a core hot update or a full host update.
+
+The preferred asset is `Codex-Local-Hub-core-<version>.zip`, which contains only `src`, `public`, and a compatibility manifest. The app requires GitHub's SHA-256 asset digest, rejects unsafe archive paths, extracts into `~/Library/Application Support/Codex Local Hub/CoreUpdates`, atomically selects the new core, and restarts the local service. If startup fails before the normal ready signal, it restores the previous core and starts it again. The signed `.app` bundle is never modified.
+
+When the core manifest requires a newer native host—or a release has no compatible core asset—the app falls back to downloading and opening the universal DMG. Equal or older versions are ignored, network failures do not interrupt the local service, and no separate update server is required.
+
+Use **Check for updates** in the host window to bypass the daily throttle. Prereleases and draft releases are intentionally ignored by automatic updates.
+
 ## Why DMG instead of PKG?
 
 Codex Local Hub is a user-level app. It does not install system extensions, privileged helpers, or files outside its own app bundle and user data directory. A PKG would introduce administrator prompts without providing a user benefit.
@@ -62,6 +74,10 @@ npm run package:mac
 ```
 
 The release script enables hardened runtime, signs the embedded Node runtimes with JIT entitlements, signs the app and DMG, submits the DMG to Apple, staples the ticket, and verifies the result.
+
+GitHub Releases themselves do not require an Apple account. A tag matching `package.json` triggers the release workflow. Without Developer ID secrets the workflow publishes an explicitly marked prerelease for testing; with signing and notarization secrets it publishes a stable release that the in-app updater can discover.
+
+For a stable automated release, configure these GitHub Actions secrets: `MACOS_CERTIFICATE_BASE64`, `MACOS_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_TEAM_ID`, and `APPLE_APP_SPECIFIC_PASSWORD`. The first value is a base64-encoded Developer ID Application `.p12`; the password is an app-specific Apple password, not the normal Apple Account password. Creating a GitHub prerelease requires none of these Apple credentials.
 
 ## Homebrew
 
