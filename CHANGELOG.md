@@ -13,6 +13,7 @@ All notable changes to Codex Local Hub will be documented in this file.
 - Added cached update availability, manual checks, six-hour wake-up polling, and offline-safe failure handling.
 - Added a tag-driven GitHub Release workflow that publishes both core and universal-DMG assets: unsigned builds become prereleases, while Developer ID credentials produce notarized stable releases.
 - Added macOS update-checker and core activation tests alongside the existing 100% JavaScript coverage gate.
+- Grouped tasks by project with persistent, accessible collapse controls that continue to respect status filters.
 
 ## 0.2.1 - 2026-09-22
 

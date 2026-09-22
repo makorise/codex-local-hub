@@ -100,6 +100,53 @@ function visibleTasks() {
   });
 }
 
+function projectName(task) {
+  return String(task.project || '').trim();
+}
+
+function projectLabel(name) {
+  return name || t('project.uncategorized');
+}
+
+function projectTaskCount(count) {
+  return t(count === 1 ? 'project.taskCountOne' : 'project.taskCountOther', { count });
+}
+
+function groupTasksByProject(tasks) {
+  const groups = new Map();
+  tasks.forEach((task) => {
+    const name = projectName(task);
+    if (!groups.has(name)) groups.set(name, []);
+    groups.get(name).push(task);
+  });
+  return [...groups].map(([name, projectTasks]) => ({ name, tasks: projectTasks }));
+}
+
+function projectCollapseKey(name) {
+  return `codex-local-hub-project-collapsed:${encodeURIComponent(name)}`;
+}
+
+function isProjectCollapsed(name) {
+  return localStorage.getItem(projectCollapseKey(name)) === '1';
+}
+
+function setProjectCollapsed(name, collapsed) {
+  if (collapsed) localStorage.setItem(projectCollapseKey(name), '1');
+  else localStorage.removeItem(projectCollapseKey(name));
+}
+
+function renderTaskCard(task) {
+  return `
+    <button class="task-card ${task.id === state.selectedId ? 'is-selected' : ''}" type="button" data-id="${escapeHtml(task.id)}">
+      <div class="task-card-top">
+        <span class="status-pill" data-tone="${escapeHtml(task.progress.tone)}">${escapeHtml(localizedProgress(task))}</span>
+      </div>
+      <h3>${escapeHtml(task.title)}</h3>
+      <p>${escapeHtml(task.latestTask || t('empty.task'))}</p>
+      <div class="task-card-foot"><span>${escapeHtml(localizedActivity(task))}</span><time>${relativeTime(task.updatedAt)}</time></div>
+    </button>`;
+}
+
 function renderList() {
   const tasks = visibleTasks();
   $('#active-count').textContent = state.tasks.filter((task) => task.progress.state === 'running').length;
@@ -109,16 +156,27 @@ function renderList() {
     list.innerHTML = `<div class="list-empty">${escapeHtml(t('empty.filtered'))}</div>`;
     return;
   }
-  list.innerHTML = tasks.map((task) => `
-    <button class="task-card ${task.id === state.selectedId ? 'is-selected' : ''}" type="button" data-id="${escapeHtml(task.id)}">
-      <div class="task-card-top">
-        <span class="task-project"><span class="project-icon">${escapeHtml(task.project.slice(0, 1).toUpperCase())}</span>${escapeHtml(task.project)}</span>
-        <span class="status-pill" data-tone="${escapeHtml(task.progress.tone)}">${escapeHtml(localizedProgress(task))}</span>
-      </div>
-      <h3>${escapeHtml(task.title)}</h3>
-      <p>${escapeHtml(task.latestTask || t('empty.task'))}</p>
-      <div class="task-card-foot"><span>${escapeHtml(localizedActivity(task))}</span><time>${relativeTime(task.updatedAt)}</time></div>
-    </button>`).join('');
+  list.innerHTML = groupTasksByProject(tasks).map((group, index) => {
+    const label = projectLabel(group.name);
+    const collapsed = isProjectCollapsed(group.name);
+    const action = collapsed ? t('project.expand') : t('project.collapse');
+    const countLabel = projectTaskCount(group.tasks.length);
+    const groupId = `project-group-${index}`;
+    return `
+      <section class="project-group ${collapsed ? 'is-collapsed' : ''}" data-project="${escapeHtml(group.name)}">
+        <button class="project-group-toggle" type="button" aria-expanded="${!collapsed}" aria-controls="${groupId}" aria-label="${escapeHtml(t('project.toggle', { action, project: label, countLabel }))}">
+          <span class="project-heading"><strong>${escapeHtml(label)}</strong></span>
+          <span class="project-count">${escapeHtml(countLabel)}</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4" /></svg>
+        </button>
+        <div id="${groupId}" class="project-group-tasks" ${collapsed ? 'hidden' : ''}>${group.tasks.map(renderTaskCard).join('')}</div>
+      </section>`;
+  }).join('');
+  list.querySelectorAll('.project-group-toggle').forEach((button) => button.addEventListener('click', () => {
+    const name = button.closest('.project-group').dataset.project;
+    setProjectCollapsed(name, button.getAttribute('aria-expanded') === 'true');
+    renderList();
+  }));
   list.querySelectorAll('.task-card').forEach((card) => card.addEventListener('click', () => selectTask(card.dataset.id)));
 }
 
@@ -657,6 +715,14 @@ export {
   formatDuration,
   localizedError,
   visibleTasks,
+  projectName,
+  projectLabel,
+  projectTaskCount,
+  groupTasksByProject,
+  projectCollapseKey,
+  isProjectCollapsed,
+  setProjectCollapsed,
+  renderTaskCard,
   renderList,
   selectTask,
   renderDetail,
