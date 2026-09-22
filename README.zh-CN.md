@@ -1,5 +1,11 @@
 # Codex Local Hub · 用手机查看和控制 Codex 的随身工作台
 
+## 复制到 Codex，立即安装
+
+```text
+使用 $skill-installer 安装 https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub，然后在当前任务中使用 $setup-codex-local-hub：安装或更新 Codex Local Hub、安装图片交付 Skill、启动程序并验证手机访问。优先使用最新正式版，否则从源码构建；保护已有文件，不要修改我的全局 Node.js 环境。
+```
+
 [English](README.md) · 简体中文
 
 **不用一直守着电脑，也能从手机查看 ChatGPT/Codex 做到哪、是否需要回复。**
@@ -66,15 +72,9 @@ Mac 继续工作，你继续生活。
 
 以上为真实产品界面截图，使用的是脱敏示例数据。宿主程序截图中的有效二维码和私人局域网地址已经替换为不可扫描的占位图与示例地址，不包含私人任务内容。
 
-## 复制一句话，让 Codex 完成安装
+## 安装方式说明
 
-普通用户不需要先研究终端命令。请在作为宿主机的 Mac 上打开一个 Codex 任务，把下面整段话复制进去：
-
-```text
-使用 $skill-installer 从 https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub 安装 setup-codex-local-hub Skill。安装后请立即读取已安装的 SKILL.md，并在这个任务中按它完成：在这台 Mac 上安装或更新 Codex Local Hub、安装图片交付 Skill、启动程序并验证手机的局域网访问。优先使用最新正式版；没有合适的正式版时就从源码构建。除非确实有一步必须由我操作，否则请自主继续；最后只需要告诉我程序安装位置、访问方式和验证结果。
-```
-
-这一句话会让 Codex 安装可复用的 [`setup-codex-local-hub`](.agents/skills/setup-codex-local-hub) Skill，并立即完成后续工作。这个 Skill 会保持 Gatekeeper 开启、保护已有文件、运行完整测试、验证应用、安装图片交付 Skill；它不会擅自把本地服务暴露到公网。
+README 最上方的命令会安装可复用的 [`setup-codex-local-hub`](.agents/skills/setup-codex-local-hub) Skill，并立即完成后续工作。这个 Skill 会保持 Gatekeeper 开启、保护已有文件、运行完整测试、验证应用、安装图片交付 Skill；它不会擅自把本地服务暴露到公网。
 
 如果 Mac 上已经有源码仓库，可以继续把下面这句话发给 Codex。同一个 Skill 会保护本地修改，并在原地源码升级与全新干净检出之间安全选择：
 

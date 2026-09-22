@@ -1,5 +1,11 @@
 # Codex Local Hub — Mobile Dashboard for Codex · Codex 随身工作台
 
+## Copy into Codex to install
+
+```text
+Use $skill-installer to install https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub, then use $setup-codex-local-hub in this task to install or update Codex Local Hub, install its image-delivery skill, launch it, and verify phone access. Prefer the latest stable release; otherwise build from source. Preserve existing files and do not change my global Node.js environment.
+```
+
 **Monitor and control long-running ChatGPT Codex tasks from your phone—without staying glued to your Mac.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-2563eb.svg)](LICENSE)
@@ -68,15 +74,9 @@ Your Mac keeps doing the work while you keep living your life.
 
 These are real product-interface screenshots with sanitized demo data. The working QR code and private LAN address in the host screenshot were replaced with a non-scannable placeholder and example address; no private task content is included.
 
-## Install with one message to Codex
+## Installation details
 
-You do not need to begin with Terminal commands. Copy the message below into a Codex task on the Mac you want to use as the host:
-
-```text
-Use $skill-installer to install the setup skill from https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub. After installation, read the installed SKILL.md and carry it out in this task: install or update Codex Local Hub on this Mac, install its image-delivery skill, launch the app, and verify local phone access. Prefer the latest stable release; if no suitable release exists, build it from source. Continue autonomously unless an action genuinely requires me, then finish with the app location, access method, and verification results.
-```
-
-This one message asks Codex to install the reusable [`setup-codex-local-hub`](.agents/skills/setup-codex-local-hub) skill and immediately complete the setup. The skill keeps Gatekeeper enabled, preserves existing files, runs the test suite, verifies the application, installs the companion image-delivery skill, and stops instead of exposing the service to the public internet.
+The command at the top installs the reusable [`setup-codex-local-hub`](.agents/skills/setup-codex-local-hub) skill and immediately completes the setup. The skill keeps Gatekeeper enabled, preserves existing files, runs the test suite, verifies the application, installs the companion image-delivery skill, and stops instead of exposing the service to the public internet.
 
 If the source repository already exists on the Mac, use this shorter follow-up; the same skill will preserve changes and choose an in-place source upgrade or a clean fallback checkout:
 
