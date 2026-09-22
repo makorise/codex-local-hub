@@ -30,6 +30,25 @@ This development build may use the locally installed Node.js runtime. To produce
 npm run package:mac
 ```
 
+## Optional: install the image-delivery skill
+
+The host app already includes the phone **Delivery inbox**. Install the bundled skill when you want Codex to send screenshots and image results into it.
+
+In a Codex conversation, run:
+
+```text
+$skill-installer Install the skill from https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/deliver-to-codex-local-hub
+```
+
+For a source checkout, Codex discovers `.agents/skills/deliver-to-codex-local-hub` while working in this repository. For user-wide manual installation:
+
+```bash
+mkdir -p "$HOME/.agents/skills"
+cp -R ".agents/skills/deliver-to-codex-local-hub" "$HOME/.agents/skills/"
+```
+
+Restart Codex only if the skill does not appear automatically. Keep Codex Local Hub running, then ask Codex to send an existing PNG, JPEG, WebP, or GIF file to the delivery inbox. Images must not exceed 20 MB.
+
 ## Signing and notarization
 
 Before public distribution, configure a Developer ID Application certificate and a `notarytool` keychain profile:

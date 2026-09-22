@@ -60,6 +60,31 @@ These are real screenshots of the production interface rendered with sanitized d
 
 The current release is local-network only. The data path stays between the Mac and paired devices on the same trusted Wi-Fi; no hosted Codex Local Hub relay is involved.
 
+## Enable the visual delivery skill
+
+The **Delivery inbox** is built into Codex Local Hub. The optional [`deliver-to-codex-local-hub`](.agents/skills/deliver-to-codex-local-hub) skill teaches Codex how to validate an existing screenshot or image and stage it for the inbox. The source file is never moved or modified, and the inbox keeps only the latest 20 supported images.
+
+Recommended installation: send this message in Codex (it is not a Terminal command):
+
+```text
+$skill-installer Install the skill from https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/deliver-to-codex-local-hub
+```
+
+If you cloned this repository, Codex can discover the repo-scoped skill automatically while working inside the repository. To install it manually for every project:
+
+```bash
+mkdir -p "$HOME/.agents/skills"
+cp -R ".agents/skills/deliver-to-codex-local-hub" "$HOME/.agents/skills/"
+```
+
+Codex normally detects the new skill automatically; restart Codex if it does not appear. Then ask naturally, or invoke it explicitly:
+
+```text
+Use $deliver-to-codex-local-hub to send /absolute/path/to/screenshot.png to my phone as "Checkout result".
+```
+
+Keep Codex Local Hub running. The image appears in **Delivery inbox** on the next refresh. Supported formats are PNG, JPEG, WebP, and GIF, up to 20 MB. See the [official OpenAI skill documentation](https://learn.chatgpt.com/docs/build-skills) for how Codex discovers and invokes skills.
+
 ## Requirements
 
 - macOS 15 or newer
