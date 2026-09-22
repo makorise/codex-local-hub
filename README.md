@@ -14,6 +14,16 @@ Codex Local Hub is an open-source **Codex mobile dashboard, task monitor, and ph
 
 > Codex Local Hub is an independent open-source project and is not affiliated with or endorsed by OpenAI.
 
+## Install with one message to Codex
+
+You do not need to begin with Terminal commands. Copy the message below into a Codex task on the Mac you want to use as the host:
+
+```text
+Use $skill-installer to install the setup skill from https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub. After installation, read the installed SKILL.md and carry it out in this task: install or update Codex Local Hub on this Mac, install its image-delivery skill, launch the app, and verify local phone access. Prefer the latest stable release; if no suitable release exists, build it from source. Continue autonomously unless an action genuinely requires me, then finish with the app location, access method, and verification results.
+```
+
+This one message asks Codex to install the reusable [`setup-codex-local-hub`](.agents/skills/setup-codex-local-hub) skill and immediately complete the setup. The skill keeps Gatekeeper enabled, preserves existing files, runs the test suite, verifies the application, installs the companion image-delivery skill, and stops instead of exposing the service to the public internet.
+
 ## See it in action
 
 ### 1. Start the host on your Mac
@@ -85,7 +95,7 @@ The current release is local-network only. The data path stays between the Mac a
 
 ## Enable the visual delivery skill
 
-The **Delivery inbox** is built into Codex Local Hub. The optional [`deliver-to-codex-local-hub`](.agents/skills/deliver-to-codex-local-hub) skill teaches Codex how to validate an existing screenshot or image and stage it for the inbox. The source file is never moved or modified, and the inbox keeps only the latest 20 supported images.
+The **Delivery inbox** is built into Codex Local Hub. The one-message setup above installs the companion [`deliver-to-codex-local-hub`](.agents/skills/deliver-to-codex-local-hub) skill automatically. It teaches Codex how to validate an existing screenshot or image and stage it for the inbox. The source file is never moved or modified, and the inbox keeps only the latest 20 supported images.
 
 Recommended installation: send this message in Codex (it is not a Terminal command):
 
@@ -116,6 +126,8 @@ Keep Codex Local Hub running. The image appears in **Delivery inbox** on the nex
 - A phone and Mac connected to the same trusted Wi-Fi network
 
 ## Install
+
+For most users, the **Install with one message to Codex** flow near the top of this README is the recommended path.
 
 The first public notarized DMG is being prepared. Until it is available in GitHub Releases, build from source using the development steps below. Future release DMGs will include Node.js for Apple silicon and Intel Macs, so end users will not need Node.js or Terminal. See the [installation guide](docs/INSTALL.md) and [macOS compatibility matrix](docs/COMPATIBILITY.md).
 

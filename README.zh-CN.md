@@ -14,6 +14,16 @@ Codex Local Hub 是一个开源的 **Codex 手机控制台、任务监控器和 
 
 > 本项目是独立开源项目，与 OpenAI 没有隶属或官方背书关系。
 
+## 复制一句话，让 Codex 完成安装
+
+普通用户不需要先研究终端命令。请在作为宿主机的 Mac 上打开一个 Codex 任务，把下面整段话复制进去：
+
+```text
+使用 $skill-installer 从 https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub 安装 setup-codex-local-hub Skill。安装后请立即读取已安装的 SKILL.md，并在这个任务中按它完成：在这台 Mac 上安装或更新 Codex Local Hub、安装图片交付 Skill、启动程序并验证手机的局域网访问。优先使用最新正式版；没有合适的正式版时就从源码构建。除非确实有一步必须由我操作，否则请自主继续；最后只需要告诉我程序安装位置、访问方式和验证结果。
+```
+
+这一句话会让 Codex 安装可复用的 [`setup-codex-local-hub`](.agents/skills/setup-codex-local-hub) Skill，并立即完成后续工作。这个 Skill 会保持 Gatekeeper 开启、保护已有文件、运行完整测试、验证应用、安装图片交付 Skill；它不会擅自把本地服务暴露到公网。
+
 ## 运行效果
 
 ### 1. 在 Mac 上启动服务
@@ -85,7 +95,7 @@ Codex Local Hub 是一个开源的 **Codex 手机控制台、任务监控器和 
 
 ## 启用图片交付 Skill
 
-**交付信箱**本身已经内置在 Codex Local Hub 中。可选的 [`deliver-to-codex-local-hub`](.agents/skills/deliver-to-codex-local-hub) Skill 会告诉 Codex 如何检查现有截图或图片，并把它安全地放入交付通道。原图不会被移动或修改，信箱只保留最近 20 张受支持的图片。
+**交付信箱**本身已经内置在 Codex Local Hub 中。使用上面的一句话安装方式时，系统会自动安装配套的 [`deliver-to-codex-local-hub`](.agents/skills/deliver-to-codex-local-hub) Skill。它会告诉 Codex 如何检查现有截图或图片，并把它安全地放入交付通道。原图不会被移动或修改，信箱只保留最近 20 张受支持的图片。
 
 推荐安装方式：在 Codex 对话中发送下面这句话，注意这不是终端命令：
 
@@ -109,6 +119,8 @@ Codex 通常会自动发现新 Skill；如果没有出现，请重启 Codex。�
 使用时请保持 Codex Local Hub 运行，图片会在下一次刷新时出现在**交付信箱**。支持 PNG、JPEG、WebP 和 GIF，单张不超过 20 MB。Codex 如何发现和调用 Skill，可参考 [OpenAI 官方 Skill 文档](https://learn.chatgpt.com/docs/build-skills)。
 
 ## 安装
+
+对大多数用户，推荐直接使用 README 开头的“复制一句话，让 Codex 完成安装”。
 
 首个经过 Apple 公证的公开 DMG 正在准备中。在 GitHub Releases 提供之前，请先按照下面的开发者步骤从源码构建。未来发布包会内置 Apple Silicon 与 Intel 版本的 Node.js，普通用户不需要单独安装 Node 或打开终端。详细说明见[安装指南](docs/INSTALL.md)和[兼容性说明](docs/COMPATIBILITY.md)。
 
