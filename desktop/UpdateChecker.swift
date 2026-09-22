@@ -80,7 +80,7 @@ enum UpdateCheckResult {
 
 final class GitHubUpdateChecker {
     static let checkInterval: TimeInterval = 24 * 60 * 60
-    static let defaultEndpoint = URL(string: "https://api.github.com/repos/brandonwang001/codex-local-hub/releases/latest")!
+    static let defaultEndpoint = URL(string: "https://api.github.com/repos/makorise/codex-local-hub/releases/latest")!
 
     private enum Key {
         static let checkedAt = "CodexLocalHubUpdateCheckedAt"

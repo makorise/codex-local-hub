@@ -5,7 +5,7 @@ description: Install, update, launch, and verify Codex Local Hub on a Mac, inclu
 
 # Setup Codex Local Hub
 
-Set up the official project from `https://github.com/brandonwang001/codex-local-hub` as a user-level macOS application. Treat invocation as authorization to download this repository, install or update **Codex Local Hub**, install its bundled `deliver-to-codex-local-hub` skill, launch the app, and run local verification. It does not authorize disabling Gatekeeper, changing firewall or router settings, exposing port `8787` to the internet, deleting user data, or configuring an unrequested remote relay.
+Set up the official project from `https://github.com/makorise/codex-local-hub` as a user-level macOS application. Treat invocation as authorization to download this repository, install or update **Codex Local Hub**, install its bundled `deliver-to-codex-local-hub` skill, launch the app, and run local verification. It does not authorize disabling Gatekeeper, changing firewall or router settings, exposing port `8787` to the internet, deleting user data, or configuring an unrequested remote relay.
 
 ## Resume safely after an interruption
 

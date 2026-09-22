@@ -1,6 +1,6 @@
 const INSTALL_PROMPTS = {
-  en: 'Use $skill-installer to install https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub, then use $setup-codex-local-hub in this task to install or update Codex Local Hub, launch it, and verify phone access. Preserve existing files and do not change my global Node.js environment.',
-  'zh-CN': '使用 $skill-installer 安装 https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub，然后在当前任务中使用 $setup-codex-local-hub：安装或更新 Codex Local Hub、启动程序并验证手机访问。保护已有文件，不要修改我的全局 Node.js 环境。',
+  en: 'Use $skill-installer to install https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub, then use $setup-codex-local-hub in this task to install or update Codex Local Hub, launch it, and verify phone access. Preserve existing files and do not change my global Node.js environment.',
+  'zh-CN': '使用 $skill-installer 安装 https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub，然后在当前任务中使用 $setup-codex-local-hub：安装或更新 Codex Local Hub、启动程序并验证手机访问。保护已有文件，不要修改我的全局 Node.js 环境。',
 };
 
 const COPY = {

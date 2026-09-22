@@ -31,14 +31,14 @@ private func releaseJSON(
     tag: String = "v0.3.0",
     draft: Bool = false,
     prerelease: Bool = false,
-    page: String = "https://github.com/brandonwang001/codex-local-hub/releases/tag/v0.3.0",
+    page: String = "https://github.com/makorise/codex-local-hub/releases/tag/v0.3.0",
     includeCore: Bool = true,
     validDigest: Bool = true
 ) -> Data {
     let digest = validDigest ? String(repeating: "a", count: 64) : "broken"
-    let core = includeCore ? "{\"name\":\"Codex-Local-Hub-core-0.3.0.zip\",\"browser_download_url\":\"https://github.com/brandonwang001/codex-local-hub/releases/download/v0.3.0/Codex-Local-Hub-core-0.3.0.zip\",\"digest\":\"sha256:\(digest)\"}," : ""
+    let core = includeCore ? "{\"name\":\"Codex-Local-Hub-core-0.3.0.zip\",\"browser_download_url\":\"https://github.com/makorise/codex-local-hub/releases/download/v0.3.0/Codex-Local-Hub-core-0.3.0.zip\",\"digest\":\"sha256:\(digest)\"}," : ""
     return Data("""
-    {"tag_name":"\(tag)","html_url":"\(page)","draft":\(draft),"prerelease":\(prerelease),"assets":[\(core){"name":"Codex-Local-Hub-0.3.0-universal.dmg","browser_download_url":"https://github.com/brandonwang001/codex-local-hub/releases/download/v0.3.0/Codex-Local-Hub-0.3.0-universal.dmg","digest":"sha256:\(digest)"}]}
+    {"tag_name":"\(tag)","html_url":"\(page)","draft":\(draft),"prerelease":\(prerelease),"assets":[\(core){"name":"Codex-Local-Hub-0.3.0-universal.dmg","browser_download_url":"https://github.com/makorise/codex-local-hub/releases/download/v0.3.0/Codex-Local-Hub-0.3.0-universal.dmg","digest":"sha256:\(digest)"}]}
     """.utf8)
 }
 

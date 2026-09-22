@@ -3,15 +3,15 @@
 ## Copy into Codex to install
 
 ```text
-Use $skill-installer to install https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub, then use $setup-codex-local-hub in this task to install or update Codex Local Hub, install its image-delivery skill, launch it, and verify phone access. Prefer the latest stable release; otherwise build from source. Preserve existing files and do not change my global Node.js environment.
+Use $skill-installer to install https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub, then use $setup-codex-local-hub in this task to install or update Codex Local Hub, install its image-delivery skill, launch it, and verify phone access. Prefer the latest stable release; otherwise build from source. Preserve existing files and do not change my global Node.js environment.
 ```
 
-**[Visit the product website →](https://brandonwang001.github.io/codex-local-hub/)** · [简体中文](README.zh-CN.md)
+**[Visit the product website →](https://makorise.github.io/codex-local-hub/)** · [简体中文](README.zh-CN.md)
 
 **Monitor and control long-running ChatGPT Codex tasks from your phone—without staying glued to your Mac.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-2563eb.svg)](LICENSE)
-[![CI](https://github.com/brandonwang001/codex-local-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/brandonwang001/codex-local-hub/actions/workflows/ci.yml)
+[![CI](https://github.com/makorise/codex-local-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/makorise/codex-local-hub/actions/workflows/ci.yml)
 ![macOS 15+](https://img.shields.io/badge/macOS-15%2B-111827.svg)
 ![Node.js 22.22.2+](https://img.shields.io/badge/Node.js-22.22.2%2B-16a34a.svg)
 ![Test coverage](https://img.shields.io/badge/coverage-100%25-16a34a.svg)
@@ -128,7 +128,7 @@ The **Delivery inbox** is built into Codex Local Hub. The one-message setup abov
 Recommended installation: send this message in Codex (it is not a Terminal command):
 
 ```text
-$skill-installer Install the skill from https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/deliver-to-codex-local-hub
+$skill-installer Install the skill from https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/deliver-to-codex-local-hub
 ```
 
 If you cloned this repository, Codex can discover the repo-scoped skill automatically while working inside the repository. To install it manually for every project:
@@ -166,7 +166,7 @@ If you want Codex to perform a full install or host upgrade without manually dow
 For development:
 
 ```bash
-git clone https://github.com/brandonwang001/codex-local-hub.git
+git clone https://github.com/makorise/codex-local-hub.git
 cd codex-local-hub
 npm install
 BUNDLE_NODE=1 npm run build:mac

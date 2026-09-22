@@ -4,13 +4,13 @@
   "private": true,
   "type": "module",
   "description": "Local-first macOS dashboard for monitoring and controlling ChatGPT Codex tasks from your phone.",
-  "homepage": "https://brandonwang001.github.io/codex-local-hub/",
+  "homepage": "https://makorise.github.io/codex-local-hub/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/brandonwang001/codex-local-hub.git"
+    "url": "git+https://github.com/makorise/codex-local-hub.git"
   },
   "bugs": {
-    "url": "https://github.com/brandonwang001/codex-local-hub/issues"
+    "url": "https://github.com/makorise/codex-local-hub/issues"
   },
   "keywords": [
     "codex",

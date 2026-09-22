@@ -55,7 +55,7 @@ The host app already includes the phone **Delivery inbox**. Install the bundled 
 In a Codex conversation, run:
 
 ```text
-$skill-installer Install the skill from https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/deliver-to-codex-local-hub
+$skill-installer Install the skill from https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/deliver-to-codex-local-hub
 ```
 
 For a source checkout, Codex discovers `.agents/skills/deliver-to-codex-local-hub` while working in this repository. For user-wide manual installation:

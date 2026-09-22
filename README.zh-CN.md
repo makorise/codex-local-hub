@@ -3,10 +3,10 @@
 ## 复制到 Codex，立即安装
 
 ```text
-使用 $skill-installer 安装 https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub，然后在当前任务中使用 $setup-codex-local-hub：安装或更新 Codex Local Hub、安装图片交付 Skill、启动程序并验证手机访问。优先使用最新正式版，否则从源码构建；保护已有文件，不要修改我的全局 Node.js 环境。
+使用 $skill-installer 安装 https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub，然后在当前任务中使用 $setup-codex-local-hub：安装或更新 Codex Local Hub、安装图片交付 Skill、启动程序并验证手机访问。优先使用最新正式版，否则从源码构建；保护已有文件，不要修改我的全局 Node.js 环境。
 ```
 
-[**访问产品官网 →**](https://brandonwang001.github.io/codex-local-hub/) · [English](README.md)
+[**访问产品官网 →**](https://makorise.github.io/codex-local-hub/) · [English](README.md)
 
 **不用一直守着电脑，也能从手机查看 ChatGPT/Codex 做到哪、是否需要回复。**
 
@@ -15,7 +15,7 @@
 </p>
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-2563eb.svg)](LICENSE)
-[![CI](https://github.com/brandonwang001/codex-local-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/brandonwang001/codex-local-hub/actions/workflows/ci.yml)
+[![CI](https://github.com/makorise/codex-local-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/makorise/codex-local-hub/actions/workflows/ci.yml)
 ![macOS 15+](https://img.shields.io/badge/macOS-15%2B-111827.svg)
 ![Node.js 22.22.2+](https://img.shields.io/badge/Node.js-22.22.2%2B-16a34a.svg)
 ![测试覆盖率](https://img.shields.io/badge/coverage-100%25-16a34a.svg)
@@ -126,7 +126,7 @@ README 最上方的命令会安装可复用的 [`setup-codex-local-hub`](.agents
 推荐安装方式：在 Codex 对话中发送下面这句话，注意这不是终端命令：
 
 ```text
-$skill-installer 请从 https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/deliver-to-codex-local-hub 安装这个 Skill
+$skill-installer 请从 https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/deliver-to-codex-local-hub 安装这个 Skill
 ```
 
 如果已经克隆本仓库，在仓库目录内使用 Codex 时会自动发现仓库级 Skill。也可以手动安装到个人目录，让它在所有项目中可用：
@@ -159,7 +159,7 @@ Mac 程序每天最多检查一次最新的 GitHub 正式版，不需要 Codex L
 环境要求：macOS 15+、Node.js 22.22.2+、本机已安装并使用 Codex。Node 只用于源码编译，安装后的程序会使用自己内置的运行时。
 
 ```bash
-git clone https://github.com/brandonwang001/codex-local-hub.git
+git clone https://github.com/makorise/codex-local-hub.git
 cd codex-local-hub
 npm install
 BUNDLE_NODE=1 npm run build:mac
