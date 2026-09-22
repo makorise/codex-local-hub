@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 const execute = promisify(execFile);
-const script = fileURLToPath(new URL('../.agents/skills/deliver-to-codex-local-hub/scripts/deliver-image.mjs', import.meta.url));
+const script = fileURLToPath(new URL('../.agents/skills/deliver-to-codex-local-hub/scripts/deliver-image.sh', import.meta.url));
+const runSkill = (args, options) => execute('/bin/zsh', [script, ...args], options);
 
 test('delivery skill stages a supported image without changing its source', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'local-hub-skill-'));
@@ -17,7 +18,7 @@ test('delivery skill stages a supported image without changing its source', asyn
   const outbox = join(root, 'outbox');
   await writeFile(source, Buffer.from('safe-demo-image'));
 
-  const { stdout, stderr } = await execute(process.execPath, [script, source, 'Final / mobile: view'], {
+  const { stdout, stderr } = await runSkill([source, 'Final / mobile: view'], {
     env: { ...process.env, CODEX_TASK_DESK_OUTBOX: outbox },
   });
   const result = JSON.parse(stdout);
@@ -41,11 +42,11 @@ test('delivery skill rejects missing, unsupported, absent, and non-file inputs',
   await oversizedHandle.truncate(20 * 1024 * 1024 + 1);
   await oversizedHandle.close();
 
-  await assert.rejects(execute(process.execPath, [script]), /Usage:/);
-  await assert.rejects(execute(process.execPath, [script, join(root, 'notes.txt')]), /Only PNG/);
-  await assert.rejects(execute(process.execPath, [script, join(root, 'missing.png')]), /does not exist/);
-  await assert.rejects(execute(process.execPath, [script, directory]), /not a file/);
-  await assert.rejects(execute(process.execPath, [script, oversized]), /must not exceed 20 MB/);
+  await assert.rejects(runSkill([]), /Usage:/);
+  await assert.rejects(runSkill([join(root, 'notes.txt')]), /Only PNG/);
+  await assert.rejects(runSkill([join(root, 'missing.png')]), /does not exist/);
+  await assert.rejects(runSkill([directory]), /not a file/);
+  await assert.rejects(runSkill([oversized]), /must not exceed 20 MB/);
 });
 
 test('delivery skill derives a safe fallback title from the source name', async (t) => {
@@ -55,10 +56,10 @@ test('delivery skill derives a safe fallback title from the source name', async 
   const outbox = join(root, 'outbox');
   await writeFile(source, Buffer.from('gif'));
 
-  const derived = JSON.parse((await execute(process.execPath, [script, source], {
+  const derived = JSON.parse((await runSkill([source], {
     env: { ...process.env, CODEX_TASK_DESK_OUTBOX: outbox },
   })).stdout);
-  const fallback = JSON.parse((await execute(process.execPath, [script, source, '///'], {
+  const fallback = JSON.parse((await runSkill([source, '///'], {
     env: { ...process.env, CODEX_TASK_DESK_OUTBOX: outbox },
   })).stdout);
 

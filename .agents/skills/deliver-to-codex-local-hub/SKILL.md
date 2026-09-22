@@ -10,10 +10,10 @@ Deliver only an image already within the current task's scope. If it does not ex
 Resolve this skill's directory from the loaded `SKILL.md` path, then run:
 
 ```bash
-node <skill-directory>/scripts/deliver-image.mjs <absolute-image-path> [short-title]
+<skill-directory>/scripts/deliver-image.sh <absolute-image-path> [short-title]
 ```
 
-The helper accepts PNG, JPEG, WebP, and GIF files up to 20 MB. It copies the image into Codex Local Hub's sandbox-safe staging outbox and prints a JSON result; it never removes or changes the source image. `CODEX_TASK_DESK_OUTBOX` can override the staging directory when the host uses a custom location.
+The helper uses Codex Local Hub's bundled architecture-specific Node.js runtime when the app is installed, falling back to an existing `node` command only for source-development environments. It never installs or changes Node.js. It accepts PNG, JPEG, WebP, and GIF files up to 20 MB, copies the image into Codex Local Hub's sandbox-safe staging outbox, and prints a JSON result; it never removes or changes the source image. `CODEX_TASK_DESK_OUTBOX` can override the staging directory when the host uses a custom location.
 
 After staging:
 
