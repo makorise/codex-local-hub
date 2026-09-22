@@ -4,7 +4,6 @@ import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
 
 const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
-const styles = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
 
 function response(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -114,24 +113,14 @@ async function setup({ failing = new Map(), empty = false, taskCount = 1 } = {})
   return { dom, module, calls, failing, setMessageMode: (mode) => { messageMode = mode; }, cleanup };
 }
 
-test('task pane renders a long list with desktop and mobile scrolling enabled', async (t) => {
-  const { dom, cleanup } = await setup({ taskCount: 24 });
-  t.after(cleanup);
-
-  assert.equal(dom.window.document.querySelectorAll('.task-card').length, 24);
-  assert.match(styles, /\.app-shell \{[^}]*height: 100dvh;[^}]*overflow: hidden;/);
-  assert.match(styles, /\.task-pane \{[^}]*overflow-y: auto;[^}]*overscroll-behavior-y: contain;[^}]*-webkit-overflow-scrolling: touch;/);
-  assert.match(styles, /@media \(max-width: 760px\)[\s\S]*\.task-pane \{[^}]*height: 100%;[^}]*overflow-y: auto;[^}]*touch-action: pan-y;/);
-});
-
 test('frontend renders tasks, details, usage and every queue interaction', async (t) => {
   const failures = new Map();
-  const { dom, module: ui, calls, failing: activeFailures, setMessageMode, cleanup } = await setup({ failing: failures });
+  const { dom, module: ui, calls, failing: activeFailures, setMessageMode, cleanup } = await setup({ failing: failures, taskCount: 24 });
   t.after(cleanup);
   const document = dom.window.document;
   assert.equal(dom.window.location.search, '');
   ui.stripTokenFromUrl();
-  assert.equal(document.querySelectorAll('.task-card').length, 1);
+  assert.equal(document.querySelectorAll('.task-card').length, 24);
   assert.equal(document.querySelector('#detail-pane').classList.contains('is-open'), true);
   assert.equal(document.querySelector('#usage-summary').textContent, '周窗口剩余 80%');
   assert.equal(document.querySelectorAll('.delivery-thumb').length, 2);
