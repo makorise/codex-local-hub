@@ -16,19 +16,37 @@ Codex Local Hub is an open-source **Codex mobile dashboard, task monitor, and ph
 
 ## See it in action
 
+### 1. Start the host on your Mac
+
 <p align="center">
   <img src="docs/assets/screenshots/mac-host.en.png" width="720" alt="Codex Local Hub macOS host app showing service status, safe pairing placeholder, LAN address, and launch controls">
 </p>
 <p align="center"><strong>Mac host app</strong> — start the local service, pair the phone, and open the dashboard</p>
 
+### 2. See every task at a glance
+
+<p align="center">
+  <img src="docs/assets/screenshots/desktop-home.en.png" width="920" alt="Codex Local Hub home screen showing usage, task counts, filters, task status, and an empty conversation panel before a task is selected">
+</p>
+<p align="center"><strong>Workspace home</strong> — usage, running work, queued tasks, and completed work stay visible together</p>
+
+### 3. Open a task and continue the conversation
+
+<p align="center">
+  <img src="docs/assets/screenshots/desktop-dashboard.en.png" width="920" alt="Codex Local Hub task view showing a selected task, recent conversation, goal status, queue count, last prompt, and message composer">
+</p>
+<p align="center"><strong>Task conversation</strong> — review the latest visible messages, inspect the goal and queue, then send the next prompt</p>
+
+### 4. Use the same flow on your phone
+
 <table>
   <tr>
-    <td width="78%"><img src="docs/assets/screenshots/desktop-dashboard.en.png" width="100%" alt="Codex Local Hub desktop dashboard showing tasks, progress, usage, recent messages, goal status, and the prompt composer"></td>
-    <td width="22%"><img src="docs/assets/screenshots/mobile-dashboard.en.png" width="100%" alt="Codex Local Hub phone dashboard showing current usage and task states"></td>
+    <td width="50%"><img src="docs/assets/screenshots/mobile-dashboard.en.png" width="100%" alt="Codex Local Hub phone home screen showing current usage and task states"></td>
+    <td width="50%"><img src="docs/assets/screenshots/mobile-conversation.en.png" width="100%" alt="Codex Local Hub phone task view showing recent messages, goal status, queue count, last prompt, and message composer"></td>
   </tr>
   <tr>
-    <td align="center"><strong>Desktop workspace</strong> — task list and conversation stay visible together</td>
-    <td align="center"><strong>Phone dashboard</strong> — a compact view built for one-handed use</td>
+    <td align="center"><strong>Phone home</strong> — choose a task from the compact dashboard</td>
+    <td align="center"><strong>Phone conversation</strong> — monitor progress and send the next prompt with one hand</td>
   </tr>
 </table>
 

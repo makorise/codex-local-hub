@@ -16,19 +16,37 @@ Codex Local Hub 是一个开源的 **Codex 手机控制台、任务监控器和 
 
 ## 运行效果
 
+### 1. 在 Mac 上启动服务
+
 <p align="center">
   <img src="docs/assets/screenshots/mac-host.zh-CN.png" width="720" alt="Codex 随身工作台 Mac 宿主程序，展示服务状态、安全配对占位图、局域网地址和启动控制">
 </p>
 <p align="center"><strong>Mac 宿主程序</strong>：启动本地服务、配对手机并打开工作台</p>
 
+### 2. 在主页总览全部任务
+
+<p align="center">
+  <img src="docs/assets/screenshots/desktop-home.zh-CN.png" width="920" alt="Codex 随身工作台主页，展示用量、任务数量、筛选项、任务状态，以及尚未选择任务时的对话区域">
+</p>
+<p align="center"><strong>工作台主页</strong>：用量、正在进行、等待处理和已完成任务一目了然</p>
+
+### 3. 进入具体任务并继续对话
+
+<p align="center">
+  <img src="docs/assets/screenshots/desktop-dashboard.zh-CN.png" width="920" alt="Codex 随身工作台任务页面，展示选中的任务、最近对话、目标状态、队列数量、最后问题和消息输入框">
+</p>
+<p align="center"><strong>任务对话</strong>：查看最近可见消息、目标和队列，再发送下一条提示词</p>
+
+### 4. 在手机上完成同样的操作
+
 <table>
   <tr>
-    <td width="78%"><img src="docs/assets/screenshots/desktop-dashboard.zh-CN.png" width="100%" alt="Codex 随身工作台电脑端界面，展示任务列表、进度、用量、最近消息、目标状态和输入框"></td>
-    <td width="22%"><img src="docs/assets/screenshots/mobile-dashboard.zh-CN.png" width="100%" alt="Codex 随身工作台手机界面，展示当前用量和任务状态"></td>
+    <td width="50%"><img src="docs/assets/screenshots/mobile-dashboard.zh-CN.png" width="100%" alt="Codex 随身工作台手机主页，展示当前用量和任务状态"></td>
+    <td width="50%"><img src="docs/assets/screenshots/mobile-conversation.zh-CN.png" width="100%" alt="Codex 随身工作台手机任务页面，展示最近消息、目标状态、队列数量、最后问题和消息输入框"></td>
   </tr>
   <tr>
-    <td align="center"><strong>电脑端工作区</strong>：任务列表与对话进度同时可见</td>
-    <td align="center"><strong>手机端工作台</strong>：适合单手操作的紧凑布局</td>
+    <td align="center"><strong>手机主页</strong>：从紧凑的任务面板中选择任务</td>
+    <td align="center"><strong>手机对话</strong>：单手查看进度并发送下一条提示词</td>
   </tr>
 </table>
 
