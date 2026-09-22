@@ -1,0 +1,48 @@
+name: Deploy website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - 'docs/assets/screenshots/**'
+      - 'docs/assets/social-preview/codex-local-hub-social-preview.png'
+      - 'public/favicon.svg'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/configure-pages@v6
+      - name: Prepare static site
+        run: |
+          mkdir -p _site/assets
+          cp -R website/. _site/
+          cp public/favicon.svg _site/assets/favicon.svg
+          cp docs/assets/social-preview/codex-local-hub-social-preview.png _site/assets/social-preview.png
+          cp docs/assets/screenshots/desktop-dashboard.en.png _site/assets/desktop-dashboard.en.png
+          cp docs/assets/screenshots/desktop-dashboard.zh-CN.png _site/assets/desktop-dashboard.zh-CN.png
+          cp docs/assets/screenshots/mobile-conversation.en.png _site/assets/mobile-conversation.en.png
+          cp docs/assets/screenshots/mobile-conversation.zh-CN.png _site/assets/mobile-conversation.zh-CN.png
+          touch _site/.nojekyll
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

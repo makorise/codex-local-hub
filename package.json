@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Local-first macOS dashboard for monitoring and controlling ChatGPT Codex tasks from your phone.",
-  "homepage": "https://github.com/brandonwang001/codex-local-hub#readme",
+  "homepage": "https://brandonwang001.github.io/codex-local-hub/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/brandonwang001/codex-local-hub.git"
@@ -35,11 +35,12 @@
     "start": "node src/index.mjs",
     "dev": "node --watch src/index.mjs",
     "docs:preview": "node scripts/docs-preview.mjs",
+    "site:preview": "node scripts/site-preview.mjs",
     "build:mac": "zsh scripts/build-macos-app.sh",
     "package:core": "zsh scripts/package-core.sh",
     "package:mac": "zsh scripts/package-macos.sh",
     "test": "node --test",
-    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=100 --test-coverage-include=src/control.mjs --test-coverage-include=src/core.mjs --test-coverage-include=src/deliveries.mjs --test-coverage-include=src/rollout.mjs --test-coverage-include=src/repository.mjs --test-coverage-include=src/server.mjs --test-coverage-include=src/usage.mjs --test-coverage-include=public/app.js --test-coverage-include=public/i18n.js"
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=100 --test-coverage-include=src/control.mjs --test-coverage-include=src/core.mjs --test-coverage-include=src/deliveries.mjs --test-coverage-include=src/rollout.mjs --test-coverage-include=src/repository.mjs --test-coverage-include=src/server.mjs --test-coverage-include=src/usage.mjs --test-coverage-include=public/app.js --test-coverage-include=public/i18n.js --test-coverage-include=website/app.js"
   },
   "engines": {
     "node": ">=22.22.2"

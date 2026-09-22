@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#07110f">
+    <meta name="description" content="Codex Lookout is a local-first mobile command center for monitoring and steering long-running Codex tasks from your phone.">
+    <meta name="keywords" content="Codex mobile dashboard, Codex remote control, Codex task monitor, local-first, macOS, open source">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Codex Lookout — Step away. Stay in control.">
+    <meta property="og:description" content="Monitor tasks, reply to Codex, manage queued prompts, and review visual results from your phone.">
+    <meta property="og:image" content="assets/social-preview.png">
+    <meta property="og:url" content="https://brandonwang001.github.io/codex-local-hub/">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="canonical" href="https://brandonwang001.github.io/codex-local-hub/">
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+    <title>Codex Lookout — Your Codex workspace, within reach</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Codex Lookout",
+        "alternateName": "Codex Local Hub",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "macOS 15 or later",
+        "isAccessibleForFree": true,
+        "license": "https://opensource.org/licenses/MIT",
+        "downloadUrl": "https://github.com/brandonwang001/codex-local-hub/releases/latest",
+        "codeRepository": "https://github.com/brandonwang001/codex-local-hub",
+        "description": "A local-first mobile command center for monitoring and controlling Codex tasks from a phone."
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main" data-i18n="a11y.skip">Skip to content</a>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="Codex Lookout home">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><b></b></span>
+        <span>Codex Lookout</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="#features" data-i18n="nav.features">Features</a>
+        <a href="#how" data-i18n="nav.how">How it works</a>
+        <a href="#install" data-i18n="nav.install">Install</a>
+      </nav>
+      <div class="header-actions">
+        <button class="language-toggle" type="button" aria-label="Switch language"><span data-lang-label>中文</span></button>
+        <a class="github-link" href="https://github.com/brandonwang001/codex-local-hub" target="_blank" rel="noreferrer">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .7A11.3 11.3 0 0 0 8.4 22.8c.6.1.8-.2.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.5-1.4-1.3-1.7-1.3-1.7-1.1-.8.1-.8.1-.8 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.4-1.3-5.4-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.1 1.2a10.7 10.7 0 0 1 5.7 0c2.2-1.5 3.1-1.2 3.1-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.8 5.5-5.4 5.8.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6A11.3 11.3 0 0 0 12 .7Z"/></svg>
+          <span>GitHub</span>
+        </a>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="top">
+        <div class="eyebrow reveal"><span class="live-dot"></span><span data-i18n="hero.eyebrow">LOCAL-FIRST · OPEN SOURCE · PHONE-FIRST</span></div>
+        <h1 class="reveal" data-i18n-html="hero.title">Your Mac runs Codex.<br><em>You keep moving.</em></h1>
+        <p class="hero-copy reveal" data-i18n="hero.copy">Codex Lookout turns long-running Codex work into a calm, mobile command center. Check progress, answer the next question, steer urgent work, and review visual results—without returning to your desk.</p>
+        <div class="hero-actions reveal">
+          <a class="button button-primary" href="#install"><span data-i18n="hero.cta">Install with Codex</span><span aria-hidden="true">↘</span></a>
+          <a class="button button-secondary" href="https://github.com/brandonwang001/codex-local-hub" target="_blank" rel="noreferrer"><span data-i18n="hero.source">View source</span><span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="trust-row reveal" aria-label="Product highlights">
+          <span><b>100%</b> <i data-i18n="hero.coverage">test coverage</i></span>
+          <span><b>20</b> <i data-i18n="hero.recent">recent messages only</i></span>
+          <span><b>0</b> <i data-i18n="hero.cloud">hosted relay required</i></span>
+        </div>
+
+        <div class="product-stage reveal" aria-label="Codex Lookout product interface">
+          <div class="stage-glow" aria-hidden="true"></div>
+          <div class="desktop-frame">
+            <div class="window-bar"><span></span><span></span><span></span><small>lookout.local</small></div>
+            <img data-product-image="desktop" src="assets/desktop-dashboard.en.png" alt="Codex Lookout desktop dashboard showing an active task and recent conversation">
+          </div>
+          <div class="phone-frame">
+            <div class="phone-speaker"></div>
+            <img data-product-image="mobile" src="assets/mobile-conversation.en.png" alt="Codex Lookout mobile dashboard showing task controls and conversation">
+          </div>
+          <div class="status-pill status-running"><span></span><b data-i18n="stage.running">3 tasks moving</b></div>
+          <div class="status-pill status-local"><span>⌁</span><b data-i18n="stage.local">Your data stays local</b></div>
+        </div>
+      </section>
+
+      <section class="problem-section section" aria-labelledby="problem-title">
+        <div class="section-kicker" data-i18n="problem.kicker">THE REAL PROBLEM</div>
+        <div class="split-heading">
+          <h2 id="problem-title" data-i18n-html="problem.title">The agent is autonomous.<br>Your attention still isn’t.</h2>
+          <p data-i18n="problem.copy">Long tasks create a strange kind of waiting: you leave the work to Codex, but keep checking the Mac to see whether it finished, failed, or needs one small answer.</p>
+        </div>
+        <div class="pain-grid">
+          <article class="pain-card reveal"><span class="card-number">01</span><h3 data-i18n="problem.one.title">The silent wait</h3><p data-i18n="problem.one.copy">A 40-minute task can stop after minute four because Codex needs a clarification you never saw.</p></article>
+          <article class="pain-card reveal"><span class="card-number">02</span><h3 data-i18n="problem.two.title">Context switching</h3><p data-i18n="problem.two.copy">You return to the Mac just to check one status, then lose focus to the full desktop again.</p></article>
+          <article class="pain-card reveal"><span class="card-number">03</span><h3 data-i18n="problem.three.title">Invisible outcomes</h3><p data-i18n="problem.three.copy">Screenshots and visual results exist on the host, while the person approving them is somewhere else.</p></article>
+        </div>
+      </section>
+
+      <section class="solution-section section" id="how" aria-labelledby="solution-title">
+        <div class="solution-copy">
+          <div class="section-kicker" data-i18n="solution.kicker">THE SOLUTION</div>
+          <h2 id="solution-title" data-i18n-html="solution.title">A lookout post<br>for work in motion.</h2>
+          <p data-i18n="solution.copy">Codex Lookout adds a lightweight local layer around the Codex desktop app. It reads only the useful visible state, serves a phone-ready workspace over trusted Wi-Fi, and returns your instructions to the right task.</p>
+          <ul class="check-list">
+            <li><span>✓</span><span data-i18n="solution.pointOne">No browser scraping and no copied full-chat archive</span></li>
+            <li><span>✓</span><span data-i18n="solution.pointTwo">No third-party dashboard between your Mac and phone</span></li>
+            <li><span>✓</span><span data-i18n="solution.pointThree">No changes to your global Node.js environment</span></li>
+          </ul>
+        </div>
+        <div class="flow-card reveal" aria-label="How Codex Lookout works">
+          <div class="flow-node"><span class="node-icon">⌘</span><div><b data-i18n="flow.mac">Your Mac</b><small data-i18n="flow.macSmall">Codex keeps working</small></div></div>
+          <div class="flow-line"><i></i><small data-i18n="flow.read">reads local state</small></div>
+          <div class="flow-node flow-center"><span class="brand-mark small" aria-hidden="true"><i></i><i></i><b></b></span><div><b>Codex Lookout</b><small data-i18n="flow.hubSmall">filters, syncs, relays</small></div></div>
+          <div class="flow-line"><i></i><small data-i18n="flow.sync">trusted Wi-Fi</small></div>
+          <div class="flow-node"><span class="node-icon">▯</span><div><b data-i18n="flow.phone">Your phone</b><small data-i18n="flow.phoneSmall">you decide what’s next</small></div></div>
+          <div class="return-path"><span>↩</span><small data-i18n="flow.return">Prompts and queue actions travel back to the selected task</small></div>
+        </div>
+      </section>
+
+      <section class="features-section section" id="features" aria-labelledby="features-title">
+        <div class="section-kicker" data-i18n="features.kicker">BUILT FOR THE HUMAN IN THE LOOP</div>
+        <div class="split-heading compact">
+          <h2 id="features-title" data-i18n-html="features.title">Everything that matters.<br>Nothing that doesn’t.</h2>
+          <p data-i18n="features.copy">A focused surface for monitoring, deciding, and moving work forward—not a miniature remote desktop.</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card feature-wide reveal"><div class="feature-visual radar-visual"><div class="radar"><i></i><i></i><i></i><b></b><span></span></div><div class="mini-tasks"><i></i><i></i><i></i></div></div><span class="feature-label" data-i18n="features.live.label">LIVE TASK VIEW</span><h3 data-i18n="features.live.title">Know what is moving—and what is waiting.</h3><p data-i18n="features.live.copy">See running, queued, paused, failed, and completed work grouped by project, with long-running goal status and elapsed time.</p></article>
+          <article class="feature-card reveal"><div class="feature-icon">↗</div><span class="feature-label" data-i18n="features.reply.label">TWO-WAY CONTROL</span><h3 data-i18n="features.reply.title">Reply without walking back.</h3><p data-i18n="features.reply.copy">Continue an idle task, queue the next prompt, or steer urgent context into the active run.</p></article>
+          <article class="feature-card reveal"><div class="feature-icon">≋</div><span class="feature-label" data-i18n="features.queue.label">PRIORITY QUEUE</span><h3 data-i18n="features.queue.title">Shape the work ahead.</h3><p data-i18n="features.queue.copy">Reorder queued prompts, remove stale ideas, and promote the one that matters now.</p></article>
+          <article class="feature-card reveal"><div class="feature-icon">◫</div><span class="feature-label" data-i18n="features.inbox.label">DELIVERY INBOX</span><h3 data-i18n="features.inbox.title">Review visual results anywhere.</h3><p data-i18n="features.inbox.copy">Receive recent screenshots and image outputs on your phone, then clear the inbox when review is done.</p></article>
+          <article class="feature-card reveal"><div class="feature-icon">◔</div><span class="feature-label" data-i18n="features.usage.label">USAGE AWARENESS</span><h3 data-i18n="features.usage.title">See capacity before planning more.</h3><p data-i18n="features.usage.copy">Keep current usage and reset timing beside the tasks that consume it.</p></article>
+          <article class="feature-card feature-dark reveal"><div class="feature-icon shield">◇</div><span class="feature-label" data-i18n="features.privacy.label">LOCAL BY DEFAULT</span><h3 data-i18n="features.privacy.title">Your work stays where it started.</h3><p data-i18n="features.privacy.copy">The current release stays on your trusted local network. Hidden reasoning is never mirrored, and only a small recent window is shown.</p></article>
+        </div>
+      </section>
+
+      <section class="moment-section section" aria-labelledby="moment-title">
+        <div class="moment-card">
+          <div class="moment-copy"><span class="section-kicker" data-i18n="moment.kicker">A SMALL CHANGE IN YOUR DAY</span><h2 id="moment-title" data-i18n-html="moment.title">Start the task.<br>Leave the desk.</h2><p data-i18n="moment.copy">Codex keeps the keyboard. You keep the decisions.</p></div>
+          <ol class="moment-steps">
+            <li><span>1</span><div><b data-i18n="moment.one.title">Launch</b><small data-i18n="moment.one.copy">Open the Mac host and scan the QR code.</small></div></li>
+            <li><span>2</span><div><b data-i18n="moment.two.title">Move</b><small data-i18n="moment.two.copy">Keep your phone on the same trusted Wi-Fi.</small></div></li>
+            <li><span>3</span><div><b data-i18n="moment.three.title">Intervene</b><small data-i18n="moment.three.copy">Reply only when the work actually needs you.</small></div></li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="install-section section" id="install" aria-labelledby="install-title">
+        <div class="install-header">
+          <div><div class="section-kicker" data-i18n="install.kicker">INSTALL IN ONE CONVERSATION</div><h2 id="install-title" data-i18n-html="install.title">Let Codex install<br>its own lookout.</h2></div>
+          <p data-i18n="install.copy">No terminal tutorial. Copy one request into Codex; the setup skill preserves existing files, avoids your global Node.js environment, installs the companion delivery skill, launches the app, and verifies phone access.</p>
+        </div>
+        <div class="prompt-card reveal">
+          <div class="prompt-top"><span><i></i><span data-i18n="install.promptLabel">PASTE INTO CODEX</span></span><button type="button" data-copy-prompt><span data-i18n="install.copyButton">Copy prompt</span><b aria-hidden="true">⌘C</b></button></div>
+          <pre><code data-install-prompt>Use $skill-installer to install https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub, then use $setup-codex-local-hub in this task to install or update Codex Local Hub, install its image-delivery skill, launch it, and verify phone access. Prefer the latest stable release; otherwise build from source. Preserve existing files and do not change my global Node.js environment.</code></pre>
+        </div>
+        <div class="install-meta">
+          <div><span>01</span><b data-i18n="install.stepOne.title">Paste the request</b><small data-i18n="install.stepOne.copy">Codex installs the reusable setup skill.</small></div>
+          <div><span>02</span><b data-i18n="install.stepTwo.title">Let it verify</b><small data-i18n="install.stepTwo.copy">Tests, architecture, signature, and launch are checked.</small></div>
+          <div><span>03</span><b data-i18n="install.stepThree.title">Scan and go</b><small data-i18n="install.stepThree.copy">The QR code opens the local address directly.</small></div>
+        </div>
+        <div class="requirements"><span data-i18n="install.requirements">Requires macOS 15+, Codex desktop, and a phone on the same trusted Wi-Fi.</span><a href="https://github.com/brandonwang001/codex-local-hub/releases/latest" target="_blank" rel="noreferrer" data-i18n="install.release">Browse releases ↗</a></div>
+        <p class="compatibility-note" data-i18n="install.compatibility">Downloads currently keep the Codex Local Hub app name so existing installations can update safely.</p>
+      </section>
+
+      <section class="open-section section">
+        <div class="open-card reveal">
+          <div><span class="section-kicker" data-i18n="open.kicker">OPEN SOURCE, LOCAL-FIRST</span><h2 data-i18n-html="open.title">Built in public.<br>Useful in private.</h2><p data-i18n="open.copy">Inspect the implementation, run the complete test suite, suggest an improvement, or adapt the local bridge for your workflow.</p></div>
+          <a class="button button-light" href="https://github.com/brandonwang001/codex-local-hub" target="_blank" rel="noreferrer"><span data-i18n="open.cta">Explore on GitHub</span><span>↗</span></a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <a class="brand footer-brand" href="#top"><span class="brand-mark small" aria-hidden="true"><i></i><i></i><b></b></span><span>Codex Lookout</span></a>
+      <p data-i18n="footer.note">Independent open-source project. Not affiliated with or endorsed by OpenAI.</p>
+      <div><a href="https://github.com/brandonwang001/codex-local-hub/blob/main/SECURITY.md" data-i18n="footer.security">Security</a><a href="https://github.com/brandonwang001/codex-local-hub/blob/main/LICENSE" data-i18n="footer.license">MIT License</a></div>
+    </footer>
+
+    <div class="toast" role="status" aria-live="polite" data-toast></div>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

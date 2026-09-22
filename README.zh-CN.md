@@ -1,4 +1,4 @@
-# Codex Local Hub · 用手机查看和控制 Codex 的随身工作台
+# Codex 瞭望台 · 用手机查看和控制 Codex 的随身工作台
 
 ## 复制到 Codex，立即安装
 
@@ -6,7 +6,7 @@
 使用 $skill-installer 安装 https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub，然后在当前任务中使用 $setup-codex-local-hub：安装或更新 Codex Local Hub、安装图片交付 Skill、启动程序并验证手机访问。优先使用最新正式版，否则从源码构建；保护已有文件，不要修改我的全局 Node.js 环境。
 ```
 
-[English](README.md) · 简体中文
+[**访问产品官网 →**](https://brandonwang001.github.io/codex-local-hub/) · [English](README.md)
 
 **不用一直守着电脑，也能从手机查看 ChatGPT/Codex 做到哪、是否需要回复。**
 
@@ -20,7 +20,7 @@
 ![Node.js 22.22.2+](https://img.shields.io/badge/Node.js-22.22.2%2B-16a34a.svg)
 ![测试覆盖率](https://img.shields.io/badge/coverage-100%25-16a34a.svg)
 
-Codex Local Hub 是一个开源的 **Codex 手机控制台、任务监控器和 macOS 远程助手**。打开 Mac 客户端，扫描二维码，即可在同一局域网内查看 ChatGPT 桌面版里的 Codex 任务进度、最近对话、长程目标和图片交付结果，并从手机继续发送提示词。
+Codex 瞭望台是一个开源的 **Codex 手机控制台、任务监控器和 macOS 远程助手**。打开 Mac 客户端，扫描二维码，即可在同一局域网内查看 ChatGPT 桌面版里的 Codex 任务进度、最近对话、长程目标和图片交付结果，并从手机继续发送提示词。为保证已有安装可以安全升级，当前下载包仍保留 Codex Local Hub 应用名称。
 
 > 本项目是独立开源项目，与 OpenAI 没有隶属或官方背书关系。
 

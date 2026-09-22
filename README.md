@@ -1,10 +1,12 @@
-# Codex Local Hub — Mobile Dashboard for Codex · Codex 随身工作台
+# Codex Lookout — Mobile Command Center for Codex · Codex 瞭望台
 
 ## Copy into Codex to install
 
 ```text
 Use $skill-installer to install https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub, then use $setup-codex-local-hub in this task to install or update Codex Local Hub, install its image-delivery skill, launch it, and verify phone access. Prefer the latest stable release; otherwise build from source. Preserve existing files and do not change my global Node.js environment.
 ```
+
+**[Visit the product website →](https://brandonwang001.github.io/codex-local-hub/)** · [简体中文](README.zh-CN.md)
 
 **Monitor and control long-running ChatGPT Codex tasks from your phone—without staying glued to your Mac.**
 
@@ -14,13 +16,11 @@ Use $skill-installer to install https://github.com/brandonwang001/codex-local-hu
 ![Node.js 22.22.2+](https://img.shields.io/badge/Node.js-22.22.2%2B-16a34a.svg)
 ![Test coverage](https://img.shields.io/badge/coverage-100%25-16a34a.svg)
 
-[简体中文](README.zh-CN.md) · English
-
 <p align="center">
   <img src="docs/assets/social-preview/codex-local-hub-social-preview.png" width="100%" alt="Codex Local Hub mobile dashboard for monitoring and controlling ChatGPT Codex tasks from a phone">
 </p>
 
-Codex Local Hub is an open-source **Codex mobile dashboard, task monitor, and phone remote control for macOS**. It turns a Mac running Codex into a private, phone-friendly task console on your local network. Scan the QR code in the macOS app to monitor task progress, review recent messages and visual deliveries, manage queued prompts, and continue a task without exposing your conversations to a third-party service.
+Codex Lookout is an open-source **Codex mobile dashboard, task monitor, and phone remote control for macOS**. It turns a Mac running Codex into a private, phone-friendly task console on your local network. Scan the QR code in the macOS app to monitor task progress, review recent messages and visual deliveries, manage queued prompts, and continue a task without exposing your conversations to a third-party service. Downloads retain the Codex Local Hub app name for update compatibility.
 
 中文用户可以把它理解为“**Codex 随身工作台**”：用手机查看和控制 Mac 上 ChatGPT/Codex 正在运行的任务，不用一直守着电脑。
 
