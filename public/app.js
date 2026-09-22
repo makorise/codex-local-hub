@@ -122,6 +122,10 @@ function groupTasksByProject(tasks) {
   return [...groups].map(([name, projectTasks]) => ({ name, tasks: projectTasks }));
 }
 
+function orderTasksByProject(tasks) {
+  return groupTasksByProject(tasks).flatMap((group) => group.tasks);
+}
+
 function projectCollapseKey(name) {
   return `codex-local-hub-project-collapsed:${encodeURIComponent(name)}`;
 }
@@ -135,10 +139,12 @@ function setProjectCollapsed(name, collapsed) {
   else localStorage.removeItem(projectCollapseKey(name));
 }
 
-function renderTaskCard(task) {
+function renderTaskCard(task, showProject = false) {
+  const project = projectLabel(projectName(task));
   return `
-    <button class="task-card ${task.id === state.selectedId ? 'is-selected' : ''}" type="button" data-id="${escapeHtml(task.id)}">
+    <button class="task-card ${showProject ? 'shows-project' : ''} ${task.id === state.selectedId ? 'is-selected' : ''}" type="button" data-id="${escapeHtml(task.id)}">
       <div class="task-card-top">
+        ${showProject ? `<span class="task-project">${escapeHtml(project)}</span>` : ''}
         <span class="status-pill" data-tone="${escapeHtml(task.progress.tone)}">${escapeHtml(localizedProgress(task))}</span>
       </div>
       <h3>${escapeHtml(task.title)}</h3>
@@ -156,22 +162,26 @@ function renderList() {
     list.innerHTML = `<div class="list-empty">${escapeHtml(t('empty.filtered'))}</div>`;
     return;
   }
-  list.innerHTML = groupTasksByProject(tasks).map((group, index) => {
-    const label = projectLabel(group.name);
-    const collapsed = isProjectCollapsed(group.name);
-    const action = collapsed ? t('project.expand') : t('project.collapse');
-    const countLabel = projectTaskCount(group.tasks.length);
-    const groupId = `project-group-${index}`;
-    return `
-      <section class="project-group ${collapsed ? 'is-collapsed' : ''}" data-project="${escapeHtml(group.name)}">
-        <button class="project-group-toggle" type="button" aria-expanded="${!collapsed}" aria-controls="${groupId}" aria-label="${escapeHtml(t('project.toggle', { action, project: label, countLabel }))}">
-          <span class="project-heading"><strong>${escapeHtml(label)}</strong></span>
-          <span class="project-count">${escapeHtml(countLabel)}</span>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4" /></svg>
-        </button>
-        <div id="${groupId}" class="project-group-tasks" ${collapsed ? 'hidden' : ''}>${group.tasks.map(renderTaskCard).join('')}</div>
-      </section>`;
-  }).join('');
+  if (tasks.length <= 5) {
+    list.innerHTML = orderTasksByProject(tasks).map((task) => renderTaskCard(task, true)).join('');
+  } else {
+    list.innerHTML = groupTasksByProject(tasks).map((group, index) => {
+      const label = projectLabel(group.name);
+      const collapsed = isProjectCollapsed(group.name);
+      const action = collapsed ? t('project.expand') : t('project.collapse');
+      const countLabel = projectTaskCount(group.tasks.length);
+      const groupId = `project-group-${index}`;
+      return `
+        <section class="project-group ${collapsed ? 'is-collapsed' : ''}" data-project="${escapeHtml(group.name)}">
+          <button class="project-group-toggle" type="button" aria-expanded="${!collapsed}" aria-controls="${groupId}" aria-label="${escapeHtml(t('project.toggle', { action, project: label, countLabel }))}">
+            <span class="project-heading"><strong>${escapeHtml(label)}</strong></span>
+            <span class="project-count">${escapeHtml(countLabel)}</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4" /></svg>
+          </button>
+          <div id="${groupId}" class="project-group-tasks" ${collapsed ? 'hidden' : ''}>${group.tasks.map((task) => renderTaskCard(task)).join('')}</div>
+        </section>`;
+    }).join('');
+  }
   list.querySelectorAll('.project-group-toggle').forEach((button) => button.addEventListener('click', () => {
     const name = button.closest('.project-group').dataset.project;
     setProjectCollapsed(name, button.getAttribute('aria-expanded') === 'true');
@@ -719,6 +729,7 @@ export {
   projectLabel,
   projectTaskCount,
   groupTasksByProject,
+  orderTasksByProject,
   projectCollapseKey,
   isProjectCollapsed,
   setProjectCollapsed,

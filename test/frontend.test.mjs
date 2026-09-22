@@ -138,6 +138,17 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.equal(ui.projectTaskCount(1), '1 个任务');
   assert.equal(ui.projectTaskCount(2), '2 个任务');
   assert.equal(ui.groupTasksByProject([]).length, 0);
+  const groupedOrder = ui.orderTasksByProject([
+    task({ id: 'a1', project: 'A' }), task({ id: 'b1', project: 'B' }), task({ id: 'a2', project: 'A' }),
+  ]);
+  assert.deepEqual(groupedOrder.map((item) => item.id), ['a1', 'a2', 'b1']);
+  const originalTasks = ui.state.tasks;
+  ui.state.tasks = originalTasks.slice(0, 5);
+  ui.renderList();
+  assert.equal(document.querySelectorAll('.project-group').length, 0);
+  assert.equal(document.querySelectorAll('.task-project').length, 5);
+  ui.state.tasks = originalTasks;
+  ui.renderList();
   assert.equal(document.querySelector('#detail-pane').classList.contains('is-open'), true);
   assert.equal(document.querySelector('#usage-summary').textContent, '周窗口剩余 80%');
   assert.equal(document.querySelectorAll('.delivery-thumb').length, 2);
