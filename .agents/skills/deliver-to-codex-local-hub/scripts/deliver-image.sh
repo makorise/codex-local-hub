@@ -8,10 +8,10 @@ case "$(/usr/bin/uname -m)" in
   *) runtime_name="" ;;
 esac
 
-if [[ -n "$runtime_name" ]]; then
+if [ -n "$runtime_name" ]; then
   for application_dir in "/Applications" "${HOME:-}/Applications"; do
     bundled_node="$application_dir/Codex Local Hub.app/Contents/Resources/runtime/$runtime_name"
-    if [[ -x "$bundled_node" ]]; then
+    if [ -x "$bundled_node" ]; then
       exec "$bundled_node" "$script_dir/deliver-image.mjs" "$@"
     fi
   done
