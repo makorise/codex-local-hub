@@ -2,6 +2,12 @@
 
 All notable changes to Codex Local Hub will be documented in this file.
 
+## 0.2.8 - 2026-09-22
+
+- Moved the official source, installation skills, release channel, and product website to the Makorise GitHub organization.
+- Updated the native updater, documentation, package metadata, website links, SEO metadata, and social preview to use the organization-owned URLs.
+- Preserved the old personal repository as a compatibility pointer while new installations and future hot updates use `makorise/codex-local-hub`.
+
 ## 0.2.7 - 2026-09-22
 
 - Fixed `steer` failing with `thread not found` by sending the prompt through the running Codex desktop app that owns the task, instead of starting a competing app-server process.
