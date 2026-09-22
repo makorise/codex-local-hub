@@ -1,0 +1,174 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { execFile as nodeExecFile } from 'node:child_process';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
+import { CodexRepository, escapeSqlite, parseHistoryMessage } from '../src/repository.mjs';
+
+const execFile = promisify(nodeExecFile);
+
+const row = { id: '1234567890abcdef1234', name: 'Task', cwd: '/work', updated_at_ms: 1, recency_at_ms: 1, rollout_path: '/rollout', queued_count: 0 };
+
+test('repository lists, caches details and escapes database paths', async () => {
+  const calls = [];
+  const repository = new CodexRepository({
+    stateDb: "/state's.db",
+    queueDb: "/queue's.db",
+    historyDb: "/history's.db",
+    goalsDb: "/goals's.db",
+    now: () => 500_000,
+    execFile: async (...args) => {
+      calls.push(args);
+      if (calls.length === 1) return { stdout: JSON.stringify([row]) };
+      return { stdout: JSON.stringify([{ created_at_ms: 4, item_type: 'agentMessage', item_json: '{"id":"a","text":"Result"}', pending: 0 }]) };
+    },
+  });
+  const tasks = await repository.listTasks();
+  assert.equal(tasks[0].title, 'Task');
+  assert.equal((await repository.getTask(row.id)).messages.length, 1);
+  assert.match(calls[0][1][2], /queue''s\.db/);
+  assert.match(calls[0][1][2], /history''s\.db/);
+  assert.match(calls[0][1][2], /goals''s\.db/);
+  assert.equal(escapeSqlite("a'b"), "a''b");
+});
+
+test('repository handles empty lists, misses and queue stdout or stderr', async () => {
+  let response = { stdout: '' };
+  let queueResponse = { stdout: '', stderr: 'queued' };
+  const repository = new CodexRepository({
+    stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals', codexBin: '/codex',
+    execFile: async (...args) => args[0] === 'sqlite3' ? response : queueResponse,
+    readSnapshot: async () => ({}),
+  });
+  assert.deepEqual(await repository.listTasks(), []);
+  assert.equal(await repository.getTask('missing'), null);
+  assert.deepEqual(await repository.sendMessage(row.id, 'hello'), { accepted: true, mode: 'queued', output: 'queued', warning: '当前 Codex 不支持启动任务' });
+  queueResponse = { stdout: 'ok', stderr: 'ignored' };
+  assert.equal((await repository.sendMessage(row.id, 'hello')).output, 'ok');
+  queueResponse = {};
+  assert.equal((await repository.sendMessage(row.id, 'hello')).output, '');
+  const started = new CodexRepository({
+    stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals',
+    execFile: async () => ({ stdout: '' }),
+    startTurn: async (...args) => ({ turn: args }),
+  });
+  started.details.set(row.id, { cwd: '/work' });
+  assert.deepEqual(await started.sendMessage(row.id, 'run'), { accepted: true, mode: 'started', result: { turn: [row.id, 'run', '/work'] } });
+  const loadedCwd = new CodexRepository({
+    stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals',
+    execFile: async (_command, args) => args[2].includes('SELECT cwd') ? { stdout: '[{"cwd":"/loaded"}]' } : { stdout: '' },
+    startTurn: async (...args) => args,
+  });
+  assert.deepEqual((await loadedCwd.sendMessage(row.id, 'load')).result, [row.id, 'load', '/loaded']);
+  loadedCwd.execFile = async () => ({ stdout: '[{}]' });
+  assert.equal(await loadedCwd.threadCwd('uncached'), process.cwd());
+  const active = new CodexRepository({
+    stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals',
+    execFile: async (command) => command === 'sqlite3' ? { stdout: '[{"turn_id":"active"}]' } : { stderr: 'waiting' },
+  });
+  assert.deepEqual(await active.sendMessage(row.id, 'later'), { accepted: true, mode: 'queued', output: 'waiting' });
+  const defaults = new CodexRepository({
+    stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals',
+    execFile: async () => ({ stdout: JSON.stringify([{ ...row, queued_count: null }]) }),
+  });
+  assert.equal((await defaults.listTasks()).length, 1);
+});
+
+test('history messages parse user, assistant, queued and invalid records', () => {
+  assert.deepEqual(parseHistoryMessage({ created_at_ms: 1, item_type: 'agentMessage', item_json: '{"id":"a","text":" answer "}', pending: 0 }), { id: 'a', role: 'assistant', text: 'answer', timestamp: 1, pending: false });
+  assert.equal(parseHistoryMessage({ created_at_ms: 2, item_type: 'userMessage', item_json: '{"content":[{"type":"text","text":"<environment_context>x"}]}', pending: 0 }), null);
+  assert.deepEqual(parseHistoryMessage({ created_at_ms: 3, item_type: 'queuedMessage', item_json: '{"UserInput":{"content":[{"type":"text","text":"next"}]}}', pending: 1 }), { id: '3-queuedMessage', role: 'user', text: 'next', timestamp: 3, pending: true, queueOrder: 0, queueRevision: 0 });
+  assert.deepEqual(parseHistoryMessage({ queue_item_id: 'queue-id', queue_order: 2, queue_revision: 7, created_at_ms: 4, item_type: 'queuedMessage', item_json: '{"UserInput":{"content":[{"type":"text","text":"<in-app-browser-context>x</in-app-browser-context>\\n## My request:\\nclean"}]}}', pending: 1 }), { id: 'queue-id', role: 'user', text: 'clean', timestamp: 4, pending: true, queueOrder: 2, queueRevision: 7 });
+  assert.equal(parseHistoryMessage({ created_at_ms: 5, item_type: 'agentMessage', item_json: '{}', pending: 0 }), null);
+  assert.equal(parseHistoryMessage({ item_json: '{' }), null);
+});
+
+test('history loaders return empty collections when databases have no rows', async () => {
+  const repository = new CodexRepository({
+    stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals',
+    execFile: async () => ({ stdout: '' }),
+  });
+  assert.deepEqual(await repository.loadMessages('1234567890abcdef1234'), []);
+  assert.deepEqual(await repository.loadQueuedTasks('1234567890abcdef1234'), []);
+});
+
+test('queue mutations reorder and delete atomically with revision conflict protection', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'bridge-queue-'));
+  const queueDb = join(directory, 'queue.sqlite');
+  t.after(() => rm(directory, { recursive: true }));
+  await execFile('sqlite3', [queueDb, `
+    CREATE TABLE queued_items (id TEXT PRIMARY KEY NOT NULL, thread_id TEXT NOT NULL, payload_json TEXT NOT NULL, queue_order INTEGER NOT NULL, created_at_ms INTEGER NOT NULL, updated_at_ms INTEGER NOT NULL);
+    CREATE UNIQUE INDEX queued_items_thread_order_idx ON queued_items(thread_id, queue_order);
+    CREATE TABLE queued_thread_revisions (revision INTEGER PRIMARY KEY AUTOINCREMENT, thread_id TEXT NOT NULL UNIQUE);
+    CREATE TRIGGER queued_items_revision_after_insert AFTER INSERT ON queued_items BEGIN INSERT INTO queued_thread_revisions (thread_id) VALUES (NEW.thread_id) ON CONFLICT(thread_id) DO UPDATE SET revision = (SELECT COALESCE(MAX(revision), 0) + 1 FROM queued_thread_revisions); END;
+    CREATE TRIGGER queued_items_revision_after_update AFTER UPDATE ON queued_items BEGIN INSERT INTO queued_thread_revisions (thread_id) VALUES (NEW.thread_id) ON CONFLICT(thread_id) DO UPDATE SET revision = (SELECT COALESCE(MAX(revision), 0) + 1 FROM queued_thread_revisions); END;
+    CREATE TRIGGER queued_items_revision_after_delete AFTER DELETE ON queued_items BEGIN INSERT INTO queued_thread_revisions (thread_id) VALUES (OLD.thread_id) ON CONFLICT(thread_id) DO UPDATE SET revision = (SELECT COALESCE(MAX(revision), 0) + 1 FROM queued_thread_revisions); END;
+    INSERT INTO queued_items VALUES
+      ('aaaaaaaaaaaaaaaaaaaa', '1234567890abcdef1234', '{"UserInput":{"content":[{"type":"text","text":"first"}]}}', 1, 1, 1),
+      ('bbbbbbbbbbbbbbbbbbbb', '1234567890abcdef1234', '{"UserInput":{"content":[{"type":"text","text":"second"}]}}', 2, 2, 2),
+      ('cccccccccccccccccccc', '1234567890abcdef1234', '{"UserInput":{"content":[{"type":"text","text":"third"}]}}', 3, 3, 3);
+  `]);
+  const repository = new CodexRepository({
+    stateDb: '/state', queueDb, historyDb: '/history', goalsDb: '/goals', now: () => 99,
+  });
+  const initial = await repository.loadQueuedTasks('1234567890abcdef1234');
+  assert.deepEqual(initial.map((item) => item.text), ['first', 'second', 'third']);
+  const reordered = await repository.reorderQueuedTasks('1234567890abcdef1234', [initial[2].id, initial[0].id, initial[1].id], initial[0].queueRevision);
+  assert.deepEqual(reordered.map((item) => item.text), ['third', 'first', 'second']);
+  assert.ok(reordered[0].queueRevision > initial[0].queueRevision);
+  await assert.rejects(repository.reorderQueuedTasks('1234567890abcdef1234', reordered.map((item) => item.id), initial[0].queueRevision), (error) => error.statusCode === 409);
+  await assert.rejects(repository.reorderQueuedTasks('1234567890abcdef1234', ['dddddddddddddddddddd'], reordered[0].queueRevision), /任务队列已变化/);
+  const afterDelete = await repository.deleteQueuedTask('1234567890abcdef1234', reordered[1].id, reordered[0].queueRevision);
+  assert.deepEqual(afterDelete.map((item) => item.text), ['third', 'second']);
+  await assert.rejects(repository.deleteQueuedTask('1234567890abcdef1234', 'dddddddddddddddddddd', afterDelete[0].queueRevision), (error) => error.statusCode === 409);
+});
+
+test('queued task steering targets the active turn and removes only the steered item', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'bridge-steer-'));
+  const queueDb = join(directory, 'queue.sqlite');
+  const historyDb = join(directory, 'history.sqlite');
+  const threadId = '1234567890abcdef1234';
+  t.after(() => rm(directory, { recursive: true }));
+  await execFile('sqlite3', [queueDb, `
+    CREATE TABLE queued_items (id TEXT PRIMARY KEY NOT NULL, thread_id TEXT NOT NULL, payload_json TEXT NOT NULL, queue_order INTEGER NOT NULL, created_at_ms INTEGER NOT NULL, updated_at_ms INTEGER NOT NULL);
+    CREATE TABLE queued_thread_revisions (revision INTEGER PRIMARY KEY AUTOINCREMENT, thread_id TEXT NOT NULL UNIQUE);
+    CREATE TRIGGER queued_items_revision_after_insert AFTER INSERT ON queued_items BEGIN INSERT INTO queued_thread_revisions (thread_id) VALUES (NEW.thread_id) ON CONFLICT(thread_id) DO UPDATE SET revision = (SELECT COALESCE(MAX(revision), 0) + 1 FROM queued_thread_revisions); END;
+    CREATE TRIGGER queued_items_revision_after_delete AFTER DELETE ON queued_items BEGIN INSERT INTO queued_thread_revisions (thread_id) VALUES (OLD.thread_id) ON CONFLICT(thread_id) DO UPDATE SET revision = (SELECT COALESCE(MAX(revision), 0) + 1 FROM queued_thread_revisions); END;
+    INSERT INTO queued_items VALUES
+      ('aaaaaaaaaaaaaaaaaaaa', '${threadId}', '{"UserInput":{"content":[{"type":"text","text":"steer me"}]}}', 1, 1, 1),
+      ('bbbbbbbbbbbbbbbbbbbb', '${threadId}', '{"UserInput":{"content":[{"type":"text","text":"keep me"}]}}', 2, 2, 2);
+  `]);
+  await execFile('sqlite3', [historyDb, 'CREATE TABLE thread_turns (thread_id TEXT, turn_id TEXT, status TEXT, rollout_ordinal INTEGER);']);
+  const calls = [];
+  const starts = [];
+  const repository = new CodexRepository({
+    stateDb: '/state', queueDb, historyDb, goalsDb: '/goals',
+    steerMessage: async (...args) => { calls.push(args); return { accepted: true }; },
+    startTurn: async (...args) => { starts.push(args); return { started: true }; },
+  });
+  repository.details.set(threadId, { cwd: '/work' });
+  const initial = await repository.loadQueuedTasks(threadId);
+  await assert.rejects(repository.steerQueuedTask(threadId, initial[0].id, initial[0].queueRevision + 1), (error) => error.statusCode === 409);
+  const started = await repository.steerQueuedTask(threadId, initial[0].id, initial[0].queueRevision);
+  assert.deepEqual(starts, [[threadId, 'steer me', '/work']]);
+  assert.deepEqual(started.result, { started: true });
+  assert.deepEqual(started.queuedTasks.map((item) => item.text), ['keep me']);
+  await execFile('sqlite3', [historyDb, `INSERT INTO thread_turns VALUES ('${threadId}', 'turn-old', 'completed', 1), ('${threadId}', 'turn-active', 'inProgress', 2);`]);
+  const remaining = await repository.loadQueuedTasks(threadId);
+  const steered = await repository.steerQueuedTask(threadId, remaining[0].id, remaining[0].queueRevision);
+  assert.deepEqual(calls, [[threadId, 'turn-active', 'keep me']]);
+  assert.deepEqual(steered.result, { accepted: true });
+  assert.deepEqual(steered.queuedTasks, []);
+
+  await execFile('sqlite3', [queueDb, `INSERT INTO queued_items VALUES ('cccccccccccccccccccc', '${threadId}', '{"UserInput":{"content":[{"type":"text","text":"preserve me"}]}}', 1, 3, 3);`]);
+  await execFile('sqlite3', [historyDb, `UPDATE thread_turns SET status = 'completed';`]);
+  const unsupported = new CodexRepository({ stateDb: '/state', queueDb, historyDb, goalsDb: '/goals' });
+  unsupported.details.set(threadId, { cwd: '/work' });
+  const preserved = await unsupported.loadQueuedTasks(threadId);
+  await assert.rejects(unsupported.steerQueuedTask(threadId, preserved[0].id, preserved[0].queueRevision), (error) => error.statusCode === 503);
+  assert.deepEqual((await unsupported.loadQueuedTasks(threadId)).map((item) => item.text), ['preserve me']);
+  await execFile('sqlite3', [historyDb, `INSERT INTO thread_turns VALUES ('${threadId}', 'turn-new', 'inProgress', 3);`]);
+  await assert.rejects(unsupported.steerQueuedTask(threadId, preserved[0].id, preserved[0].queueRevision), (error) => error.statusCode === 503);
+});

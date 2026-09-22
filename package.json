@@ -1,0 +1,26 @@
+{
+  "name": "codex-local-hub",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first mobile dashboard for monitoring and controlling Codex tasks.",
+  "keywords": ["codex", "openai", "mobile-dashboard", "local-network", "task-monitor", "macos", "pwa"],
+  "license": "MIT",
+  "scripts": {
+    "start": "node src/index.mjs",
+    "dev": "node --watch src/index.mjs",
+    "build:mac": "zsh scripts/build-macos-app.sh",
+    "package:mac": "zsh scripts/package-macos.sh",
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=100 --test-coverage-include=src/control.mjs --test-coverage-include=src/core.mjs --test-coverage-include=src/deliveries.mjs --test-coverage-include=src/rollout.mjs --test-coverage-include=src/repository.mjs --test-coverage-include=src/server.mjs --test-coverage-include=src/usage.mjs --test-coverage-include=public/app.js --test-coverage-include=public/i18n.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "jsdom": "^30.1.0"
+  },
+  "dependencies": {
+    "ws": "^8.21.3"
+  }
+}

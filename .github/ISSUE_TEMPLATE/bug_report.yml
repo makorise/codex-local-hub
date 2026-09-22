@@ -1,0 +1,19 @@
+name: Bug report
+description: Report a reproducible Codex Local Hub problem
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: textarea
+    attributes: { label: What happened?, description: Describe the problem and expected behavior. }
+    validations: { required: true }
+  - type: input
+    attributes: { label: Version, placeholder: 0.2.0 }
+    validations: { required: true }
+  - type: input
+    attributes: { label: Environment, placeholder: macOS version, Node.js version, phone/browser }
+    validations: { required: true }
+  - type: textarea
+    attributes: { label: Reproduction steps }
+    validations: { required: true }
+  - type: textarea
+    attributes: { label: Logs or screenshots, description: Remove tokens and private conversation data first. }

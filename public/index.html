@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#080b12" />
+    <meta name="description" content="Codex Local Hub is a local-first mobile dashboard for monitoring and controlling Codex tasks from your phone." />
+    <meta name="keywords" content="Codex, mobile dashboard, local network, task monitor, remote control, macOS, Node.js, PWA" />
+    <meta property="og:title" content="Codex Local Hub" />
+    <meta property="og:description" content="Monitor and control Codex tasks from your phone on the local network." />
+    <meta property="og:type" content="website" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Codex Hub" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/app-icon-192.png" />
+    <link rel="stylesheet" href="/styles.css?v=18" />
+    <title>Codex Local Hub</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <div>
+            <h1 data-i18n="brand.name">Codex 随身工作台</h1>
+            <p><span id="connection-dot" class="connection-dot"></span><span id="connection-text" data-i18n="connection.connecting">正在连接 Mac</span></p>
+          </div>
+        </div>
+        <div class="top-actions">
+          <button id="language-button" class="language-button" type="button" aria-label="切换为英文" data-i18n-aria="action.switchLanguage">EN</button>
+          <button id="refresh-button" class="icon-button" type="button" aria-label="刷新任务" data-i18n-aria="action.refresh">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7" /></svg>
+          </button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="task-pane" aria-label="任务列表" data-i18n-aria="nav.taskList">
+          <aside id="install-tip" class="install-tip" hidden>
+            <span class="install-tip-icon" aria-hidden="true">↗</span>
+            <span><strong data-i18n="install.title">添加到手机桌面</strong><small data-i18n="install.summary">像 App 一样快速打开，仅在同一局域网使用</small></span>
+            <button id="install-help" type="button" data-i18n="install.action">查看方法</button>
+            <button id="install-dismiss" class="install-dismiss" type="button" aria-label="关闭" data-i18n-aria="action.close">×</button>
+          </aside>
+          <button id="usage-card" class="usage-overview" type="button" hidden>
+            <span class="usage-symbol" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 19V9m7 10V5m7 14v-7" /></svg>
+            </span>
+            <span class="usage-copy">
+              <span class="usage-kicker"><span data-i18n="usage.title">Codex 用量</span> <em id="usage-plan"></em></span>
+              <strong id="usage-summary"></strong>
+              <span id="usage-reset"></span>
+            </span>
+            <span id="usage-ring" class="usage-ring" aria-hidden="true">
+              <span><strong id="usage-ring-value"></strong><small>%</small></span>
+            </span>
+          </button>
+
+          <section id="delivery-inbox" class="delivery-inbox" aria-label="交付信箱" data-i18n-aria="delivery.title" hidden>
+            <div class="delivery-inbox-head">
+              <div><span class="section-label" data-i18n="delivery.title">交付信箱</span><strong data-i18n="delivery.subtitle">最近的图片结果</strong></div>
+              <span id="delivery-count"></span>
+            </div>
+            <div id="delivery-list" class="delivery-list"></div>
+          </section>
+
+          <div class="summary-row">
+            <div><span id="active-count">0</span><small data-i18n="summary.running">正在进行</small></div>
+            <div><span id="queued-count">0</span><small data-i18n="summary.queued">等待处理</small></div>
+            <div><span id="task-count">0</span><small data-i18n="summary.all">全部任务</small></div>
+          </div>
+
+          <div class="filters" role="tablist" aria-label="任务筛选" data-i18n-aria="nav.taskFilter">
+            <button class="filter is-active" type="button" data-filter="all" data-i18n="filter.all">全部</button>
+            <button class="filter" type="button" data-filter="running" data-i18n="filter.running">进行中</button>
+            <button class="filter" type="button" data-filter="queued" data-i18n="filter.queued">已排队</button>
+            <button class="filter" type="button" data-filter="done" data-i18n="filter.done">已完成</button>
+          </div>
+
+          <div id="task-list" class="task-list" aria-live="polite">
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+          </div>
+        </section>
+
+        <section id="detail-pane" class="detail-pane is-empty" aria-label="任务详情" data-i18n-aria="nav.taskDetail">
+          <div id="empty-state" class="empty-state">
+            <div class="empty-orbit"><span></span></div>
+            <h2 data-i18n="empty.title">选择一个任务</h2>
+            <p data-i18n="empty.summary">查看最新进展，并从手机继续对话。</p>
+          </div>
+
+          <div id="task-detail" class="task-detail" hidden>
+            <div class="detail-head">
+              <button id="back-button" class="back-button" type="button" aria-label="返回任务列表" data-i18n-aria="action.back">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+              </button>
+              <div class="detail-title-wrap">
+                <span id="detail-project" class="eyebrow"></span>
+                <h2 id="detail-title"></h2>
+              </div>
+              <span id="detail-status" class="status-pill"></span>
+              <button id="resume-button" class="resume-button" type="button" hidden data-i18n="action.resume">继续任务</button>
+            </div>
+
+            <div class="detail-scroll">
+              <section class="conversation-card">
+                <div class="conversation-heading">
+                  <div class="section-label" data-i18n="conversation.title">对话记录</div>
+                  <span data-i18n="conversation.hint">越上越早 · 最多 20 条</span>
+                </div>
+                <div id="recent-messages" class="recent-messages"></div>
+              </section>
+            </div>
+
+            <div class="composer-dock">
+              <div class="context-bar">
+                <div class="context-topline">
+                  <button id="latest-task-preview" class="text-preview" type="button" aria-label="查看最后一个问题全文" data-i18n-aria="context.lastQuestionAria">
+                    <span class="context-label" data-i18n="context.lastQuestion">最后问题</span>
+                    <span id="detail-latest-task"></span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+                  </button>
+                  <div class="context-actions">
+                    <button id="goal-card" class="context-chip" type="button" hidden>
+                      <span data-i18n="context.goal">目标</span><strong id="goal-status"></strong><span id="goal-elapsed"></span>
+                    </button>
+                    <button id="queue-card" class="context-chip queue-chip" type="button" hidden>
+                      <span id="queue-count-label"></span>
+                    </button>
+                  </div>
+                </div>
+                <span id="goal-objective" hidden></span>
+              </div>
+
+              <form id="message-form" class="composer">
+                <label for="message-input" class="sr-only" data-i18n="composer.label">给当前任务发送新提示词</label>
+                <textarea id="message-input" rows="1" maxlength="12000" placeholder="输入新的提示词…" data-i18n-placeholder="composer.placeholder" required></textarea>
+                <button id="send-button" type="submit" aria-label="发送消息" data-i18n-aria="action.send">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14-8-4 16-3-6-7-2Z" /><path d="m12 14 7-10" /></svg>
+                </button>
+                <p id="composer-hint" data-i18n="composer.hint">消息会进入当前 Codex 任务</p>
+              </form>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div id="content-modal" class="content-modal" hidden>
+      <button class="modal-backdrop" type="button" aria-label="关闭详情" data-i18n-aria="action.closeDetail"></button>
+      <section class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-head">
+          <div>
+            <div id="modal-kicker" class="section-label" data-i18n="modal.fullContent">完整内容</div>
+            <h2 id="modal-title"></h2>
+          </div>
+          <button id="modal-close" class="icon-button" type="button" aria-label="关闭详情" data-i18n-aria="action.closeDetail">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+        <div id="modal-content" class="modal-content"></div>
+      </section>
+    </div>
+    <script type="module" src="/app.js?v=23"></script>
+  </body>
+</html>
