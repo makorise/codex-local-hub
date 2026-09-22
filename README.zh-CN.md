@@ -121,7 +121,7 @@ README 最上方的命令会安装可复用的 [`setup-codex-local-hub`](.agents
 
 ## 启用图片交付 Skill
 
-**交付信箱**本身已经内置在 Codex Local Hub 中。使用上面的一句话安装方式时，系统会自动安装配套的 [`deliver-to-codex-local-hub`](.agents/skills/deliver-to-codex-local-hub) Skill。它会告诉 Codex 如何检查现有截图或图片，并把它安全地放入交付通道。Skill 使用 App 内置的 Node.js，不会增加全局运行时依赖。原图不会被移动或修改，信箱只保留最近 20 张受支持的图片。
+**交付信箱**本身已经内置在 Codex Local Hub 中。使用上面的一句话安装方式时，系统会自动安装配套的 [`deliver-to-codex-local-hub`](.agents/skills/deliver-to-codex-local-hub) Skill。它会告诉 Codex 如何检查现有截图或图片，并把它安全地放入交付通道。Skill 使用 App 内置的 Node.js，不会增加全局运行时依赖。原图不会被移动或修改，信箱只保留最近 20 张受支持的图片；看完后可用紧凑的“清空”按钮删除信箱副本，不影响原图。
 
 推荐安装方式：在 Codex 对话中发送下面这句话，注意这不是终端命令：
 

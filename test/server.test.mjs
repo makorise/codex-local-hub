@@ -69,6 +69,7 @@ test('bridge server serves authenticated API, static files, SSE and messages', a
   const deliveryInbox = {
     list: async () => [{ id: 'image.png', title: '交付图', createdAt: 1, size: 3, mime: 'image/png', url: '/api/deliveries/files/image.png' }],
     open: async (id) => id === 'image.png' ? { mime: 'image/png', size: 3, stream: () => Readable.from(Buffer.from('png')) } : null,
+    clear: async () => 1,
   };
   const bridge = createBridgeServer({ repository, token: 'secret', requirePairing: true, publicDir, deliveryInbox, pollMs: 60_000, runtimeInfo: { version: '0.2.4', source: 'hot-update' } });
   await new Promise((resolve) => bridge.server.listen(0, '127.0.0.1', resolve));
@@ -80,6 +81,7 @@ test('bridge server serves authenticated API, static files, SSE and messages', a
   assert.equal((await request(base, '/api/tasks', { headers: { authorization: 'Bearer secret' } })).body.tasks.length, 1);
   assert.deepEqual((await request(base, '/api/usage?token=secret')).body.usage, { available: false, limits: [] });
   assert.equal((await request(base, '/api/deliveries?token=secret')).body.deliveries[0].title, '交付图');
+  assert.deepEqual((await request(base, '/api/deliveries?token=secret', { method: 'DELETE' })).body, { deleted: 1 });
   const deliveredImage = await request(base, '/api/deliveries/files/image.png?token=secret');
   assert.equal(deliveredImage.status, 200);
   assert.equal(deliveredImage.body, 'png');
@@ -233,6 +235,7 @@ test('bridge reports repository and message failures and closes active streams',
   const base2 = `http://127.0.0.1:${second.server.address().port}`;
   assert.equal((await request(base2, '/api/tasks')).body.error, '服务暂时不可用');
   assert.deepEqual((await request(base2, '/api/deliveries')).body.deliveries, []);
+  assert.deepEqual((await request(base2, '/api/deliveries', { method: 'DELETE' })).body, { deleted: 0 });
   assert.equal((await request(base2, '/api/deliveries/files/missing.png')).status, 404);
   second.server.closeAllConnections();
   await new Promise((resolve) => second.server.close(resolve));

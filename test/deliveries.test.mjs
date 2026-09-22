@@ -85,3 +85,28 @@ test('delivery inbox imports sandbox-safe staged images before listing', async (
   await oversizedStaging.importStaging();
   assert.equal((await stat(join(stagingDirectory, '3000000000000-bbbbbbbb-too_large.jpg'))).isFile(), true);
 });
+
+test('delivery inbox clears managed images without touching unrelated files', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'delivery-clear-'));
+  const directory = join(root, 'inbox');
+  const stagingDirectory = join(root, 'outbox');
+  t.after(() => rm(root, { recursive: true }));
+  await mkdir(directory);
+  await mkdir(stagingDirectory);
+  await writeFile(join(directory, 'delivered.png'), 'png');
+  await writeFile(join(directory, 'keep.txt'), 'keep');
+  await writeFile(join(stagingDirectory, 'pending.jpg'), 'jpg');
+  await writeFile(join(stagingDirectory, 'keep.json'), '{}');
+
+  const inbox = new DeliveryInbox({ directory, stagingDirectory });
+  assert.equal(await inbox.clear(), 2);
+  assert.deepEqual(await inbox.list(), []);
+  assert.equal((await stat(join(directory, 'keep.txt'))).isFile(), true);
+  assert.equal((await stat(join(stagingDirectory, 'keep.json'))).isFile(), true);
+
+  await writeFile(join(directory, 'same.webp'), 'webp');
+  const sameDirectory = new DeliveryInbox({ directory, stagingDirectory: directory });
+  assert.equal(await sameDirectory.clear(), 1);
+  const noStaging = new DeliveryInbox({ directory });
+  assert.equal(await noStaging.clear(), 0);
+});

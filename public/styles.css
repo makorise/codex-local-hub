@@ -97,7 +97,12 @@ button { color: inherit; }
 .delivery-inbox-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .delivery-inbox-head > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .delivery-inbox-head strong { font-size: .8rem; font-weight: 620; }
-.delivery-inbox-head > span { color: #7e8ba1; font-size: .68rem; }
+.delivery-inbox-head .delivery-inbox-actions { flex: 0 0 auto; flex-direction: row; align-items: center; gap: 8px; }
+.delivery-inbox-actions > span { color: #7e8ba1; font-size: .68rem; white-space: nowrap; }
+.delivery-inbox-actions button { min-height: 28px; padding: 0 9px; border: 1px solid rgba(255,255,255,.08); border-radius: 9px; color: #8995a9; background: rgba(255,255,255,.035); font-size: .64rem; cursor: pointer; }
+.delivery-inbox-actions button:hover { color: #d9e0eb; border-color: rgba(255,255,255,.14); background: rgba(255,255,255,.06); }
+.delivery-inbox-actions button[data-confirming="true"] { color: #ff9eaa; border-color: rgba(255,129,145,.2); background: rgba(255,105,125,.08); }
+.delivery-inbox-actions button:disabled { opacity: .45; cursor: wait; }
 .delivery-list { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(126px, 43%); gap: 8px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; }
 .delivery-list::-webkit-scrollbar { display: none; }
 .delivery-thumb { min-width: 0; padding: 0; overflow: hidden; border: 1px solid rgba(255,255,255,.075); border-radius: 13px; color: inherit; background: rgba(255,255,255,.025); text-align: left; cursor: pointer; scroll-snap-align: start; }

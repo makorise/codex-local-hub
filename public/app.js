@@ -251,6 +251,7 @@ function switchLanguage() {
   renderDetail();
   renderUsage();
   renderDeliveries();
+  resetDeliveryClearButton();
   if (state.syncedAt) {
     const time = new Date(state.syncedAt).toLocaleTimeString(getLanguage(), { hour: '2-digit', minute: '2-digit' });
     setConnection(true, t('connection.synced', { time }));
@@ -395,6 +396,24 @@ async function loadDeliveries() {
     state.deliveries = deliveries;
     renderDeliveries();
   } catch { /* 保留当前缩略图，避免网络抖动时闪烁。 */ }
+}
+
+function resetDeliveryClearButton() {
+  const button = $('#delivery-clear');
+  button.disabled = false;
+  delete button.dataset.confirming;
+  button.textContent = t('delivery.clear');
+  button.setAttribute('aria-label', t('delivery.clearAria'));
+}
+
+async function clearDeliveries() {
+  const response = await fetch(api('/api/deliveries'), { method: 'DELETE' });
+  const result = await response.json();
+  if (!response.ok) throw new Error(localizedError(result.error, 'delivery.clearFailure'));
+  state.deliveries = [];
+  renderDeliveries();
+  showToast(t('delivery.cleared', { count: result.deleted }));
+  return result.deleted;
 }
 
 function showDelivery(delivery) {
@@ -626,6 +645,23 @@ $('#delivery-list').addEventListener('click', (event) => {
   const delivery = state.deliveries.find((item) => item.id === button?.dataset.deliveryId);
   if (delivery) showDelivery(delivery);
 });
+$('#delivery-clear').addEventListener('click', async () => {
+  const button = $('#delivery-clear');
+  if (!button.dataset.confirming) {
+    button.dataset.confirming = 'true';
+    button.textContent = t('delivery.confirmClear');
+    button.setAttribute('aria-label', t('delivery.confirmClearAria'));
+    return;
+  }
+  button.disabled = true;
+  try {
+    await clearDeliveries();
+  } catch (error) {
+    showToast(localizedError(error.message, 'delivery.clearFailure'));
+  } finally {
+    resetDeliveryClearButton();
+  }
+});
 $('#back-button').addEventListener('click', () => {
   detailPane.classList.remove('is-open');
   history.replaceState(null, '', location.pathname + location.search);
@@ -753,6 +789,8 @@ export {
   renderDeliveries,
   deliverySignature,
   loadDeliveries,
+  resetDeliveryClearButton,
+  clearDeliveries,
   showDelivery,
   loadTasks,
   sendTaskMessage,

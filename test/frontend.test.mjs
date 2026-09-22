@@ -66,6 +66,11 @@ async function setup({ failing = new Map(), empty = false, taskCount = 1 } = {})
   let queued = queue();
   let messageMode = 'started';
   const deliveryTimestamp = Date.now();
+  const sampleDeliveries = [
+    { id: 'one.png', title: '首页截图', createdAt: deliveryTimestamp, size: 200, mime: 'image/png', url: '/api/deliveries/files/one.png' },
+    { id: 'two.jpg', title: '最终效果', createdAt: deliveryTimestamp - 60_000, size: 2048, mime: 'image/jpeg', url: '/api/deliveries/files/two.jpg' },
+  ];
+  let deliveries = empty ? [] : sampleDeliveries;
   const calls = [];
   const availableTasks = Array.from({ length: taskCount }, (_, index) => task(index === 0 ? {} : {
     id: `${String(index + 1).padStart(8, '0')}-1111-4111-8111-${String(index + 1).padStart(12, '0')}`,
@@ -79,10 +84,12 @@ async function setup({ failing = new Map(), empty = false, taskCount = 1 } = {})
     if (failing.has(url.pathname)) return response({ error: failing.get(url.pathname) }, 500);
     if (url.pathname === '/api/tasks') return response({ tasks: empty ? [] : availableTasks, syncedAt: Date.now() });
     if (url.pathname === '/api/usage') return response({ usage: empty ? { available: false, limits: [] } : { planType: 'pro', limits: [{ label: '周', usedPercent: 20, remainingPercent: 80, resetsAt: Date.now() + 60_000 }] } });
-    if (url.pathname === '/api/deliveries') return response({ deliveries: empty ? [] : [
-      { id: 'one.png', title: '首页截图', createdAt: deliveryTimestamp, size: 200, mime: 'image/png', url: '/api/deliveries/files/one.png' },
-      { id: 'two.jpg', title: '最终效果', createdAt: deliveryTimestamp - 60_000, size: 2048, mime: 'image/jpeg', url: '/api/deliveries/files/two.jpg' },
-    ] });
+    if (url.pathname === '/api/deliveries' && options.method === 'DELETE') {
+      const deleted = deliveries.length;
+      deliveries = [];
+      return response({ deleted });
+    }
+    if (url.pathname === '/api/deliveries') return response({ deliveries });
     if (url.pathname === `/api/tasks/${task().id}`) return response({ task: { ...task(), messages: empty ? [] : [{ id: 'm1', role: 'assistant', text: '结果', timestamp: Date.now(), pending: false }], queuedTasks: empty ? [] : queued } });
     if (url.pathname === `/api/tasks/${task().id}/queue` && options.method === 'PATCH') {
       const body = JSON.parse(options.body);
@@ -239,6 +246,17 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.match(document.querySelector('.delivery-view').textContent, /2 KB/);
   ui.closeContent();
   document.querySelector('#delivery-list').click();
+  const originalDeliveries = [...ui.state.deliveries];
+  document.querySelector('#delivery-clear').click();
+  assert.equal(document.querySelector('#delivery-clear').textContent, '确认');
+  assert.match(document.querySelector('#delivery-clear').getAttribute('aria-label'), /再次点击/);
+  document.querySelector('#delivery-clear').click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(document.querySelector('#delivery-inbox').hidden, true);
+  assert.ok(calls.some(([path, method]) => path === '/api/deliveries' && method === 'DELETE'));
+  ui.state.deliveries = originalDeliveries;
+  ui.renderDeliveries();
+  ui.resetDeliveryClearButton();
   assert.equal(document.querySelector('#recent-messages').textContent.includes('结果'), true);
   document.querySelector('.task-card').click();
   await new Promise((resolve) => setImmediate(resolve));
@@ -512,6 +530,11 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   await ui.loadDeliveries();
   assert.equal(document.querySelector('#delivery-inbox').hidden, false);
   assert.equal(document.querySelector('.delivery-thumb'), currentThumbnail);
+  document.querySelector('#delivery-clear').click();
+  document.querySelector('#delivery-clear').click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(document.querySelector('#toast').textContent, /delivery failed/);
+  assert.equal(document.querySelector('#delivery-clear').disabled, false);
   failures.delete('/api/deliveries');
   await ui.loadDeliveries();
   ui.state.deliveries = null;

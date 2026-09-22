@@ -2,6 +2,12 @@
 
 All notable changes to Codex Local Hub will be documented in this file.
 
+## 0.2.5 - 2026-09-22
+
+- Added a compact, two-step confirmation control for clearing the visual delivery inbox from desktop or phone.
+- Clearing removes only managed inbox and pending-delivery image copies; original screenshots and unrelated files remain untouched.
+- Added complete backend, API, bilingual frontend, failure-state, and filesystem-safety test coverage for inbox clearing.
+
 ## 0.2.4 - 2026-09-22
 
 - Added active core version and runtime source to `/api/health`, so a manual hot update can be verified independently from the desktop prompt.

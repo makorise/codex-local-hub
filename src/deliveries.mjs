@@ -74,6 +74,19 @@ export class DeliveryInbox {
     }));
   }
 
+  async clearDirectory(directory) {
+    await this.ensureDir(directory, { recursive: true });
+    const names = (await this.readDirectory(directory)).filter(isDeliveryName);
+    await Promise.all(names.map((name) => this.removeFile(join(directory, name))));
+    return names.length;
+  }
+
+  async clear() {
+    const deleted = await this.clearDirectory(this.directory);
+    if (!this.stagingDirectory || this.stagingDirectory === this.directory) return deleted;
+    return deleted + await this.clearDirectory(this.stagingDirectory);
+  }
+
   async open(id) {
     if (!isDeliveryName(id)) return null;
     const path = join(this.directory, id);

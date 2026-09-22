@@ -123,7 +123,7 @@ The current release is local-network only. The data path stays between the Mac a
 
 ## Enable the visual delivery skill
 
-The **Delivery inbox** is built into Codex Local Hub. The one-message setup above installs the companion [`deliver-to-codex-local-hub`](.agents/skills/deliver-to-codex-local-hub) skill automatically. It teaches Codex how to validate an existing screenshot or image and stage it for the inbox. It uses the app's bundled Node.js, so it does not add a global runtime dependency. The source file is never moved or modified, and the inbox keeps only the latest 20 supported images.
+The **Delivery inbox** is built into Codex Local Hub. The one-message setup above installs the companion [`deliver-to-codex-local-hub`](.agents/skills/deliver-to-codex-local-hub) skill automatically. It teaches Codex how to validate an existing screenshot or image and stage it for the inbox. It uses the app's bundled Node.js, so it does not add a global runtime dependency. The source file is never moved or modified, the inbox keeps only the latest 20 supported images, and its compact **Clear** control removes reviewed inbox copies without touching the originals.
 
 Recommended installation: send this message in Codex (it is not a Terminal command):
 

@@ -15,7 +15,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/app-icon-192.png" />
-    <link rel="stylesheet" href="/styles.css?v=20" />
+    <link rel="stylesheet" href="/styles.css?v=21" />
     <title>Codex Local Hub</title>
   </head>
   <body>
@@ -61,7 +61,10 @@
           <section id="delivery-inbox" class="delivery-inbox" aria-label="交付信箱" data-i18n-aria="delivery.title" hidden>
             <div class="delivery-inbox-head">
               <div><span class="section-label" data-i18n="delivery.title">交付信箱</span><strong data-i18n="delivery.subtitle">最近的图片结果</strong></div>
-              <span id="delivery-count"></span>
+              <div class="delivery-inbox-actions">
+                <span id="delivery-count"></span>
+                <button id="delivery-clear" type="button" aria-label="清空交付信箱" data-i18n-aria="delivery.clearAria" data-i18n="delivery.clear">清空</button>
+              </div>
             </div>
             <div id="delivery-list" class="delivery-list"></div>
           </section>
@@ -165,6 +168,6 @@
         <div id="modal-content" class="modal-content"></div>
       </section>
     </div>
-    <script type="module" src="/app.js?v=24"></script>
+    <script type="module" src="/app.js?v=25"></script>
   </body>
 </html>

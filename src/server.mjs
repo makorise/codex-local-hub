@@ -82,7 +82,7 @@ export function createBridgeServer({
   requirePairing = false,
   publicDir,
   usageReader = async () => ({ available: false, limits: [] }),
-  deliveryInbox = { list: async () => [], open: async () => null },
+  deliveryInbox = { list: async () => [], open: async () => null, clear: async () => 0 },
   createServer = nodeCreateServer,
   pollMs = 1500,
   runtimeInfo = { version: 'unknown', source: 'bundled' },
@@ -140,6 +140,9 @@ export function createBridgeServer({
       }
       if (request.method === 'GET' && url.pathname === '/api/deliveries') {
         return json(response, 200, { deliveries: await deliveryInbox.list() });
+      }
+      if (request.method === 'DELETE' && url.pathname === '/api/deliveries') {
+        return json(response, 200, { deleted: await deliveryInbox.clear() });
       }
       const deliveryMatch = request.method === 'GET' && url.pathname.match(/^\/api\/deliveries\/files\/([^/]+)$/);
       if (deliveryMatch) {
