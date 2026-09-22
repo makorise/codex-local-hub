@@ -1,6 +1,6 @@
-# Codex Local Hub
+# Codex Local Hub — Mobile Dashboard for Codex · Codex 随身工作台
 
-**A local-first mobile dashboard for monitoring and controlling Codex tasks from your phone.**
+**Monitor and control long-running ChatGPT Codex tasks from your phone—without staying glued to your Mac.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-2563eb.svg)](LICENSE)
 [![CI](https://github.com/brandonwang001/codex-local-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/brandonwang001/codex-local-hub/actions/workflows/ci.yml)
@@ -10,31 +10,25 @@
 
 [简体中文](README.zh-CN.md) · English
 
+<p align="center">
+  <img src="docs/assets/social-preview/codex-local-hub-social-preview.png" width="100%" alt="Codex Local Hub mobile dashboard for monitoring and controlling ChatGPT Codex tasks from a phone">
+</p>
+
 Codex Local Hub is an open-source **Codex mobile dashboard, task monitor, and phone remote control for macOS**. It turns a Mac running Codex into a private, phone-friendly task console on your local network. Scan the QR code in the macOS app to monitor task progress, review recent messages and visual deliveries, manage queued prompts, and continue a task without exposing your conversations to a third-party service.
+
+中文用户可以把它理解为“**Codex 随身工作台**”：用手机查看和控制 Mac 上 ChatGPT/Codex 正在运行的任务，不用一直守着电脑。
 
 > Codex Local Hub is an independent open-source project and is not affiliated with or endorsed by OpenAI.
 
-## Install with one message to Codex
+## Stop babysitting long Codex tasks
 
-You do not need to begin with Terminal commands. Copy the message below into a Codex task on the Mac you want to use as the host:
+Start a long Codex task, then leave your desk. From bed, the couch, the bathroom, or another room, you can open your phone to answer the questions that matter:
 
-```text
-Use $skill-installer to install the setup skill from https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub. After installation, read the installed SKILL.md and carry it out in this task: install or update Codex Local Hub on this Mac, install its image-delivery skill, launch the app, and verify local phone access. Prefer the latest stable release; if no suitable release exists, build it from source. Continue autonomously unless an action genuinely requires me, then finish with the app location, access method, and verification results.
-```
+- Is the task still running, queued, paused, or finished?
+- What did Codex just say, and does it need a reply?
+- Is the screenshot or visual result ready to review?
 
-This one message asks Codex to install the reusable [`setup-codex-local-hub`](.agents/skills/setup-codex-local-hub) skill and immediately complete the setup. The skill keeps Gatekeeper enabled, preserves existing files, runs the test suite, verifies the application, installs the companion image-delivery skill, and stops instead of exposing the service to the public internet.
-
-If the source repository already exists on the Mac, use this shorter follow-up; the same skill will preserve changes and choose an in-place source upgrade or a clean fallback checkout:
-
-```text
-Use $setup-codex-local-hub to update my existing Codex Local Hub source checkout and installed app. Fast-forward only if the checkout is clean; preserve every local change, run the full test suite, build the self-contained universal app, back up the installed version, replace it, relaunch it, and verify phone access. Do not ask me to download an installer manually.
-```
-
-If Codex reports that the selected model is at capacity, wait while the task is still working. If it stops, choose another available model and send this in the same task:
-
-```text
-Continue with $setup-codex-local-hub from the last verified setup stage. Reuse the existing checkpoint and files; do not restart completed work. Finish installation, launch, and phone-access verification.
-```
+Your Mac keeps doing the work while you keep living your life.
 
 ## See it in action
 
@@ -73,6 +67,28 @@ Continue with $setup-codex-local-hub from the last verified setup stage. Reuse t
 </table>
 
 These are real product-interface screenshots with sanitized demo data. The working QR code and private LAN address in the host screenshot were replaced with a non-scannable placeholder and example address; no private task content is included.
+
+## Install with one message to Codex
+
+You do not need to begin with Terminal commands. Copy the message below into a Codex task on the Mac you want to use as the host:
+
+```text
+Use $skill-installer to install the setup skill from https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub. After installation, read the installed SKILL.md and carry it out in this task: install or update Codex Local Hub on this Mac, install its image-delivery skill, launch the app, and verify local phone access. Prefer the latest stable release; if no suitable release exists, build it from source. Continue autonomously unless an action genuinely requires me, then finish with the app location, access method, and verification results.
+```
+
+This one message asks Codex to install the reusable [`setup-codex-local-hub`](.agents/skills/setup-codex-local-hub) skill and immediately complete the setup. The skill keeps Gatekeeper enabled, preserves existing files, runs the test suite, verifies the application, installs the companion image-delivery skill, and stops instead of exposing the service to the public internet.
+
+If the source repository already exists on the Mac, use this shorter follow-up; the same skill will preserve changes and choose an in-place source upgrade or a clean fallback checkout:
+
+```text
+Use $setup-codex-local-hub to update my existing Codex Local Hub source checkout and installed app. Fast-forward only if the checkout is clean; preserve every local change, run the full test suite, build the self-contained universal app, back up the installed version, replace it, relaunch it, and verify phone access. Do not ask me to download an installer manually.
+```
+
+If Codex reports that the selected model is at capacity, wait while the task is still working. If it stops, choose another available model and send this in the same task:
+
+```text
+Continue with $setup-codex-local-hub from the last verified setup stage. Reuse the existing checkpoint and files; do not restart completed work. Finish installation, launch, and phone-access verification.
+```
 
 ## How it works
 
@@ -232,10 +248,6 @@ No. Locking the screen is supported. Sleep, shutdown, or quitting Codex Local Hu
 ## Contributing
 
 Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md) first.
-
-## Suggested GitHub topics
-
-`codex` `openai` `mobile-dashboard` `local-first` `task-monitor` `macos` `nodejs` `pwa` `developer-tools` `remote-control`
 
 ## License
 

@@ -3,7 +3,7 @@
   "version": "0.2.2",
   "private": true,
   "type": "module",
-  "description": "Local-first mobile dashboard for monitoring and controlling Codex tasks.",
+  "description": "Local-first macOS dashboard for monitoring and controlling ChatGPT Codex tasks from your phone.",
   "homepage": "https://github.com/brandonwang001/codex-local-hub#readme",
   "repository": {
     "type": "git",
@@ -12,7 +12,24 @@
   "bugs": {
     "url": "https://github.com/brandonwang001/codex-local-hub/issues"
   },
-  "keywords": ["codex", "openai", "mobile-dashboard", "local-network", "task-monitor", "macos", "pwa"],
+  "keywords": [
+    "codex",
+    "openai",
+    "openai-codex",
+    "codex-cli",
+    "codex-desktop",
+    "codex-mobile",
+    "codex-dashboard",
+    "codex-remote",
+    "mobile-dashboard",
+    "phone-remote-control",
+    "local-network",
+    "local-first",
+    "task-monitor",
+    "task-queue",
+    "macos",
+    "pwa"
+  ],
   "license": "MIT",
   "scripts": {
     "start": "node src/index.mjs",

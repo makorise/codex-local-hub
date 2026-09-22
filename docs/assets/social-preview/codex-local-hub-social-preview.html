@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>Codex Local Hub Social Preview</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 1280px; height: 640px; overflow: hidden; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif; background: #060913; }
+    .canvas {
+      position: relative;
+      width: 1280px;
+      height: 640px;
+      overflow: hidden;
+      color: #fff;
+      background:
+        radial-gradient(circle at 87% 36%, rgba(58, 87, 255, .46), transparent 35%),
+        radial-gradient(circle at 32% 100%, rgba(35, 58, 151, .28), transparent 47%),
+        linear-gradient(135deg, #080c18 0%, #071027 58%, #070a12 100%);
+    }
+    .canvas::before { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(5, 8, 18, .97) 0%, rgba(6, 10, 23, .87) 48%, rgba(5, 8, 18, .34) 100%); }
+    .canvas::after { content: ""; position: absolute; width: 540px; height: 540px; right: 25px; top: 54px; border-radius: 50%; background: rgba(67, 89, 255, .18); filter: blur(70px); }
+    .copy { position: absolute; z-index: 3; left: 74px; top: 56px; width: 690px; }
+    .brand { display: flex; align-items: center; gap: 16px; }
+    .brand img { width: 58px; height: 58px; border-radius: 16px; box-shadow: 0 12px 30px rgba(75, 94, 255, .32); }
+    .brand-name { font-size: 27px; font-weight: 790; letter-spacing: -.02em; }
+    .brand-sub { margin-top: 5px; color: #8795b2; font-size: 14px; font-weight: 650; letter-spacing: .15em; }
+    .tag { display: inline-flex; margin-left: 24px; padding: 8px 13px; border: 1px solid rgba(93, 225, 178, .32); border-radius: 999px; color: #69edba; background: rgba(21, 114, 82, .13); font-size: 13px; font-weight: 760; letter-spacing: .08em; }
+    h1 { margin: 43px 0 0; font-size: 65px; line-height: 1.07; letter-spacing: -.048em; font-weight: 860; }
+    h1 span { color: transparent; background: linear-gradient(90deg, #d7e4ff, #7189ff); -webkit-background-clip: text; background-clip: text; }
+    .desc { margin-top: 22px; width: 600px; color: #c0cadc; font-size: 23px; line-height: 1.52; }
+    .desc strong { color: #fff; }
+    .pills { display: flex; gap: 10px; margin-top: 24px; }
+    .pill { padding: 9px 15px; border: 1px solid rgba(143, 163, 217, .22); border-radius: 999px; background: rgba(15, 22, 41, .75); color: #dbe4f5; font-size: 15px; font-weight: 650; }
+    .phones { position: absolute; z-index: 2; right: 46px; bottom: -145px; width: 520px; height: 735px; }
+    .phone { position: absolute; width: 274px; padding: 9px; border-radius: 42px; background: #0d1423; border: 1px solid rgba(172, 188, 232, .24); box-shadow: 0 30px 70px rgba(0, 0, 0, .62); }
+    .phone::before { content: ""; position: absolute; z-index: 3; top: 14px; left: 50%; transform: translateX(-50%); width: 76px; height: 19px; border-radius: 99px; background: #03050a; }
+    .phone img { display: block; width: 100%; border-radius: 33px; }
+    .phone.one { left: 2px; top: 75px; transform: rotate(-6deg); }
+    .phone.two { right: 0; top: 8px; transform: rotate(5deg); }
+    .url { position: absolute; z-index: 3; left: 75px; bottom: 33px; color: #70809f; font-size: 14px; letter-spacing: .025em; }
+  </style>
+</head>
+<body>
+  <main class="canvas" aria-label="Codex Local Hub GitHub social preview">
+    <section class="copy">
+      <header class="brand">
+        <img src="../../../public/app-icon-512.png" alt="Codex Local Hub icon">
+        <div>
+          <div class="brand-name">Codex Local Hub</div>
+          <div class="brand-sub">CODEX 随身工作台</div>
+        </div>
+        <div class="tag">OPEN SOURCE · LOCAL FIRST</div>
+      </header>
+      <h1>Mac 继续工作<br><span>你继续生活</span></h1>
+      <p class="desc">从床上、沙发或另一个房间，用手机查看和控制 <strong>ChatGPT / Codex</strong> 任务。</p>
+      <div class="pills">
+        <span class="pill">查看任务进度</span>
+        <span class="pill">继续发送提示词</span>
+        <span class="pill">验收图片结果</span>
+      </div>
+    </section>
+    <section class="phones" aria-label="Codex Local Hub mobile interface">
+      <div class="phone one"><img src="../screenshots/mobile-dashboard.zh-CN.png" alt="手机任务总览"></div>
+      <div class="phone two"><img src="../screenshots/mobile-conversation.zh-CN.png" alt="手机任务对话"></div>
+    </section>
+    <div class="url">github.com/brandonwang001/codex-local-hub</div>
+  </main>
+</body>
+</html>

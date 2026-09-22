@@ -1,8 +1,12 @@
-# Codex Local Hub · Codex 随身工作台
+# Codex Local Hub · 用手机查看和控制 Codex 的随身工作台
 
 [English](README.md) · 简体中文
 
-**把 Mac 上的 Codex 任务变成一个可在手机上查看和控制的本地工作台。**
+**不用一直守着电脑，也能从手机查看 ChatGPT/Codex 做到哪、是否需要回复。**
+
+<p align="center">
+  <img src="docs/assets/social-preview/codex-local-hub-social-preview.png" width="100%" alt="Codex 随身工作台：用手机查看和控制 Mac 上的 ChatGPT Codex 任务">
+</p>
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-2563eb.svg)](LICENSE)
 [![CI](https://github.com/brandonwang001/codex-local-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/brandonwang001/codex-local-hub/actions/workflows/ci.yml)
@@ -10,31 +14,19 @@
 ![Node.js 22.22.2+](https://img.shields.io/badge/Node.js-22.22.2%2B-16a34a.svg)
 ![测试覆盖率](https://img.shields.io/badge/coverage-100%25-16a34a.svg)
 
-Codex Local Hub 是一个开源的 **Codex 手机控制台、任务监控器和 macOS 远程助手**。打开 Mac 客户端，扫描二维码，即可在同一局域网内查看任务进度、最近对话、长程目标和图片交付结果，并从手机继续发送提示词。
+Codex Local Hub 是一个开源的 **Codex 手机控制台、任务监控器和 macOS 远程助手**。打开 Mac 客户端，扫描二维码，即可在同一局域网内查看 ChatGPT 桌面版里的 Codex 任务进度、最近对话、长程目标和图片交付结果，并从手机继续发送提示词。
 
 > 本项目是独立开源项目，与 OpenAI 没有隶属或官方背书关系。
 
-## 复制一句话，让 Codex 完成安装
+## 不用一直守着电脑
 
-普通用户不需要先研究终端命令。请在作为宿主机的 Mac 上打开一个 Codex 任务，把下面整段话复制进去：
+启动一个耗时较长的 Codex 任务后，你可以离开工位。躺在床上、窝在沙发、去上厕所或走到另一个房间时，拿起手机就能知道：
 
-```text
-使用 $skill-installer 从 https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub 安装 setup-codex-local-hub Skill。安装后请立即读取已安装的 SKILL.md，并在这个任务中按它完成：在这台 Mac 上安装或更新 Codex Local Hub、安装图片交付 Skill、启动程序并验证手机的局域网访问。优先使用最新正式版；没有合适的正式版时就从源码构建。除非确实有一步必须由我操作，否则请自主继续；最后只需要告诉我程序安装位置、访问方式和验证结果。
-```
+- 任务还在运行、排队、暂停，还是已经完成？
+- Codex 刚刚回复了什么，是否正在等你补充信息？
+- 截图或视觉结果是否已经生成，可以直接验收？
 
-这一句话会让 Codex 安装可复用的 [`setup-codex-local-hub`](.agents/skills/setup-codex-local-hub) Skill，并立即完成后续工作。这个 Skill 会保持 Gatekeeper 开启、保护已有文件、运行完整测试、验证应用、安装图片交付 Skill；它不会擅自把本地服务暴露到公网。
-
-如果 Mac 上已经有源码仓库，可以继续把下面这句话发给 Codex。同一个 Skill 会保护本地修改，并在原地源码升级与全新干净检出之间安全选择：
-
-```text
-使用 $setup-codex-local-hub 更新我现有的 Codex Local Hub 源码仓库和已安装程序。只有仓库完全干净时才允许快进；保留全部本地修改，运行完整测试，构建内置双架构运行时的通用程序，备份旧版本后完成替换、重新启动并验证手机访问。不要让我手动下载安装包。
-```
-
-如果看到“所选模型容量已满”，但任务仍显示正在工作，可以先让它继续。如果任务已经停止，请切换到另一个可用模型，并在同一个任务中发送：
-
-```text
-继续使用 $setup-codex-local-hub，从上一次已经验证成功的安装阶段接着执行。复用已有检查点和文件，不要重做已经完成的工作；继续完成安装、启动和手机访问验证。
-```
+Mac 继续工作，你继续生活。
 
 ## 运行效果
 
@@ -73,6 +65,28 @@ Codex Local Hub 是一个开源的 **Codex 手机控制台、任务监控器和 
 </table>
 
 以上为真实产品界面截图，使用的是脱敏示例数据。宿主程序截图中的有效二维码和私人局域网地址已经替换为不可扫描的占位图与示例地址，不包含私人任务内容。
+
+## 复制一句话，让 Codex 完成安装
+
+普通用户不需要先研究终端命令。请在作为宿主机的 Mac 上打开一个 Codex 任务，把下面整段话复制进去：
+
+```text
+使用 $skill-installer 从 https://github.com/brandonwang001/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub 安装 setup-codex-local-hub Skill。安装后请立即读取已安装的 SKILL.md，并在这个任务中按它完成：在这台 Mac 上安装或更新 Codex Local Hub、安装图片交付 Skill、启动程序并验证手机的局域网访问。优先使用最新正式版；没有合适的正式版时就从源码构建。除非确实有一步必须由我操作，否则请自主继续；最后只需要告诉我程序安装位置、访问方式和验证结果。
+```
+
+这一句话会让 Codex 安装可复用的 [`setup-codex-local-hub`](.agents/skills/setup-codex-local-hub) Skill，并立即完成后续工作。这个 Skill 会保持 Gatekeeper 开启、保护已有文件、运行完整测试、验证应用、安装图片交付 Skill；它不会擅自把本地服务暴露到公网。
+
+如果 Mac 上已经有源码仓库，可以继续把下面这句话发给 Codex。同一个 Skill 会保护本地修改，并在原地源码升级与全新干净检出之间安全选择：
+
+```text
+使用 $setup-codex-local-hub 更新我现有的 Codex Local Hub 源码仓库和已安装程序。只有仓库完全干净时才允许快进；保留全部本地修改，运行完整测试，构建内置双架构运行时的通用程序，备份旧版本后完成替换、重新启动并验证手机访问。不要让我手动下载安装包。
+```
+
+如果看到“所选模型容量已满”，但任务仍显示正在工作，可以先让它继续。如果任务已经停止，请切换到另一个可用模型，并在同一个任务中发送：
+
+```text
+继续使用 $setup-codex-local-hub，从上一次已经验证成功的安装阶段接着执行。复用已有检查点和文件，不要重做已经完成的工作；继续完成安装、启动和手机访问验证。
+```
 
 ## 工作原理
 
