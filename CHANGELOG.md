@@ -2,6 +2,11 @@
 
 All notable changes to Codex Local Hub will be documented in this file.
 
+## 0.2.6 - 2026-09-22
+
+- Disabled accidental double-tap page zoom across the phone dashboard while keeping ordinary scrolling and accessibility-friendly pinch zoom available.
+- Added a mobile touch-policy regression test and refreshed the offline shell cache.
+
 ## 0.2.5 - 2026-09-22
 
 - Added a compact, two-step confirmation control for clearing the visual delivery inbox from desktop or phone.

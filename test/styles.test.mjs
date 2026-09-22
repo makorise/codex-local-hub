@@ -6,6 +6,8 @@ const styles = await readFile(new URL('../public/styles.css', import.meta.url), 
 
 test('task pane has bounded desktop and touch scrolling styles', () => {
   assert.match(styles, /\.app-shell \{[^}]*height: 100dvh;[^}]*overflow: hidden;/);
+  assert.match(styles, /html \{[^}]*touch-action: manipulation;/);
   assert.match(styles, /\.task-pane \{[^}]*overflow-y: auto;[^}]*overscroll-behavior-y: contain;[^}]*-webkit-overflow-scrolling: touch;/);
-  assert.match(styles, /@media \(max-width: 760px\)[\s\S]*\.task-pane \{[^}]*height: 100%;[^}]*overflow-y: auto;[^}]*touch-action: pan-y;/);
+  assert.match(styles, /@media \(max-width: 760px\)[\s\S]*\.task-pane \{[^}]*height: 100%;[^}]*overflow-y: auto;[^}]*touch-action: pan-y pinch-zoom;/);
+  assert.match(styles, /@media \(max-width: 760px\)[\s\S]*\.detail-scroll \{[^}]*overflow-y: scroll;[^}]*touch-action: pan-y pinch-zoom;/);
 });
