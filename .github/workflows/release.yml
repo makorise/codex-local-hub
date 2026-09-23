@@ -74,4 +74,4 @@ jobs:
             "$preview#Unsigned universal DMG preview" \
             "$preview.sha256#DMG preview SHA-256" \
             --verify-tag --generate-notes --latest --title "Codex Lookout v$version" \
-            --notes "Existing v0.2.2 users can update safely through the app's checksum-verified core updater. The attached DMG preview is universal but is not Apple-notarized; new users should prefer the one-message Codex setup documented in the README until a notarized DMG is published."
+            --notes "Installations whose Mac host already uses the Makorise release channel can update safely through the app's checksum-verified core updater. Hosts installed before the repository move need one data-preserving full migration with the README's one-message Codex setup; later compatible releases can hot-update normally. The attached DMG preview is universal but is not Apple-notarized."
