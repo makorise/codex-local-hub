@@ -2,6 +2,12 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.19 - 2026-09-23
+
+- Replaced the misleading seven-day locally observed percentage chart with an exact “Tokens today” summary read from Codex session logs on this Mac.
+- Added compact mobile presentation plus detailed input, output, and cached-input totals, with clear local-only scope in Chinese and English.
+- Streams and filters rollout logs without loading message content into memory, and retains 100% line, branch, and function test coverage.
+
 ## 0.2.18 - 2026-09-23
 
 - Fixed Steer surfacing a raw “closed” error when Codex closed or interrupted the target turn between status sync and the phone tap.

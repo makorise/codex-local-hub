@@ -1,10 +1,21 @@
 import { spawn as nodeSpawn } from 'node:child_process';
+import { createReadStream as nodeCreateReadStream } from 'node:fs';
 import { mkdir as nodeMkdir, readFile as nodeReadFile, rename as nodeRename, unlink as nodeUnlink, writeFile as nodeWriteFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { readdir as nodeReaddir, stat as nodeStat } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 
 const WEEK_MINUTES = 10_080;
 const HISTORY_DAYS = 7;
 const RESET_TOLERANCE_MS = 60 * 60_000;
+const TOKEN_LINE_LIMIT = 256 * 1024;
+const TOKEN_FIELDS = ['inputTokens', 'cachedInputTokens', 'outputTokens', 'reasoningOutputTokens', 'totalTokens'];
+const TOKEN_SOURCE_FIELDS = {
+  inputTokens: 'input_tokens',
+  cachedInputTokens: 'cached_input_tokens',
+  outputTokens: 'output_tokens',
+  reasoningOutputTokens: 'reasoning_output_tokens',
+  totalTokens: 'total_tokens',
+};
 
 export function usageWindowLabel(minutes) {
   const value = Number(minutes || 0);
@@ -35,6 +46,104 @@ export function localDateKey(timestamp) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+export function emptyTodayTokenUsage(timestamp = Date.now()) {
+  return {
+    available: false,
+    recorded: false,
+    date: localDateKey(timestamp),
+    eventCount: 0,
+    fileCount: 0,
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    reasoningOutputTokens: 0,
+    totalTokens: 0,
+  };
+}
+
+export function addTokenCountLine(summary, line, date = summary.date) {
+  if (!line.includes('"token_count"')) return summary;
+  let event;
+  try { event = JSON.parse(line); } catch { return summary; }
+  if (event?.type !== 'event_msg' || event.payload?.type !== 'token_count') return summary;
+  const timestamp = Date.parse(event.timestamp);
+  if (!Number.isFinite(timestamp) || localDateKey(timestamp) !== date) return summary;
+  const usage = event.payload.info?.last_token_usage;
+  if (!usage || typeof usage !== 'object') return summary;
+  for (const field of TOKEN_FIELDS) {
+    const value = Number(usage[TOKEN_SOURCE_FIELDS[field]]);
+    if (Number.isFinite(value) && value > 0) summary[field] += value;
+  }
+  summary.eventCount += 1;
+  summary.recorded = true;
+  return summary;
+}
+
+export async function scanTokenRollout(path, summary, {
+  createReadStream = nodeCreateReadStream,
+  lineLimit = TOKEN_LINE_LIMIT,
+} = {}) {
+  const stream = createReadStream(path, { encoding: 'utf8' });
+  let carry = '';
+  let skipping = false;
+  for await (const chunk of stream) {
+    const parts = String(chunk).split('\n');
+    for (let index = 0; index < parts.length - 1; index += 1) {
+      if (skipping) skipping = false;
+      else addTokenCountLine(summary, carry + parts[index]);
+      carry = '';
+    }
+    if (skipping) continue;
+    carry += parts.at(-1);
+    if (carry.length > lineLimit && !carry.includes('"token_count"')) {
+      carry = '';
+      skipping = true;
+    }
+  }
+  if (!skipping && carry) addTokenCountLine(summary, carry);
+  return summary;
+}
+
+export async function findModifiedRollouts(directory, since, {
+  readdir = nodeReaddir,
+  stat = nodeStat,
+} = {}) {
+  let entries;
+  try { entries = await readdir(directory, { withFileTypes: true }); }
+  catch { return []; }
+  const files = [];
+  for (const entry of entries) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...await findModifiedRollouts(path, since, { readdir, stat }));
+    else if (entry.isFile() && entry.name.endsWith('.jsonl')) {
+      try {
+        const details = await stat(path);
+        if (details.mtimeMs >= since) files.push(path);
+      } catch { /* A rollout can disappear while Codex rotates its files. */ }
+    }
+  }
+  return files;
+}
+
+export function createTodayTokenReader({
+  sessionsDir,
+  now = () => Date.now(),
+  findRollouts = findModifiedRollouts,
+  scanRollout = scanTokenRollout,
+} = {}) {
+  return async () => {
+    const timestamp = now();
+    const start = new Date(timestamp);
+    start.setHours(0, 0, 0, 0);
+    const summary = emptyTodayTokenUsage(timestamp);
+    const files = await findRollouts(sessionsDir, start.getTime());
+    summary.available = true;
+    summary.fileCount = files.length;
+    for (const path of files) await scanRollout(path, summary);
+    return summary;
+  };
 }
 
 export function recentUsageDays(timestamp = Date.now(), count = HISTORY_DAYS) {
@@ -138,6 +247,7 @@ export function createUsageHistoryStore({
 export function createUsageReader({
   request = requestRateLimits,
   historyStore = { record: async () => [] },
+  todayTokenReader = async () => emptyTodayTokenUsage(),
   now = () => Date.now(),
   ttlMs = 60_000,
 } = {}) {
@@ -152,6 +262,8 @@ export function createUsageReader({
         cached = normalizeUsage(result, now());
         try { cached.dailyUsage = await historyStore.record(cached); }
         catch { cached.dailyUsage = []; }
+        try { cached.todayTokens = await todayTokenReader(); }
+        catch { cached.todayTokens = emptyTodayTokenUsage(now()); }
         expiresAt = now() + ttlMs;
         return cached;
       }).finally(() => { pending = null; });

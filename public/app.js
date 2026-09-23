@@ -345,32 +345,17 @@ function usageWindowLabel(limit) {
   return limit.label || t('usage.window.week');
 }
 
-function usageDayLabel(date) {
-  return new Intl.DateTimeFormat(getLanguage(), { weekday: 'narrow' }).format(new Date(`${date}T12:00:00`));
+function formatTokenCount(value) {
+  return new Intl.NumberFormat(getLanguage(), { notation: 'compact', maximumFractionDigits: 1 }).format(Math.max(0, Number(value) || 0));
 }
 
-function usagePercentLabel(value) {
-  const number = Math.max(0, Number(value) || 0);
-  return Number.isInteger(number) ? String(number) : number.toFixed(1);
-}
-
-function renderUsageHistory(days = []) {
-  const chart = $('#usage-history');
-  chart.hidden = days.length !== 7;
-  if (chart.hidden) {
-    chart.innerHTML = '';
-    return '';
-  }
-  const highest = Math.max(1, ...days.map((day) => Number(day.usedPercent) || 0));
-  chart.innerHTML = days.map((day) => {
-    const value = Math.max(0, Number(day.usedPercent) || 0);
-    const height = day.observed ? Math.max(8, Math.round((value / highest) * 100)) : 3;
-    const label = t(day.observed ? 'usage.historyDay' : 'usage.historyMissing', { day: usageDayLabel(day.date), percent: usagePercentLabel(value) });
-    return `<span class="usage-day ${day.observed ? 'is-observed' : 'is-missing'}" title="${escapeHtml(label)}"><i style="--bar-height:${height}%"></i><small>${escapeHtml(usageDayLabel(day.date))}</small></span>`;
-  }).join('');
-  return days.filter((day) => day.observed).map((day) => t('usage.historyDay', {
-    day: usageDayLabel(day.date), percent: usagePercentLabel(day.usedPercent),
-  })).join(getLanguage() === 'zh-CN' ? '，' : ', ');
+function renderTodayTokens(usage = state.usage?.todayTokens) {
+  const row = $('#usage-today');
+  row.hidden = !usage?.available;
+  if (row.hidden) return '';
+  const value = usage.recorded ? t('usage.todayValue', { count: formatTokenCount(usage.totalTokens) }) : t('usage.todayEmpty');
+  $('#usage-today-value').textContent = value;
+  return value;
 }
 
 function renderUsage() {
@@ -388,9 +373,9 @@ function renderUsage() {
   $('#usage-ring-value').textContent = lowest;
   $('#usage-ring').style.setProperty('--remaining', lowest);
   card.dataset.tone = lowest <= 10 ? 'red' : lowest <= 30 ? 'amber' : 'green';
-  const historySummary = renderUsageHistory(state.usage?.dailyUsage || []);
+  const todaySummary = renderTodayTokens();
   const currentSummary = summaries.join(getLanguage() === 'zh-CN' ? '，' : ', ');
-  card.setAttribute('aria-label', `${t('usage.aria', { summary: currentSummary })}${historySummary ? ` · ${t('usage.historyAria', { summary: historySummary })}` : ''}`);
+  card.setAttribute('aria-label', `${t('usage.aria', { summary: currentSummary })}${todaySummary ? ` · ${t('usage.todayAria', { summary: todaySummary })}` : ''}`);
 }
 
 async function loadUsage() {
@@ -915,10 +900,14 @@ $('#usage-card').addEventListener('click', () => {
     used: limit.usedPercent,
     remaining: limit.remainingPercent,
   })}\n${t('usage.reset', { time: formatReset(limit.resetsAt) })}`);
-  const history = (state.usage?.dailyUsage || []).filter((day) => day.observed).map((day) => t('usage.historyDay', {
-    day: usageDayLabel(day.date), percent: usagePercentLabel(day.usedPercent),
-  }));
-  showContent(t('usage.title'), `${rows.join('\n\n')}${state.usage.planType ? `\n\n${t('usage.plan', { plan: state.usage.planType })}` : ''}${history.length ? `\n\n${t('usage.historyTitle')}\n${history.join(' · ')}\n${t('usage.historyNote')}` : ''}`);
+  const today = state.usage?.todayTokens;
+  const todayDetail = today?.available ? `\n\n${t('usage.todayTitle')}\n${today.recorded ? t('usage.todayDetail', {
+    total: new Intl.NumberFormat(getLanguage()).format(today.totalTokens),
+    input: new Intl.NumberFormat(getLanguage()).format(today.inputTokens),
+    output: new Intl.NumberFormat(getLanguage()).format(today.outputTokens),
+    cached: new Intl.NumberFormat(getLanguage()).format(today.cachedInputTokens),
+  }) : t('usage.todayEmpty')}\n${t('usage.todayNote')}` : '';
+  showContent(t('usage.title'), `${rows.join('\n\n')}${state.usage.planType ? `\n\n${t('usage.plan', { plan: state.usage.planType })}` : ''}${todayDetail}`);
 });
 $('#modal-close').addEventListener('click', closeContent);
 $('.modal-backdrop').addEventListener('click', closeContent);
@@ -980,9 +969,8 @@ export {
   setConnection,
   formatReset,
   usageWindowLabel,
-  usageDayLabel,
-  usagePercentLabel,
-  renderUsageHistory,
+  formatTokenCount,
+  renderTodayTokens,
   renderUsage,
   loadUsage,
   renderAccount,

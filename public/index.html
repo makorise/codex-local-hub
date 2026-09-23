@@ -15,7 +15,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/app-icon-192.png" />
-    <link rel="stylesheet" href="/styles.css?v=27" />
+    <link rel="stylesheet" href="/styles.css?v=28" />
     <title>Codex Lookout</title>
   </head>
   <body>
@@ -61,7 +61,10 @@
                 <span><strong id="usage-ring-value"></strong><small>%</small></span>
               </span>
             </span>
-            <span id="usage-history" class="usage-history" aria-hidden="true"></span>
+            <span id="usage-today" class="usage-today" hidden>
+              <small data-i18n="usage.todayTitle">今日 Token</small>
+              <strong id="usage-today-value"></strong>
+            </span>
           </button>
 
           <section id="delivery-inbox" class="delivery-inbox" aria-label="交付信箱" data-i18n-aria="delivery.title" hidden>
@@ -177,6 +180,6 @@
         <div id="modal-content" class="modal-content"></div>
       </section>
     </div>
-    <script type="module" src="/app.js?v=29"></script>
+    <script type="module" src="/app.js?v=30"></script>
   </body>
 </html>

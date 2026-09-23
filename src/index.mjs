@@ -8,7 +8,7 @@ import { CodexRepository } from './repository.mjs';
 import { CodexAppToolsClient, CodexControlClient } from './control.mjs';
 import { DeliveryInbox } from './deliveries.mjs';
 import { createBridgeServer, resolveRuntimeInfo } from './server.mjs';
-import { createUsageHistoryStore, createUsageReader, requestRateLimits } from './usage.mjs';
+import { createTodayTokenReader, createUsageReader, requestRateLimits } from './usage.mjs';
 import { scheduleCoreReadySignals } from './core.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -50,11 +50,8 @@ const repository = new CodexRepository({
   interruptTurn: (threadId, turnId) => control.interruptTurn(threadId, turnId),
   deleteProject: (projectId) => control.deleteProject(projectId),
 });
-const usageHistoryPath = process.platform === 'darwin'
-  ? join(home, 'Library', 'Application Support', 'Codex Local Hub', 'usage-history.json')
-  : join(home, '.local', 'share', 'codex-local-hub', 'usage-history.json');
-const usageHistoryStore = createUsageHistoryStore({ path: usageHistoryPath });
-const usageReader = createUsageReader({ request: () => requestRateLimits({ codexBin }), historyStore: usageHistoryStore });
+const todayTokenReader = createTodayTokenReader({ sessionsDir: join(home, '.codex', 'sessions') });
+const usageReader = createUsageReader({ request: () => requestRateLimits({ codexBin }), todayTokenReader });
 const accountReader = createAccountReader({ request: () => requestAccount({ codexBin }) });
 const runtimeInfo = await resolveRuntimeInfo({ root });
 const { server } = createBridgeServer({ repository, token, requirePairing, publicDir: join(root, 'public'), usageReader, accountReader, deliveryInbox, runtimeInfo });

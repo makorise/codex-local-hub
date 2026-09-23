@@ -1,6 +1,6 @@
 {
   "name": "codex-local-hub",
-  "version": "0.2.18",
+  "version": "0.2.19",
   "private": true,
   "type": "module",
   "description": "Local-first macOS dashboard for monitoring and controlling ChatGPT Codex tasks from your phone.",

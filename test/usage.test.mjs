@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  createUsageHistoryStore, createUsageReader, localDateKey, normalizeUsage,
-  normalizeUsageHistoryState, recentUsageDays, requestRateLimits, updateUsageHistory, usageWindowLabel,
+  addTokenCountLine, createTodayTokenReader, createUsageHistoryStore, createUsageReader, emptyTodayTokenUsage,
+  findModifiedRollouts, localDateKey, normalizeUsage, normalizeUsageHistoryState, recentUsageDays,
+  requestRateLimits, scanTokenRollout, updateUsageHistory, usageWindowLabel,
 } from '../src/usage.mjs';
 
 function fakeChild({ onWrite, killEmitsExit = true, withKill = true } = {}) {
@@ -73,13 +74,20 @@ test('usage reader caches results and shares an in-flight request', async () => 
     return new Promise((resolve) => { resolveRequest = resolve; });
   };
   const recorded = [];
-  const read = createUsageReader({ request, historyStore: { record: async (usage) => { recorded.push(usage.updatedAt); return [{ date: 'day' }]; } }, now: () => clock, ttlMs: 100 });
+  const read = createUsageReader({
+    request,
+    historyStore: { record: async (usage) => { recorded.push(usage.updatedAt); return [{ date: 'day' }]; } },
+    todayTokenReader: async () => ({ available: true, totalTokens: 42 }),
+    now: () => clock,
+    ttlMs: 100,
+  });
   const first = read();
   const concurrent = read();
   assert.equal(calls, 1);
   resolveRequest({ rateLimits: { primary: { usedPercent: 25, windowDurationMins: 300, resetsAt: 1 } } });
   assert.equal((await first).limits[0].remainingPercent, 75);
   assert.deepEqual((await first).dailyUsage, [{ date: 'day' }]);
+  assert.equal((await first).todayTokens.totalTokens, 42);
   assert.equal(await concurrent, await first);
   assert.equal(await read(), await first);
   assert.equal(calls, 1);
@@ -94,6 +102,64 @@ test('usage reader caches results and shares an in-flight request', async () => 
   assert.equal((await readWithDefaults()).available, false);
   const readWithBrokenHistory = createUsageReader({ request: async () => ({}), historyStore: { record: async () => { throw new Error('history'); } } });
   assert.deepEqual((await readWithBrokenHistory()).dailyUsage, []);
+  const readWithBrokenTokens = createUsageReader({ request: async () => ({}), todayTokenReader: async () => { throw new Error('tokens'); }, now: () => 1 });
+  assert.equal((await readWithBrokenTokens()).todayTokens.available, false);
+});
+
+test('today token usage sums local Codex token events without reading message content', async (t) => {
+  const now = new Date(2026, 8, 23, 12).getTime();
+  const summary = emptyTodayTokenUsage(now);
+  assert.equal(summary.date, '2026-09-23');
+  assert.equal(addTokenCountLine(summary, 'ordinary message'), summary);
+  assert.equal(addTokenCountLine(summary, '{bad "token_count" json'), summary);
+  assert.equal(addTokenCountLine(summary, JSON.stringify({ type: 'other', payload: { type: 'token_count' }, timestamp: new Date(now).toISOString() })), summary);
+  assert.equal(addTokenCountLine(summary, JSON.stringify({ type: 'event_msg', payload: { type: 'token_count' }, timestamp: 'bad' })), summary);
+  assert.equal(addTokenCountLine(summary, JSON.stringify({ type: 'event_msg', payload: { type: 'token_count' }, timestamp: '2026-09-22T10:00:00+08:00' })), summary);
+  assert.equal(addTokenCountLine(summary, JSON.stringify({ type: 'event_msg', payload: { type: 'token_count', info: {} }, timestamp: '2026-09-23T10:00:00+08:00' })), summary);
+  const event = JSON.stringify({
+    type: 'event_msg', timestamp: '2026-09-23T10:00:00+08:00',
+    payload: { type: 'token_count', info: { last_token_usage: {
+      input_tokens: 100, cached_input_tokens: 70, output_tokens: 20,
+      reasoning_output_tokens: 5, total_tokens: 120,
+    } } },
+  });
+  addTokenCountLine(summary, event);
+  addTokenCountLine(summary, JSON.stringify({
+    type: 'event_msg', timestamp: '2026-09-23T11:00:00+08:00',
+    payload: { type: 'token_count', info: { last_token_usage: { input_tokens: -1, total_tokens: '30', output_tokens: 'bad' } } },
+  }));
+  assert.deepEqual({ total: summary.totalTokens, input: summary.inputTokens, output: summary.outputTokens, events: summary.eventCount }, {
+    total: 150, input: 100, output: 20, events: 2,
+  });
+
+  const root = await mkdtemp(join(tmpdir(), 'today-tokens-'));
+  t.after(() => rm(root, { recursive: true }));
+  const nested = join(root, '2026', '09', '23');
+  await mkdir(nested, { recursive: true });
+  const current = join(nested, 'rollout-current.jsonl');
+  const stale = join(root, 'rollout-stale.jsonl');
+  const huge = `{"message":"${'x'.repeat(140_000)}"}`;
+  await writeFile(current, `${huge}\n${event}\n${event}`);
+  await writeFile(stale, `${event}\n`);
+  await utimes(stale, new Date(now - 86_400_000), new Date(now - 86_400_000));
+  const files = await findModifiedRollouts(root, new Date(2026, 8, 23).getTime());
+  assert.deepEqual(files, [current]);
+  const scanned = emptyTodayTokenUsage(now);
+  await scanTokenRollout(current, scanned, { lineLimit: 32 });
+  assert.equal(scanned.totalTokens, 240);
+  assert.equal(scanned.eventCount, 2);
+
+  const readToday = createTodayTokenReader({ sessionsDir: root, now: () => now });
+  const today = await readToday();
+  assert.equal(today.available, true);
+  assert.equal(today.fileCount, 1);
+  assert.equal(today.totalTokens, 240);
+  const defaultClock = await createTodayTokenReader({ sessionsDir: root, findRollouts: async () => [], scanRollout: async () => {} })();
+  assert.equal(defaultClock.available, true);
+
+  assert.deepEqual(await findModifiedRollouts(join(root, 'missing'), 0), []);
+  const fakeDirectory = [{ name: 'vanished.jsonl', isDirectory: () => false, isFile: () => true }];
+  assert.deepEqual(await findModifiedRollouts('/virtual', 0, { readdir: async () => fakeDirectory, stat: async () => { throw new Error('gone'); } }), []);
 });
 
 test('seven-day usage history records only locally observed weekly deltas', () => {
