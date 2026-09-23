@@ -107,7 +107,7 @@ The current release is local-network only. The data path stays between the Mac a
 - **Two-way control** — send prompts, reorder or remove queued prompts, and steer an active task.
 - **Interrupted-task recovery** — resume a paused task with one tap.
 - **Visual delivery inbox** — review the latest screenshots and image results on your phone.
-- **Usage visibility** — see current Codex usage and reset times.
+- **Usage visibility** — see current Codex usage, reset times, and a privacy-safe seven-day trend collected locally by your Mac.
 - **Account awareness** — confirm which local Codex account is active without exposing its email, account ID, or credentials to the dashboard.
 - **Privacy by default** — task data stays on your Mac and local network.
 - **Focused history** — only the latest 20 visible messages and images are presented; hidden reasoning is never mirrored.

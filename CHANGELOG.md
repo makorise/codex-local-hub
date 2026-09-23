@@ -2,6 +2,13 @@
 
 All notable changes to Codex Local Hub will be documented in this file.
 
+## 0.2.10 - 2026-09-23
+
+- Added a compact seven-day chart below the weekly Codex allowance, based on daily changes observed locally by the Mac.
+- Kept only seven small daily aggregates in the private application-support directory; no prompts, tokens, account IDs, or full usage archive are stored.
+- Compressed the running, queued, and all-task counters into a single 44-pixel status strip and tightened filter spacing, so tasks appear sooner even with the new chart.
+- Added bilingual chart labels, missing-data states, reset-window handling, atomic local persistence, mobile overflow QA, and complete regression coverage.
+
 ## 0.2.9 - 2026-09-23
 
 - Added a compact current-account badge beside the live connection state on desktop and phone.

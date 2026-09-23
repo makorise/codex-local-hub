@@ -32,6 +32,18 @@ function queue(revision = 8) {
   ];
 }
 
+function dailyUsage() {
+  return [
+    { date: '2026-09-17', usedPercent: 3, observed: true },
+    { date: '2026-09-18', usedPercent: 0, observed: true },
+    { date: '2026-09-19', usedPercent: 9.5, observed: true },
+    { date: '2026-09-20', usedPercent: 0, observed: false },
+    { date: '2026-09-21', usedPercent: 7, observed: true },
+    { date: '2026-09-22', usedPercent: 12, observed: true },
+    { date: '2026-09-23', usedPercent: 5, observed: true },
+  ];
+}
+
 class FakeEventSource {
   static instances = [];
   constructor(url) {
@@ -83,7 +95,7 @@ async function setup({ failing = new Map(), empty = false, taskCount = 1 } = {})
     calls.push([url.pathname, options.method || 'GET']);
     if (failing.has(url.pathname)) return response({ error: failing.get(url.pathname) }, 500);
     if (url.pathname === '/api/tasks') return response({ tasks: empty ? [] : availableTasks, syncedAt: Date.now() });
-    if (url.pathname === '/api/usage') return response({ usage: empty ? { available: false, limits: [] } : { planType: 'pro', limits: [{ label: '周', usedPercent: 20, remainingPercent: 80, resetsAt: Date.now() + 60_000 }] } });
+    if (url.pathname === '/api/usage') return response({ usage: empty ? { available: false, limits: [], dailyUsage: [] } : { planType: 'pro', limits: [{ label: '周', usedPercent: 20, remainingPercent: 80, resetsAt: Date.now() + 60_000 }], dailyUsage: dailyUsage() } });
     if (url.pathname === '/api/account') return response({ account: empty ? { available: false, name: null, initial: null } : { available: true, name: 'alice', initial: 'A' } });
     if (url.pathname === '/api/deliveries' && options.method === 'DELETE') {
       const deleted = deliveries.length;
@@ -159,6 +171,9 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   ui.renderList();
   assert.equal(document.querySelector('#detail-pane').classList.contains('is-open'), true);
   assert.equal(document.querySelector('#usage-summary').textContent, '周窗口剩余 80%');
+  assert.equal(document.querySelectorAll('.usage-day').length, 7);
+  assert.equal(document.querySelectorAll('.usage-day.is-observed').length, 6);
+  assert.match(document.querySelector('#usage-card').getAttribute('aria-label'), /最近 7 天本机记录/);
   assert.equal(document.querySelector('#account-badge').hidden, false);
   assert.equal(document.querySelector('#account-name').textContent, 'alice');
   assert.equal(document.querySelector('#account-initial').textContent, 'A');
@@ -171,6 +186,7 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.equal(document.querySelector('#connection-text').textContent.includes('Synced'), true);
   assert.equal(document.querySelector('#account-badge').getAttribute('aria-label'), 'Current Codex account: alice');
   assert.equal(document.querySelector('#usage-summary').textContent, 'Weekly window: 80% remaining');
+  assert.match(document.querySelector('#usage-card').getAttribute('aria-label'), /Last 7 days observed locally/);
   assert.equal(document.querySelector('#delivery-count').textContent, '2 images');
   assert.equal(document.querySelector('.task-card-foot span').textContent, 'Making progress');
   assert.equal(document.querySelector('#refresh-button').getAttribute('aria-label'), 'Refresh tasks');
@@ -189,6 +205,10 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.equal(ui.usageWindowLabel({ label: '自定义' }), 'Weekly');
   assert.equal(ui.usageWindowLabel({ label: 'Custom' }), 'Custom');
   assert.equal(ui.usageWindowLabel({}), 'Weekly');
+  assert.equal(ui.usageDayLabel('2026-09-21').length > 0, true);
+  assert.equal(ui.usagePercentLabel(-2), '0');
+  assert.equal(ui.usagePercentLabel(3), '3');
+  assert.equal(ui.usagePercentLabel(3.25), '3.3');
   assert.equal(ui.localizedProgress(task({ progress: { state: 'mystery', label: '未知', tone: 'slate' } })), 'Unknown');
   assert.equal(ui.localizedProgress(task({ progress: { state: 'mystery', label: '', tone: 'slate' } })), '');
   assert.equal(ui.localizedActivity(task({ activity: '正在更新文件' })), 'Updating files');
@@ -210,6 +230,10 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.equal(ui.localizedError('中文错误', 'error.sync'), '中文错误');
   assert.equal(ui.localizedProgress(task({ progress: { state: 'mystery', label: '未知', tone: 'slate' } })), '未知');
   assert.equal(ui.usageWindowLabel({ label: '自定义' }), '自定义');
+  assert.equal(ui.renderUsageHistory([]), '');
+  assert.equal(document.querySelector('#usage-history').hidden, true);
+  const renderedHistory = ui.renderUsageHistory(dailyUsage());
+  assert.match(renderedHistory, /12%/);
   ui.state.account = { available: true, name: 'bob', initial: '' };
   ui.renderAccount();
   assert.equal(document.querySelector('#account-initial').textContent, '#');
@@ -320,6 +344,7 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape' }));
   document.querySelector('#usage-card').click();
   assert.match(document.querySelector('#modal-content').textContent, /已使用 20%/);
+  assert.match(document.querySelector('#modal-content').textContent, /仅保留最近 7 天/);
 
   const textarea = document.querySelector('#message-input');
   textarea.value = '继续处理';

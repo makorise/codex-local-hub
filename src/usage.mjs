@@ -1,4 +1,10 @@
 import { spawn as nodeSpawn } from 'node:child_process';
+import { mkdir as nodeMkdir, readFile as nodeReadFile, rename as nodeRename, unlink as nodeUnlink, writeFile as nodeWriteFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
+
+const WEEK_MINUTES = 10_080;
+const HISTORY_DAYS = 7;
+const RESET_TOLERANCE_MS = 60 * 60_000;
 
 export function usageWindowLabel(minutes) {
   const value = Number(minutes || 0);
@@ -23,8 +29,115 @@ export function normalizeUsage(result, updatedAt = Date.now()) {
   return { available: limits.length > 0, planType: bucket.planType || null, limits, updatedAt };
 }
 
+export function localDateKey(timestamp) {
+  const date = new Date(timestamp);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function recentUsageDays(timestamp = Date.now(), count = HISTORY_DAYS) {
+  const anchor = new Date(timestamp);
+  anchor.setHours(12, 0, 0, 0);
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(anchor);
+    date.setDate(anchor.getDate() - (count - index - 1));
+    return { date: localDateKey(date.getTime()), usedPercent: 0, observed: false };
+  });
+}
+
+export function normalizeUsageHistoryState(value) {
+  const days = value?.days && typeof value.days === 'object' && !Array.isArray(value.days) ? value.days : {};
+  const normalizedDays = {};
+  for (const [date, entry] of Object.entries(days)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/u.test(date)) continue;
+    const usedPercent = Number(entry?.usedPercent);
+    if (!Number.isFinite(usedPercent) || usedPercent < 0) continue;
+    normalizedDays[date] = { usedPercent, observed: entry?.observed === true };
+  }
+  const lastUsedPercent = value?.lastUsedPercent === null || value?.lastUsedPercent === undefined ? Number.NaN : Number(value.lastUsedPercent);
+  const lastResetsAt = value?.lastResetsAt === null || value?.lastResetsAt === undefined ? Number.NaN : Number(value.lastResetsAt);
+  return {
+    schemaVersion: 1,
+    lastUsedPercent: Number.isFinite(lastUsedPercent) && lastUsedPercent >= 0 ? lastUsedPercent : null,
+    lastResetsAt: Number.isFinite(lastResetsAt) && lastResetsAt > 0 ? lastResetsAt : null,
+    days: normalizedDays,
+  };
+}
+
+export function updateUsageHistory(stateValue, usage, timestamp = Date.now()) {
+  const state = normalizeUsageHistoryState(stateValue);
+  const recent = recentUsageDays(timestamp);
+  const allowed = new Set(recent.map((day) => day.date));
+  state.days = Object.fromEntries(Object.entries(state.days).filter(([date]) => allowed.has(date)));
+  const weekly = usage?.limits?.find((limit) => Number(limit.windowDurationMins) === WEEK_MINUTES);
+  if (!weekly) return { state, days: recent.map((day) => ({ ...day, ...state.days[day.date] })) };
+
+  const usedPercent = Math.max(0, Number(weekly.usedPercent) || 0);
+  const resetsAt = Math.max(0, Number(weekly.resetsAt) || 0);
+  let delta = 0;
+  if (state.lastUsedPercent !== null) {
+    const sameWindow = state.lastResetsAt === null || resetsAt === 0
+      || Math.abs(resetsAt - state.lastResetsAt) <= RESET_TOLERANCE_MS;
+    if (sameWindow && usedPercent >= state.lastUsedPercent) delta = usedPercent - state.lastUsedPercent;
+    else if (!sameWindow) delta = usedPercent;
+  }
+  const today = localDateKey(timestamp);
+  const existing = state.days[today] || { usedPercent: 0, observed: false };
+  state.days[today] = { usedPercent: existing.usedPercent + delta, observed: true };
+  const sameOrNewerWindow = state.lastUsedPercent === null || state.lastResetsAt === null || resetsAt === 0
+    || Math.abs(resetsAt - state.lastResetsAt) > RESET_TOLERANCE_MS || usedPercent >= state.lastUsedPercent;
+  if (sameOrNewerWindow) {
+    state.lastUsedPercent = usedPercent;
+    state.lastResetsAt = resetsAt || state.lastResetsAt;
+  }
+  return { state, days: recent.map((day) => ({ ...day, ...state.days[day.date] })) };
+}
+
+export function createUsageHistoryStore({
+  path,
+  now = () => Date.now(),
+  readFile = nodeReadFile,
+  writeFile = nodeWriteFile,
+  mkdir = nodeMkdir,
+  rename = nodeRename,
+  unlink = nodeUnlink,
+} = {}) {
+  let state = null;
+  let pending = Promise.resolve();
+  async function load() {
+    if (state) return state;
+    try { state = normalizeUsageHistoryState(JSON.parse(await readFile(path, 'utf8'))); }
+    catch { state = normalizeUsageHistoryState(null); }
+    return state;
+  }
+  async function recordNow(usage) {
+    const current = await load();
+    const updated = updateUsageHistory(current, usage, now());
+    state = updated.state;
+    const temporary = `${path}.tmp`;
+    try {
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(temporary, `${JSON.stringify(state)}\n`, { mode: 0o600 });
+      await rename(temporary, path);
+    } catch {
+      try { await unlink(temporary); } catch { /* Temporary file may not exist. */ }
+    }
+    return updated.days;
+  }
+  return {
+    record(usage) {
+      const operation = pending.then(() => recordNow(usage), () => recordNow(usage));
+      pending = operation;
+      return operation;
+    },
+  };
+}
+
 export function createUsageReader({
   request = requestRateLimits,
+  historyStore = { record: async () => [] },
   now = () => Date.now(),
   ttlMs = 60_000,
 } = {}) {
@@ -35,8 +148,10 @@ export function createUsageReader({
     const timestamp = now();
     if (cached && timestamp < expiresAt) return cached;
     if (!pending) {
-      pending = Promise.resolve(request()).then((result) => {
+      pending = Promise.resolve(request()).then(async (result) => {
         cached = normalizeUsage(result, now());
+        try { cached.dailyUsage = await historyStore.record(cached); }
+        catch { cached.dailyUsage = []; }
         expiresAt = now() + ttlMs;
         return cached;
       }).finally(() => { pending = null; });

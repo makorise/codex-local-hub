@@ -15,7 +15,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/app-icon-192.png" />
-    <link rel="stylesheet" href="/styles.css?v=24" />
+    <link rel="stylesheet" href="/styles.css?v=25" />
     <title>Codex Local Hub</title>
   </head>
   <body>
@@ -48,17 +48,20 @@
             <button id="install-dismiss" class="install-dismiss" type="button" aria-label="关闭" data-i18n-aria="action.close">×</button>
           </aside>
           <button id="usage-card" class="usage-overview" type="button" hidden>
-            <span class="usage-symbol" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><path d="M5 19V9m7 10V5m7 14v-7" /></svg>
+            <span class="usage-main">
+              <span class="usage-symbol" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M5 19V9m7 10V5m7 14v-7" /></svg>
+              </span>
+              <span class="usage-copy">
+                <span class="usage-kicker"><span data-i18n="usage.title">Codex 用量</span> <em id="usage-plan"></em></span>
+                <strong id="usage-summary"></strong>
+                <span id="usage-reset"></span>
+              </span>
+              <span id="usage-ring" class="usage-ring" aria-hidden="true">
+                <span><strong id="usage-ring-value"></strong><small>%</small></span>
+              </span>
             </span>
-            <span class="usage-copy">
-              <span class="usage-kicker"><span data-i18n="usage.title">Codex 用量</span> <em id="usage-plan"></em></span>
-              <strong id="usage-summary"></strong>
-              <span id="usage-reset"></span>
-            </span>
-            <span id="usage-ring" class="usage-ring" aria-hidden="true">
-              <span><strong id="usage-ring-value"></strong><small>%</small></span>
-            </span>
+            <span id="usage-history" class="usage-history" aria-hidden="true"></span>
           </button>
 
           <section id="delivery-inbox" class="delivery-inbox" aria-label="交付信箱" data-i18n-aria="delivery.title" hidden>
@@ -171,6 +174,6 @@
         <div id="modal-content" class="modal-content"></div>
       </section>
     </div>
-    <script type="module" src="/app.js?v=26"></script>
+    <script type="module" src="/app.js?v=27"></script>
   </body>
 </html>

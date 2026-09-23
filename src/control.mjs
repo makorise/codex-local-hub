@@ -115,7 +115,7 @@ export class CodexAppToolsClient {
         params: {
           protocolVersion: '2025-11-25',
           capabilities: {},
-          clientInfo: { name: 'codex-local-hub', version: '0.2.9' },
+          clientInfo: { name: 'codex-local-hub', version: '0.2.10' },
         },
       });
     });

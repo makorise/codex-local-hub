@@ -14,4 +14,7 @@ test('task pane has bounded desktop and touch scrolling styles', () => {
   assert.match(styles, /@media \(max-width: 760px\)[\s\S]*\.detail-scroll \{[^}]*overflow-y: scroll;[^}]*touch-action: pan-y;/);
   assert.match(styles, /\.account-badge span \{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/);
   assert.match(styles, /@media \(max-width: 760px\)[\s\S]*\.account-badge \{[^}]*max-width: 92px;/);
+  assert.match(styles, /\.summary-row \{[^}]*min-height: 44px;[^}]*margin-bottom: 8px;/);
+  assert.match(styles, /\.summary-row div \{[^}]*padding: 7px 9px;[^}]*display: flex;/);
+  assert.match(styles, /\.usage-history \{[^}]*height: 38px;[^}]*grid-template-columns: repeat\(7, 1fr\);/);
 });

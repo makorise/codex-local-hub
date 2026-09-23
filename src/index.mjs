@@ -8,7 +8,7 @@ import { CodexRepository } from './repository.mjs';
 import { CodexAppToolsClient, CodexControlClient } from './control.mjs';
 import { DeliveryInbox } from './deliveries.mjs';
 import { createBridgeServer, resolveRuntimeInfo } from './server.mjs';
-import { createUsageReader, requestRateLimits } from './usage.mjs';
+import { createUsageHistoryStore, createUsageReader, requestRateLimits } from './usage.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const home = process.env.HOME;
@@ -46,7 +46,11 @@ const repository = new CodexRepository({
   steerMessage: (threadId, turnId, message) => control.steer(threadId, turnId, message),
   startTurn: (threadId, message, cwd) => control.resume(threadId, message, cwd),
 });
-const usageReader = createUsageReader({ request: () => requestRateLimits({ codexBin }) });
+const usageHistoryPath = process.platform === 'darwin'
+  ? join(home, 'Library', 'Application Support', 'Codex Local Hub', 'usage-history.json')
+  : join(home, '.local', 'share', 'codex-local-hub', 'usage-history.json');
+const usageHistoryStore = createUsageHistoryStore({ path: usageHistoryPath });
+const usageReader = createUsageReader({ request: () => requestRateLimits({ codexBin }), historyStore: usageHistoryStore });
 const accountReader = createAccountReader({ request: () => requestAccount({ codexBin }) });
 const runtimeInfo = await resolveRuntimeInfo({ root });
 const { server } = createBridgeServer({ repository, token, requirePairing, publicDir: join(root, 'public'), usageReader, accountReader, deliveryInbox, runtimeInfo });

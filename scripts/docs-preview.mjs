@@ -182,6 +182,15 @@ const usage = {
       resetsAt: now + 3 * 86_400_000,
     },
   ],
+  dailyUsage: [
+    { date: '2026-09-17', usedPercent: 6, observed: true },
+    { date: '2026-09-18', usedPercent: 11, observed: true },
+    { date: '2026-09-19', usedPercent: 3, observed: true },
+    { date: '2026-09-20', usedPercent: 0, observed: true },
+    { date: '2026-09-21', usedPercent: 8, observed: true },
+    { date: '2026-09-22', usedPercent: 12, observed: true },
+    { date: '2026-09-23', usedPercent: 5, observed: true },
+  ],
 };
 
 const mimeTypes = {
@@ -208,8 +217,8 @@ async function serveStatic(pathname, response, language) {
     if (requested === 'index.html') {
       const selected = language === 'zh-CN' ? 'zh-CN' : 'en';
       body = Buffer.from(String(body).replace(
-        '<script type="module" src="/app.js?v=26"></script>',
-        `<script>localStorage.setItem('codex-local-hub-language-choice', '${selected}');localStorage.setItem('codex-local-hub-install-dismissed', '1');</script>\n    <script type="module" src="/app.js?v=26"></script>`,
+        '<script type="module" src="/app.js?v=27"></script>',
+        `<script>localStorage.setItem('codex-local-hub-language-choice', '${selected}');localStorage.setItem('codex-local-hub-install-dismissed', '1');</script>\n    <script type="module" src="/app.js?v=27"></script>`,
       ));
     }
     response.writeHead(200, { 'content-type': mimeTypes[extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
