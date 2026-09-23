@@ -15,7 +15,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/app-icon-192.png" />
-    <link rel="stylesheet" href="/styles.css?v=25" />
+    <link rel="stylesheet" href="/styles.css?v=26" />
     <title>Codex Lookout</title>
   </head>
   <body>
@@ -112,6 +112,9 @@
               </div>
               <span id="detail-status" class="status-pill"></span>
               <button id="resume-button" class="resume-button" type="button" hidden data-i18n="action.resume">继续任务</button>
+              <button id="task-menu-button" class="task-menu-button" type="button" aria-label="管理任务" data-i18n-aria="manage.open">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>
+              </button>
             </div>
 
             <div class="detail-scroll">
@@ -174,6 +177,6 @@
         <div id="modal-content" class="modal-content"></div>
       </section>
     </div>
-    <script type="module" src="/app.js?v=27"></script>
+    <script type="module" src="/app.js?v=28"></script>
   </body>
 </html>

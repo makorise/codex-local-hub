@@ -6,7 +6,7 @@ import { cleanUserMessage, extractMessageText, isInternalMessage } from './core.
 const defaultExec = promisify(nodeExecFile);
 
 const TASK_SQL = `
-SELECT t.id, t.name, t.title, t.preview, t.cwd, t.model, t.is_pinned,
+SELECT t.id, t.name, t.title, t.preview, t.cwd, t.model, t.is_pinned, p.id AS project_id,
        t.updated_at_ms, t.recency_at_ms, t.rollout_path,
        p.name AS project_name, s.name AS section_name,
        (SELECT COUNT(*) FROM queue_db.queued_items qi WHERE qi.thread_id = t.id) AS queued_count,
@@ -19,7 +19,11 @@ SELECT t.id, t.name, t.title, t.preview, t.cwd, t.model, t.is_pinned,
        g.goal_id, g.objective AS goal_objective, g.status AS goal_status,
        g.time_used_seconds AS goal_time_used_seconds
 FROM threads t
-LEFT JOIN projects p ON p.id = t.project_id
+LEFT JOIN projects p ON p.id = COALESCE(t.project_id, (
+  SELECT pr.project_id FROM project_roots pr
+  WHERE t.cwd = pr.path OR t.cwd LIKE pr.path || '/%'
+  ORDER BY LENGTH(pr.path) DESC LIMIT 1
+))
 LEFT JOIN thread_sections s ON s.id = t.thread_section_id
 LEFT JOIN goal_db.thread_goals g ON g.thread_id = t.id
 WHERE t.archived = 0 AND t.preview <> '' AND t.thread_source = 'user'
@@ -27,7 +31,7 @@ ORDER BY t.is_pinned DESC, t.recency_at_ms DESC
 LIMIT 80;`;
 
 const BASIC_TASK_SQL = `
-SELECT t.id, t.name, t.title, t.preview, t.cwd, t.model, t.is_pinned,
+SELECT t.id, t.name, t.title, t.preview, t.cwd, t.model, t.is_pinned, NULL AS project_id,
        t.updated_at_ms, t.recency_at_ms, t.rollout_path,
        NULL AS project_name, NULL AS section_name,
        0 AS queued_count, NULL AS queued_message,
@@ -51,6 +55,9 @@ export class CodexRepository {
     now = () => Date.now(),
     steerMessage = async () => { throw Object.assign(new Error('当前 Codex 不支持立即执行'), { statusCode: 503 }); },
     startTurn = async () => { throw Object.assign(new Error('当前 Codex 不支持启动任务'), { statusCode: 503 }); },
+    archiveTask = async () => { throw Object.assign(new Error('当前 Codex 不支持归档任务'), { statusCode: 503 }); },
+    interruptTurn = async () => { throw Object.assign(new Error('当前 Codex 不支持停止任务'), { statusCode: 503 }); },
+    deleteProject = async () => { throw Object.assign(new Error('当前 Codex 不支持删除项目'), { statusCode: 503 }); },
   }) {
     this.stateDb = stateDb;
     this.queueDb = queueDb;
@@ -61,6 +68,9 @@ export class CodexRepository {
     this.now = now;
     this.steerMessage = steerMessage;
     this.startTurn = startTurn;
+    this.archiveTask = archiveTask;
+    this.interruptTurn = interruptTurn;
+    this.deleteProject = deleteProject;
     this.details = new Map();
   }
 
@@ -199,6 +209,46 @@ SELECT valid FROM mutation_guard;`;
     return this.queueMessage(threadId, message);
   }
 
+  async stopTask(threadId) {
+    const turnId = await this.activeTurnId(threadId);
+    if (!turnId) throw Object.assign(new Error('这个任务当前没有正在执行的回合'), { statusCode: 409 });
+    await this.interruptTurn(threadId, turnId);
+    return { stopped: true, threadId };
+  }
+
+  async archiveThread(threadId) {
+    if (!this.details.has(threadId)) await this.listTasks();
+    if (!this.details.has(threadId)) throw Object.assign(new Error('任务不存在或已经归档'), { statusCode: 404 });
+    await this.archiveTask(threadId);
+    this.details.delete(threadId);
+    return { archived: true, threadId };
+  }
+
+  async removeProject(projectId, expectedName) {
+    const sql = `SELECT id, name FROM projects WHERE id = '${escapeSqlite(projectId)}' LIMIT 1;`;
+    const { stdout = '' } = await this.execFile('sqlite3', ['-json', this.stateDb, sql], { maxBuffer: 1024 * 1024 });
+    const project = stdout.trim() ? JSON.parse(stdout)[0] : null;
+    if (!project) throw Object.assign(new Error('项目不存在或已经删除'), { statusCode: 404 });
+    if (String(project.name) !== String(expectedName)) throw Object.assign(new Error('项目名称不匹配，请刷新后重试'), { statusCode: 409 });
+    await this.deleteProject(projectId);
+    for (const [threadId, task] of this.details) {
+      if (task.projectId === projectId) this.details.delete(threadId);
+    }
+    return { deleted: true, projectId, name: project.name, filesDeleted: false };
+  }
+
+  async activeTurnId(threadId) {
+    const sql = `SELECT turn_id FROM thread_turns WHERE thread_id = '${escapeSqlite(threadId)}' AND status = 'inProgress' ORDER BY rollout_ordinal DESC LIMIT 1;`;
+    let stdout = '';
+    try {
+      ({ stdout = '' } = await this.execFile('sqlite3', ['-json', this.historyDb, sql], { maxBuffer: 1024 * 1024 }));
+    } catch (error) {
+      if (isOptionalDataUnavailable(error)) return null;
+      throw error;
+    }
+    return stdout.trim() ? JSON.parse(stdout)[0]?.turn_id || null : null;
+  }
+
   async queueMessage(threadId, message) {
     const { stdout = '', stderr = '' } = await this.execFile(this.codexBin, ['queue', '--thread', threadId, '--message', message], { maxBuffer: 1024 * 1024 });
     return { accepted: true, mode: 'queued', output: String(stdout || stderr).trim() };
@@ -240,6 +290,6 @@ export function escapeSqlite(value) {
 
 export function isOptionalDataUnavailable(error) {
   const detail = `${error?.message || ''}\n${error?.stderr || ''}`;
-  return /no such table: (?:queue_db\.|history_db\.|goal_db\.|main\.)?(?:queued_items|queued_thread_revisions|thread_turns|thread_items|thread_goals|projects|thread_sections)\b/i.test(detail)
+  return /no such table: (?:queue_db\.|history_db\.|goal_db\.|main\.)?(?:queued_items|queued_thread_revisions|thread_turns|thread_items|thread_goals|projects|project_roots|thread_sections)\b/i.test(detail)
     || /unable to open database(?: file)?/i.test(detail);
 }

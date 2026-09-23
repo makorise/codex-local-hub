@@ -170,6 +170,8 @@ button { color: inherit; }
 .resume-button { min-height: 34px; padding: 0 12px; border: 1px solid rgba(255,198,109,.2); border-radius: 11px; color: #ffd494; background: rgba(255,184,75,.08); cursor: pointer; font-size: .7rem; font-weight: 650; }
 .resume-button[hidden] { display: none !important; }
 .resume-button:disabled { opacity: .45; cursor: wait; }
+.task-menu-button { width: 36px; height: 36px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.08); border-radius: 11px; color: #9aa6b9; background: rgba(255,255,255,.035); cursor: pointer; }
+.task-menu-button svg { width: 18px; height: 18px; fill: currentColor; }
 .back-button { display: none; width: 38px; height: 38px; border-radius: 12px; flex: 0 0 auto; }
 .detail-title-wrap { min-width: 0; flex: 1; }
 .eyebrow, .section-label { color: var(--muted); text-transform: uppercase; letter-spacing: .11em; font-size: .68rem; font-weight: 650; }
@@ -264,6 +266,17 @@ button { color: inherit; }
 .queue-delete.is-confirming svg { display: none; }
 .queue-delete.is-confirming span { display: inline; }
 .queue-manager.is-busy { pointer-events: none; opacity: .65; }
+.management-menu { padding: 14px; white-space: normal; }
+.management-actions { display: flex; flex-direction: column; gap: 9px; }
+.management-action { width: 100%; min-height: 62px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border: 1px solid rgba(255,255,255,.075); border-radius: 15px; color: #e5eaf3; background: rgba(255,255,255,.03); text-align: left; cursor: pointer; touch-action: manipulation; }
+.management-action span { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.management-action strong { font-size: .8rem; font-weight: 650; }
+.management-action small { color: #778296; font-size: .66rem; line-height: 1.45; }
+.management-action svg { width: 19px; height: 19px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.management-action[data-action="stop"] { color: #9bc4ff; }
+.management-action[data-action="delete-project"] { color: #ff9bab; border-color: rgba(255,104,126,.13); background: rgba(255,79,106,.045); }
+.management-action.is-confirming { color: #fff; border-color: rgba(255,104,126,.28); background: rgba(255,79,106,.15); }
+.management-menu.is-busy { pointer-events: none; opacity: .58; }
 .queue-empty { padding: 34px 16px 38px; display: flex; flex-direction: column; align-items: center; color: #788497; text-align: center; }
 .queue-empty > span { width: 44px; height: 44px; display: grid; place-items: center; margin-bottom: 13px; border: 1px solid rgba(95,226,172,.18); border-radius: 15px; color: var(--green); background: rgba(95,226,172,.07); font-size: 1.1rem; }
 .queue-empty strong { color: #e3e8f0; font-size: .9rem; }

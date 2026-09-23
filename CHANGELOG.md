@@ -2,6 +2,12 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.16 - 2026-09-23
+
+- Added phone controls to stop a running task and archive a task without returning to the Mac.
+- Added two-step project removal from Codex while explicitly preserving the project directory and every local file.
+- Connected the dashboard to Codex's native task and project management protocol, with bilingual mobile UI and complete regression coverage.
+
 ## 0.2.15 - 2026-09-23
 
 - Fixed legacy hosts repeatedly offering a cached older release instead of querying GitHub again when the update button was pressed.

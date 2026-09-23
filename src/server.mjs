@@ -168,6 +168,27 @@ export function createBridgeServer({
         const task = await repository.getTask(taskMatch[1]);
         return task ? json(response, 200, { task }) : json(response, 404, { error: '任务不存在' });
       }
+      const stopTaskMatch = request.method === 'POST' && url.pathname.match(/^\/api\/tasks\/([0-9a-f-]+)\/stop$/i);
+      if (stopTaskMatch) {
+        const result = await repository.stopTask(stopTaskMatch[1]);
+        await refresh();
+        return json(response, 200, result);
+      }
+      const archiveTaskMatch = request.method === 'POST' && url.pathname.match(/^\/api\/tasks\/([0-9a-f-]+)\/archive$/i);
+      if (archiveTaskMatch) {
+        const result = await repository.archiveThread(archiveTaskMatch[1]);
+        await refresh();
+        return json(response, 200, result);
+      }
+      const deleteProjectMatch = request.method === 'DELETE' && url.pathname.match(/^\/api\/projects\/([0-9a-f-]+)$/i);
+      if (deleteProjectMatch) {
+        const body = await readJsonBody(request);
+        const name = typeof body.name === 'string' ? body.name.trim() : '';
+        if (!name || name.length > 200) return json(response, 400, { error: '项目确认名称无效' });
+        const result = await repository.removeProject(deleteProjectMatch[1], name);
+        await refresh();
+        return json(response, 200, result);
+      }
       if (request.method === 'GET' && url.pathname === '/api/events') {
         response.writeHead(200, {
           'content-type': 'text/event-stream',

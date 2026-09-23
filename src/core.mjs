@@ -103,6 +103,7 @@ export function presentTask(row, snapshot = {}, now = Date.now()) {
     id: row.id,
     title,
     project,
+    projectId: row.project_id || null,
     cwd: row.cwd,
     updatedAt: Math.max(Number(row.recency_at_ms || 0), Number(row.updated_at_ms || 0), Number(row.last_activity_at || 0), Number(snapshot.lastActivityAt || 0)),
     model: row.model || null,

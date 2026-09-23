@@ -58,6 +58,7 @@ test('bridge server serves authenticated API, static files, SSE and messages', a
   let tasks = [{ id: '1234567890abcdef1234', title: 'Task', progress: { state: 'idle' } }];
   const sent = [];
   const queueMutations = [];
+  const managementMutations = [];
   const repository = {
     listTasks: async () => tasks,
     getTask: async (id) => id === tasks[0]?.id ? { ...tasks[0], messages: [] } : null,
@@ -65,6 +66,9 @@ test('bridge server serves authenticated API, static files, SSE and messages', a
     reorderQueuedTasks: async (id, itemIds, revision) => { queueMutations.push(['reorder', id, itemIds, revision]); return itemIds.map((itemId, index) => ({ id: itemId, queueOrder: index + 1 })); },
     deleteQueuedTask: async (id, itemId, revision) => { queueMutations.push(['delete', id, itemId, revision]); return []; },
     steerQueuedTask: async (id, itemId, revision) => { queueMutations.push(['steer', id, itemId, revision]); return { result: { accepted: true }, queuedTasks: [] }; },
+    stopTask: async (id) => { managementMutations.push(['stop', id]); return { stopped: true, threadId: id }; },
+    archiveThread: async (id) => { managementMutations.push(['archive', id]); return { archived: true, threadId: id }; },
+    removeProject: async (id, name) => { managementMutations.push(['delete-project', id, name]); return { deleted: true, projectId: id, name, filesDeleted: false }; },
   };
   const deliveryInbox = {
     list: async () => [{ id: 'image.png', title: '交付图', createdAt: 1, size: 3, mime: 'image/png', url: '/api/deliveries/files/image.png' }],
@@ -149,6 +153,19 @@ test('bridge server serves authenticated API, static files, SSE and messages', a
     ['steer', tasks[0].id, order[0], 9],
   ]);
 
+  const managedThreadId = tasks[0].id;
+  assert.deepEqual((await request(base, `/api/tasks/${managedThreadId}/stop?token=secret`, { method: 'POST' })).body, { stopped: true, threadId: managedThreadId });
+  const projectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  assert.equal((await request(base, `/api/projects/${projectId}?token=secret`, { method: 'DELETE', body: '{}' })).status, 400);
+  assert.equal((await request(base, `/api/projects/${projectId}?token=secret`, { method: 'DELETE', body: JSON.stringify({ name: 'x'.repeat(201) }) })).status, 400);
+  assert.deepEqual((await request(base, `/api/projects/${projectId}?token=secret`, { method: 'DELETE', body: JSON.stringify({ name: ' sync ' }) })).body, { deleted: true, projectId, name: 'sync', filesDeleted: false });
+  assert.deepEqual((await request(base, `/api/tasks/${managedThreadId}/archive?token=secret`, { method: 'POST' })).body, { archived: true, threadId: managedThreadId });
+  assert.deepEqual(managementMutations, [
+    ['stop', managedThreadId],
+    ['delete-project', projectId, 'sync'],
+    ['archive', managedThreadId],
+  ]);
+
   await new Promise((resolve, reject) => {
     const stream = get(`${base}/api/events?token=secret`, (response) => {
       response.once('data', (chunk) => {
@@ -199,6 +216,9 @@ test('bridge reports repository and message failures and closes active streams',
     reorderQueuedTasks: async () => { throw new Error('reorder failed'); },
     deleteQueuedTask: async () => { throw new Error('delete failed'); },
     steerQueuedTask: async () => { throw steerFailure; },
+    stopTask: async () => { throw new Error('stop failed'); },
+    archiveThread: async () => { throw new Error('archive failed'); },
+    removeProject: async () => { throw new Error('project delete failed'); },
   };
   const bridge = createBridgeServer({
     repository,
@@ -216,6 +236,9 @@ test('bridge reports repository and message failures and closes active streams',
   assert.equal((await request(base, '/api/tasks/1234567890abcdef1234/queue', { method: 'PATCH', body: JSON.stringify({ itemIds: ['aaaaaaaaaaaaaaaaaaaa'], revision: 1 }) })).status, 500);
   assert.equal((await request(base, '/api/tasks/1234567890abcdef1234/queue/aaaaaaaaaaaaaaaaaaaa', { method: 'DELETE', body: JSON.stringify({ revision: 1 }) })).status, 500);
   assert.equal((await request(base, '/api/tasks/1234567890abcdef1234/queue/aaaaaaaaaaaaaaaaaaaa/steer', { method: 'POST', body: JSON.stringify({ revision: 1 }) })).status, 500);
+  assert.equal((await request(base, '/api/tasks/1234567890abcdef1234/stop', { method: 'POST' })).status, 500);
+  assert.equal((await request(base, '/api/tasks/1234567890abcdef1234/archive', { method: 'POST' })).status, 500);
+  assert.equal((await request(base, '/api/projects/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', { method: 'DELETE', body: JSON.stringify({ name: 'sync' }) })).status, 500);
   steerFailure = Object.assign(new Error('控制通道不可用；消息仍保留在队列中'), { statusCode: 503 });
   const unavailableSteer = await request(base, '/api/tasks/1234567890abcdef1234/queue/aaaaaaaaaaaaaaaaaaaa/steer', { method: 'POST', body: JSON.stringify({ revision: 1 }) });
   assert.equal(unavailableSteer.status, 503);

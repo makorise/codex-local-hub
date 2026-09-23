@@ -14,6 +14,7 @@ function task(overrides = {}) {
     id: '11111111-1111-1111-1111-111111111111',
     title: '同步任务',
     project: 'sync',
+    projectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     updatedAt: Date.now(),
     activity: '正在推进',
     latestTask: '处理前端问题',
@@ -104,6 +105,9 @@ async function setup({ failing = new Map(), empty = false, taskCount = 1 } = {})
     }
     if (url.pathname === '/api/deliveries') return response({ deliveries });
     if (url.pathname === `/api/tasks/${task().id}`) return response({ task: { ...task(), messages: empty ? [] : [{ id: 'm1', role: 'assistant', text: '结果', timestamp: Date.now(), pending: false }], queuedTasks: empty ? [] : queued } });
+    if (url.pathname === `/api/tasks/${task().id}/stop` && options.method === 'POST') return response({ stopped: true, threadId: task().id });
+    if (url.pathname === `/api/tasks/${task().id}/archive` && options.method === 'POST') return response({ archived: true, threadId: task().id });
+    if (url.pathname === `/api/projects/${task().projectId}` && options.method === 'DELETE') return response({ deleted: true, projectId: task().projectId, name: JSON.parse(options.body).name, filesDeleted: false });
     if (url.pathname === `/api/tasks/${task().id}/queue` && options.method === 'PATCH') {
       const body = JSON.parse(options.body);
       queued = body.itemIds.map((id) => queued.find((item) => item.id === id)).map((item, index) => ({ ...item, queueOrder: index + 1, queueRevision: 9 }));
@@ -308,6 +312,20 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.equal(ui.formatReset(0), '重置时间未知');
   await ui.loadUsage();
 
+  document.querySelector('#task-menu-button').click();
+  assert.equal(document.querySelectorAll('.management-action').length, 3);
+  const projectDelete = document.querySelector('[data-action="delete-project"]');
+  projectDelete.click();
+  assert.equal(projectDelete.classList.contains('is-confirming'), true);
+  assert.match(projectDelete.textContent, /再次点击/);
+  projectDelete.click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(calls.some(([path, method]) => path === `/api/projects/${task().projectId}` && method === 'DELETE'));
+  document.querySelector('#task-menu-button').click();
+  document.querySelector('[data-action="stop"]').click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(calls.some(([path, method]) => path === `/api/tasks/${task().id}/stop` && method === 'POST'));
+
   document.querySelector('#queue-card').click();
   assert.equal(document.querySelectorAll('.queue-manager-list li').length, 3);
   const steerFailurePath = `/api/tasks/${task().id}/queue/${queue()[0].id}/steer`;
@@ -401,6 +419,7 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.equal(ui.taskViewChanged(baseTask, { ...baseTask, latestTask: 'changed' }), true);
   assert.equal(ui.taskViewChanged(baseTask, { ...baseTask, title: 'changed' }), true);
   assert.equal(ui.taskViewChanged(baseTask, { ...baseTask, project: 'changed' }), true);
+  assert.equal(ui.taskViewChanged(baseTask, { ...baseTask, projectId: 'changed' }), true);
   assert.equal(ui.taskViewChanged(baseTask, { ...baseTask, goal: { ...baseTask.goal, elapsedSeconds: 181 } }), true);
   assert.equal(ui.taskViewChanged(baseTask, { ...baseTask, goal: { ...baseTask.goal, status: { state: 'done', label: '完成' } } }), true);
 
@@ -641,6 +660,46 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   await new Promise((resolve) => setImmediate(resolve));
   failures.delete(`/api/tasks/${task().id}/queue`);
   failures.delete(`/api/tasks/${task().id}`);
+
+  ui.state.tasks = [];
+  ui.state.selectedId = null;
+  ui.renderTaskManagement();
+  ui.state.tasks = [task({ projectId: null, progress: { state: 'idle', label: '待命', tone: 'slate' } })];
+  ui.state.selectedId = task().id;
+  ui.renderDetail();
+  ui.renderTaskManagement();
+  assert.equal(document.querySelectorAll('.management-action').length, 1);
+  await assert.rejects(ui.deleteSelectedProject(), /删除项目失败/);
+
+  ui.state.tasks = [baseTask];
+  ui.state.selectedId = task().id;
+  failures.set(`/api/tasks/${task().id}/stop`, 'stop failed');
+  ui.renderTaskManagement();
+  document.querySelector('[data-action="stop"]').click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(document.querySelector('#toast').textContent, /stop failed/);
+  failures.delete(`/api/tasks/${task().id}/stop`);
+
+  failures.set(`/api/projects/${task().projectId}`, 'project failed');
+  ui.renderTaskManagement();
+  const failedProjectDelete = document.querySelector('[data-action="delete-project"]');
+  failedProjectDelete.click();
+  failedProjectDelete.click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(document.querySelector('#toast').textContent, /project failed/);
+  failures.delete(`/api/projects/${task().projectId}`);
+
+  failures.set(`/api/tasks/${task().id}/archive`, 'archive failed');
+  ui.renderTaskManagement();
+  document.querySelector('[data-action="archive"]').click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(document.querySelector('#toast').textContent, /archive failed/);
+  failures.delete(`/api/tasks/${task().id}/archive`);
+  ui.renderTaskManagement();
+  document.querySelector('[data-action="archive"]').click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(ui.state.selectedId, null);
+  assert.equal(document.querySelector('#detail-pane').classList.contains('is-open'), false);
 
   failures.set('/api/tasks', 'tasks failed');
   await ui.startDashboard();

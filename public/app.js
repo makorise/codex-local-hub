@@ -303,6 +303,7 @@ function taskViewChanged(previous, current) {
     || previous.latestTask !== current.latestTask
     || previous.title !== current.title
     || previous.project !== current.project
+    || previous.projectId !== current.projectId
     || previous.goal?.elapsedSeconds !== current.goal?.elapsedSeconds
     || previous.goal?.status?.state !== current.goal?.status?.state;
 }
@@ -579,6 +580,101 @@ function renderQueueManager() {
   document.body.classList.add('modal-open');
 }
 
+function renderTaskManagement() {
+  const task = state.tasks.find((item) => item.id === state.selectedId);
+  if (!task) return;
+  $('#modal-kicker').textContent = t('manage.kicker');
+  $('#modal-title').textContent = task.title;
+  const modalContent = $('#modal-content');
+  modalContent.className = 'modal-content management-menu';
+  modalContent.innerHTML = `<div class="management-actions">
+    ${task.progress.state === 'running' ? `<button class="management-action" type="button" data-action="stop">
+      <span><strong>${escapeHtml(t('manage.stop'))}</strong><small>${escapeHtml(t('manage.stopHint'))}</small></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z" /></svg>
+    </button>` : ''}
+    <button class="management-action" type="button" data-action="archive">
+      <span><strong>${escapeHtml(t('manage.archive'))}</strong><small>${escapeHtml(t('manage.archiveHint'))}</small></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M6 7v12h12V7M9 11h6M5 4h14v3H5z" /></svg>
+    </button>
+    ${task.projectId ? `<button class="management-action" type="button" data-action="delete-project">
+      <span><strong>${escapeHtml(t('manage.projectDelete'))}</strong><small>${escapeHtml(t('manage.projectDeleteHint'))}</small></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13" /></svg>
+    </button>` : ''}
+  </div>`;
+  $('#content-modal').hidden = false;
+  document.body.classList.add('modal-open');
+}
+
+async function stopSelectedTask() {
+  const taskId = state.selectedId;
+  const response = await fetch(api(`/api/tasks/${taskId}/stop`), { method: 'POST' });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(localizedError(payload.error, 'manage.stopFailure'));
+  closeContent();
+  showToast(t('manage.stopped'));
+  await loadTasks();
+  if (state.tasks.some((task) => task.id === taskId)) await loadDetail(taskId);
+  return payload;
+}
+
+async function archiveSelectedTask() {
+  const taskId = state.selectedId;
+  const response = await fetch(api(`/api/tasks/${taskId}/archive`), { method: 'POST' });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(localizedError(payload.error, 'manage.archiveFailure'));
+  state.tasks = state.tasks.filter((task) => task.id !== taskId);
+  state.details.delete(taskId);
+  state.selectedId = null;
+  closeContent();
+  detailPane.classList.remove('is-open');
+  history.replaceState(null, '', location.pathname + location.search);
+  renderList();
+  renderDetail();
+  showToast(t('manage.archived'));
+  return payload;
+}
+
+async function deleteSelectedProject() {
+  const task = state.tasks.find((item) => item.id === state.selectedId);
+  if (!task?.projectId) throw new Error(t('manage.projectDeleteFailure'));
+  const response = await fetch(api(`/api/projects/${task.projectId}`), {
+    method: 'DELETE',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: task.project }),
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(localizedError(payload.error, 'manage.projectDeleteFailure'));
+  closeContent();
+  await loadTasks();
+  if (state.tasks.some((item) => item.id === state.selectedId)) await loadDetail(state.selectedId);
+  showToast(t('manage.projectDeleted'));
+  return payload;
+}
+
+async function handleManagementAction(button) {
+  const action = button.dataset.action;
+  if (action === 'delete-project' && !button.dataset.confirming) {
+    button.dataset.confirming = 'true';
+    button.classList.add('is-confirming');
+    button.querySelector('strong').textContent = t('manage.confirmProject');
+    return false;
+  }
+  const content = $('#modal-content');
+  content.classList.add('is-busy');
+  let succeeded = false;
+  try {
+    if (action === 'stop') await stopSelectedTask();
+    if (action === 'archive') await archiveSelectedTask();
+    if (action === 'delete-project') await deleteSelectedProject();
+    succeeded = true;
+  } catch (error) {
+    const fallback = action === 'stop' ? 'manage.stopFailure' : action === 'archive' ? 'manage.archiveFailure' : 'manage.projectDeleteFailure';
+    showToast(localizedError(error.message, fallback));
+  }
+  content.classList.remove('is-busy');
+  return succeeded;
+}
+
 async function reorderQueue(itemId, direction) {
   const queuedTasks = state.details.get(state.selectedId)?.queuedTasks || [];
   const index = queuedTasks.findIndex((message) => message.id === itemId);
@@ -730,10 +826,16 @@ $('#queue-card').addEventListener('click', () => {
     renderQueueManager();
   }
 });
+$('#task-menu-button').addEventListener('click', renderTaskManagement);
 $('#modal-content').addEventListener('click', async (event) => {
   const button = event.target.closest('[data-action]');
+  if (!button) return;
+  if ($('#modal-content').classList.contains('management-menu')) {
+    await handleManagementAction(button);
+    return;
+  }
   const row = button?.closest('[data-queue-id]');
-  if (!button || !row || !$('#modal-content').classList.contains('queue-manager')) return;
+  if (!row || !$('#modal-content').classList.contains('queue-manager')) return;
   const action = button.dataset.action;
   if (action === 'expand') {
     row.classList.toggle('is-expanded');
@@ -862,6 +964,11 @@ export {
   queueRevision,
   applyQueuedTasks,
   renderQueueManager,
+  renderTaskManagement,
+  stopSelectedTask,
+  archiveSelectedTask,
+  deleteSelectedProject,
+  handleManagementAction,
   reorderQueue,
   deleteQueueItem,
   steerQueueItem,

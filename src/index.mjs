@@ -46,6 +46,9 @@ const repository = new CodexRepository({
   codexBin,
   steerMessage: (threadId, turnId, message) => control.steer(threadId, turnId, message),
   startTurn: (threadId, message, cwd) => control.resume(threadId, message, cwd),
+  archiveTask: (threadId) => control.archiveThread(threadId),
+  interruptTurn: (threadId, turnId) => control.interruptTurn(threadId, turnId),
+  deleteProject: (projectId) => control.deleteProject(projectId),
 });
 const usageHistoryPath = process.platform === 'darwin'
   ? join(home, 'Library', 'Application Support', 'Codex Local Hub', 'usage-history.json')

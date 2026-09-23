@@ -97,7 +97,7 @@ Continue with $setup-codex-local-hub from the last verified setup stage. Reuse t
 1. **Install the host app.** The native macOS wrapper starts its bundled Node.js service on the Mac and shows a QR code containing the plain phone address.
 2. **Read local Codex data.** The service reads task, project, queue, goal, usage, and recent visible-message state from the local `~/.codex` databases. It uses the Codex CLI and app-server control channel for resume, queue, and steer actions; it does not scrape the ChatGPT web interface.
 3. **Synchronize on the LAN.** Scanning the QR code opens the dashboard directly. JSON endpoints provide current state, while server-sent events refresh it when work changes.
-4. **Control work from the phone.** Prompts and queue actions travel back to the Mac, where they are delivered to the selected Codex task. The service keeps only a small recent view for monitoring instead of building a second full chat archive.
+4. **Control work from the phone.** Prompts, queue actions, task stop/archive commands, and project-management actions travel back to the Mac through Codex's native control protocol. The service keeps only a small recent view for monitoring instead of building a second full chat archive.
 
 The current release is local-network only. The data path stays between the Mac and devices on the same trusted Wi-Fi; no hosted Codex Lookout relay is involved.
 
@@ -106,6 +106,7 @@ The current release is local-network only. The data path stays between the Mac a
 - **Phone-first monitoring** — see running, queued, paused, failed, and completed tasks.
 - **Two-way control** — send prompts, reorder or remove queued prompts, and steer an active task.
 - **Interrupted-task recovery** — resume a paused task with one tap.
+- **Bedside task management** — stop or archive a task and remove a project from Codex without returning to the Mac; project files are always preserved.
 - **Visual delivery inbox** — review the latest screenshots and image results on your phone.
 - **Usage visibility** — see current Codex usage, reset times, and a privacy-safe seven-day trend collected locally by your Mac.
 - **Account awareness** — confirm which local Codex account is active without exposing its email, account ID, or credentials to the dashboard.

@@ -115,6 +115,68 @@ test('repository handles empty lists, misses and queue stdout or stderr', async 
   assert.equal((await defaults.listTasks()).length, 1);
 });
 
+test('task and project management uses Codex controls without deleting workspace files', async () => {
+  const archived = [];
+  const interrupted = [];
+  const deletedProjects = [];
+  let activeTurn = 'turn-active';
+  let projectRow = { id: 'project-1', name: 'sync' };
+  const repository = new CodexRepository({
+    stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals',
+    execFile: async (_command, args) => {
+      const sql = args[2];
+      if (sql.includes('SELECT turn_id')) return { stdout: activeTurn ? JSON.stringify([{ turn_id: activeTurn }]) : '' };
+      if (sql.includes('SELECT id, name FROM projects')) return { stdout: projectRow ? JSON.stringify([projectRow]) : '' };
+      return { stdout: '' };
+    },
+    archiveTask: async (...args) => archived.push(args),
+    interruptTurn: async (...args) => interrupted.push(args),
+    deleteProject: async (...args) => deletedProjects.push(args),
+  });
+  repository.details.set(row.id, { ...row, projectId: 'project-1' });
+  repository.details.set('other-thread', { id: 'other-thread', projectId: 'project-2' });
+
+  assert.deepEqual(await repository.stopTask(row.id), { stopped: true, threadId: row.id });
+  assert.deepEqual(interrupted, [[row.id, 'turn-active']]);
+  activeTurn = '';
+  await assert.rejects(repository.stopTask(row.id), (error) => error.statusCode === 409);
+
+  assert.deepEqual(await repository.archiveThread(row.id), { archived: true, threadId: row.id });
+  assert.deepEqual(archived, [[row.id]]);
+  assert.equal(repository.details.has(row.id), false);
+  await assert.rejects(repository.archiveThread('missing-thread'), (error) => error.statusCode === 404);
+
+  repository.details.set(row.id, { ...row, projectId: 'project-1' });
+  await assert.rejects(repository.removeProject('project-1', 'wrong'), (error) => error.statusCode === 409);
+  assert.deepEqual(await repository.removeProject('project-1', 'sync'), {
+    deleted: true, projectId: 'project-1', name: 'sync', filesDeleted: false,
+  });
+  assert.deepEqual(deletedProjects, [['project-1']]);
+  assert.equal(repository.details.has(row.id), false);
+  assert.equal(repository.details.has('other-thread'), true);
+  projectRow = null;
+  await assert.rejects(repository.removeProject('missing-project', 'sync'), (error) => error.statusCode === 404);
+
+  repository.execFile = async () => { throw Object.assign(new Error('optional'), { stderr: 'no such table: thread_turns' }); };
+  assert.equal(await repository.activeTurnId(row.id), null);
+  const activeFailure = new Error('database locked');
+  repository.execFile = async () => { throw activeFailure; };
+  await assert.rejects(repository.activeTurnId(row.id), activeFailure);
+  repository.execFile = async () => ({ stdout: '[]' });
+  assert.equal(await repository.activeTurnId(row.id), null);
+
+  const unsupported = new CodexRepository({
+    stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals',
+    execFile: async (_command, args) => args[2].includes('SELECT turn_id')
+      ? { stdout: '[{"turn_id":"turn"}]' }
+      : { stdout: '[{"id":"project","name":"name"}]' },
+  });
+  unsupported.details.set(row.id, row);
+  await assert.rejects(unsupported.stopTask(row.id), (error) => error.statusCode === 503);
+  await assert.rejects(unsupported.archiveThread(row.id), (error) => error.statusCode === 503);
+  await assert.rejects(unsupported.removeProject('project', 'name'), (error) => error.statusCode === 503);
+});
+
 test('history messages parse user, assistant, queued and invalid records', () => {
   assert.deepEqual(parseHistoryMessage({ created_at_ms: 1, item_type: 'agentMessage', item_json: '{"id":"a","text":" answer "}', pending: 0 }), { id: 'a', role: 'assistant', text: 'answer', timestamp: 1, pending: false });
   assert.equal(parseHistoryMessage({ created_at_ms: 2, item_type: 'userMessage', item_json: '{"content":[{"type":"text","text":"<environment_context>x"}]}', pending: 0 }), null);

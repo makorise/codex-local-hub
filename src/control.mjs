@@ -115,7 +115,7 @@ export class CodexAppToolsClient {
         params: {
           protocolVersion: '2025-11-25',
           capabilities: {},
-          clientInfo: { name: 'codex-local-hub', version: '0.2.10' },
+          clientInfo: { name: 'codex-local-hub', version: '0.2.16' },
         },
       });
     });
@@ -212,6 +212,18 @@ export class CodexControlClient {
     return results.at(-1);
   }
 
+  archiveThread(threadId) {
+    return this.call('thread/archive', { threadId });
+  }
+
+  interruptTurn(threadId, turnId) {
+    return this.call('turn/interrupt', { threadId, turnId });
+  }
+
+  deleteProject(projectId) {
+    return this.call('project/delete', { projectId });
+  }
+
   call(method, params) {
     return this.callSequence([{ method, params }]).then(([result]) => result);
   }
@@ -281,7 +293,10 @@ export class CodexControlClient {
       send({
         id: 1,
         method: 'initialize',
-        params: { clientInfo: { name: 'codex-pocket-dashboard', title: 'Codex Lookout', version: '0.2.0' } },
+        params: {
+          clientInfo: { name: 'codex-pocket-dashboard', title: 'Codex Lookout', version: '0.2.16' },
+          capabilities: { experimentalApi: true },
+        },
       });
     });
   }

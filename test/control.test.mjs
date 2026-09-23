@@ -39,6 +39,7 @@ test('Codex control initializes the desktop proxy and steers the active turn', a
   assert.deepEqual(await client.steer('thread-1', 'turn-1', '现在处理这个'), { turnId: 'turn-2' });
   assert.deepEqual(spawned, ['/codex', ['app-server', 'proxy', '--sock', '/tmp/codex.sock'], { stdio: ['pipe', 'pipe', 'pipe'] }]);
   assert.equal(writes[1].method, 'initialized');
+  assert.deepEqual(writes[0].params.capabilities, { experimentalApi: true });
   assert.deepEqual(writes.slice(2), [{
     id: 2,
     method: 'turn/steer',
@@ -71,6 +72,24 @@ test('Codex control initializes the desktop proxy and steers the active turn', a
     if (message.id === 2) process.stdout.write('{"id":2,"result":{"ok":true}}\n');
   });
   assert.deepEqual(await new CodexControlClient({ spawn: () => callChild }).call('status/read', {}), { ok: true });
+
+  const managementRequests = [];
+  const managementClient = new CodexControlClient({ spawn: () => childProcess((line, process) => {
+    const message = JSON.parse(line);
+    if (message.id === 1) process.stdout.write('{"id":1,"result":{}}\n');
+    if (message.id === 2) {
+      managementRequests.push({ method: message.method, params: message.params });
+      process.stdout.write('{"id":2,"result":{}}\n');
+    }
+  }) });
+  await managementClient.archiveThread('thread-1');
+  await managementClient.interruptTurn('thread-1', 'turn-1');
+  await managementClient.deleteProject('project-1');
+  assert.deepEqual(managementRequests, [
+    { method: 'thread/archive', params: { threadId: 'thread-1' } },
+    { method: 'turn/interrupt', params: { threadId: 'thread-1', turnId: 'turn-1' } },
+    { method: 'project/delete', params: { projectId: 'project-1' } },
+  ]);
 
   const appTools = { sendMessage: async (...args) => ({ args }) };
   assert.deepEqual(

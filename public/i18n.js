@@ -49,6 +49,12 @@ const messages = {
     'modal.fullContent': '完整内容', 'error.readTask': '读取任务失败', 'error.sync': '同步失败', 'error.send': '发送失败',
     'resume.message': '请从上次中断的位置继续执行当前任务，先检查已有进展，不要重复已经完成的工作。',
     'resume.sending': '正在恢复任务…', 'resume.success': '任务已恢复执行', 'resume.failure': '恢复失败，请重试',
+    'manage.open': '管理任务', 'manage.kicker': '任务管理', 'manage.stop': '停止当前执行', 'manage.stopHint': '保留任务和对话，可以稍后继续',
+    'manage.archive': '归档任务', 'manage.archiveHint': '从当前任务列表隐藏，可在 Codex 中恢复',
+    'manage.projectDelete': '从 Codex 删除项目', 'manage.projectDeleteHint': '只移除项目记录，不会删除电脑上的工程文件',
+    'manage.confirmProject': '再次点击确认删除项目', 'manage.working': '正在处理…', 'manage.stopped': '任务已停止',
+    'manage.archived': '任务已归档', 'manage.projectDeleted': '项目已从 Codex 删除，本地文件保持不变',
+    'manage.stopFailure': '停止任务失败', 'manage.archiveFailure': '归档任务失败', 'manage.projectDeleteFailure': '删除项目失败',
   },
   en: {
     'brand.name': 'Codex Lookout',
@@ -100,6 +106,12 @@ const messages = {
     'modal.fullContent': 'Full content', 'error.readTask': 'Could not load task', 'error.sync': 'Sync failed', 'error.send': 'Could not send message',
     'resume.message': 'Resume the current task from where it was interrupted. Inspect existing progress first and do not repeat completed work.',
     'resume.sending': 'Resuming task…', 'resume.success': 'Task resumed', 'resume.failure': 'Could not resume. Try again.',
+    'manage.open': 'Manage task', 'manage.kicker': 'Task management', 'manage.stop': 'Stop current run', 'manage.stopHint': 'Keep the task and conversation so you can resume later',
+    'manage.archive': 'Archive task', 'manage.archiveHint': 'Hide it from the current list; it can be restored in Codex',
+    'manage.projectDelete': 'Remove project from Codex', 'manage.projectDeleteHint': 'Removes only the project record; files on this Mac are not deleted',
+    'manage.confirmProject': 'Tap again to remove the project', 'manage.working': 'Working…', 'manage.stopped': 'Task stopped',
+    'manage.archived': 'Task archived', 'manage.projectDeleted': 'Project removed from Codex; local files were kept',
+    'manage.stopFailure': 'Could not stop the task', 'manage.archiveFailure': 'Could not archive the task', 'manage.projectDeleteFailure': 'Could not remove the project',
   },
 };
 
