@@ -294,7 +294,8 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
-            guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+            guard !data.isEmpty else { return }
+            let text = String(decoding: data, as: UTF8.self)
             DispatchQueue.main.async { self?.consumeOutput(text) }
         }
         process.terminationHandler = { [weak self] _ in

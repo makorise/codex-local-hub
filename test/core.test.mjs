@@ -4,9 +4,10 @@ import {
   MAX_MESSAGE_LENGTH,
   CORE_READY_MARKER,
   LEGACY_HOST_READY_MARKER,
+  LEGACY_READY_DELAYS_MS,
   activityLabel,
   cleanUserMessage,
-  coreReadySignal,
+  scheduleCoreReadySignals,
   extractMessageText,
   folderName,
   formatDuration,
@@ -20,12 +21,19 @@ import {
   validateMessageInput,
 } from '../src/core.mjs';
 
-test('core readiness signal supports both stable and v0.2.8 host detection', () => {
-  const signal = coreReadySignal();
+test('core readiness signal isolates ASCII and retries v0.2.8 host detection', () => {
+  const writes = [];
+  const scheduled = [];
+  scheduleCoreReadySignals({
+    write: (line) => writes.push(line),
+    schedule: (callback, delay) => scheduled.push({ callback, delay }),
+  });
   assert.equal(CORE_READY_MARKER, 'CODEX_LOOKOUT_READY');
   assert.equal(LEGACY_HOST_READY_MARKER, 'Codex 掌上任务台已启动');
-  assert.match(signal, /CODEX_LOOKOUT_READY/);
-  assert.match(signal, /Codex 掌上任务台已启动/);
+  assert.deepEqual(writes, ['CODEX_LOOKOUT_READY']);
+  assert.deepEqual(scheduled.map(({ delay }) => delay), LEGACY_READY_DELAYS_MS);
+  for (const { callback } of scheduled) callback();
+  assert.deepEqual(writes, ['CODEX_LOOKOUT_READY', ...Array(3).fill('Codex 掌上任务台已启动')]);
 });
 
 test('text helpers normalize, extract and filter visible messages', () => {

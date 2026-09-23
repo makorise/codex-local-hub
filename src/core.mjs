@@ -1,9 +1,13 @@
 export const MAX_MESSAGE_LENGTH = 12_000;
 export const CORE_READY_MARKER = 'CODEX_LOOKOUT_READY';
 export const LEGACY_HOST_READY_MARKER = 'Codex 掌上任务台已启动';
+export const LEGACY_READY_DELAYS_MS = [100, 350, 750];
 
-export function coreReadySignal() {
-  return `${CORE_READY_MARKER} ${LEGACY_HOST_READY_MARKER}`;
+export function scheduleCoreReadySignals({ write, schedule }) {
+  write(CORE_READY_MARKER);
+  for (const delay of LEGACY_READY_DELAYS_MS) {
+    schedule(() => write(LEGACY_HOST_READY_MARKER), delay);
+  }
 }
 
 export function truncate(value, length = 180) {

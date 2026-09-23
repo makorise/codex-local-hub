@@ -2,6 +2,12 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.14 - 2026-09-23
+
+- Fixed intermittent hot-update rollback when a host read process output across a split UTF-8 character boundary and discarded the readiness marker.
+- Sends the stable ASCII readiness marker as an isolated first write, delays human-readable output, and retries the internal 0.2.8 compatibility marker during startup.
+- Made newer native hosts preserve valid output across arbitrary pipe chunk boundaries and added deterministic scheduling coverage.
+
 ## 0.2.13 - 2026-09-23
 
 - Fixed 0.2.8 hosts falsely rolling back a healthy core update after the product rename changed the human-readable startup text.
