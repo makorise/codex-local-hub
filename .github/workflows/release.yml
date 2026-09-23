@@ -58,7 +58,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="$(node -p "require('./package.json').version")"
-          gh release create "$GITHUB_REF_NAME" "dist/Codex-Local-Hub-core-$version.zip" "dist/Codex-Local-Hub-core-$version.zip.sha256" "dist/Codex-Local-Hub-$version-universal.dmg" "dist/Codex-Local-Hub-$version-universal.dmg.sha256" --verify-tag --generate-notes --title "Codex Local Hub $version"
+          gh release create "$GITHUB_REF_NAME" "dist/Codex-Local-Hub-core-$version.zip" "dist/Codex-Local-Hub-core-$version.zip.sha256" "dist/Codex-Local-Hub-$version-universal.dmg" "dist/Codex-Local-Hub-$version-universal.dmg.sha256" --verify-tag --generate-notes --title "Codex Lookout v$version"
       - name: Publish stable core release with unsigned DMG preview
         if: ${{ !(env.DEVELOPER_ID_APPLICATION != '' && env.APPLE_ID != '' && env.APPLE_TEAM_ID != '' && env.APPLE_APP_SPECIFIC_PASSWORD != '') }}
         env:
@@ -73,5 +73,5 @@ jobs:
             "dist/Codex-Local-Hub-core-$version.zip.sha256#Core SHA-256" \
             "$preview#Unsigned universal DMG preview" \
             "$preview.sha256#DMG preview SHA-256" \
-            --verify-tag --generate-notes --latest --title "Codex Local Hub $version" \
+            --verify-tag --generate-notes --latest --title "Codex Lookout v$version" \
             --notes "Existing v0.2.2 users can update safely through the app's checksum-verified core updater. The attached DMG preview is universal but is not Apple-notarized; new users should prefer the one-message Codex setup documented in the README until a notarized DMG is published."

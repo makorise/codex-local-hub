@@ -3,7 +3,7 @@
 ## Copy into Codex to install
 
 ```text
-Use $skill-installer to install https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub, then use $setup-codex-local-hub in this task to install or update Codex Local Hub, install its image-delivery skill, launch it, and verify phone access. Prefer the latest stable release; otherwise build from source. Preserve existing files and do not change my global Node.js environment.
+Use $skill-installer to install https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub, then use $setup-codex-local-hub in this task to install or update Codex Lookout, install its image-delivery skill, launch it, and verify phone access. Prefer the latest stable release; otherwise build from source. Preserve existing files and do not change my global Node.js environment.
 ```
 
 **[Visit the product website →](https://makorise.github.io/codex-local-hub/)** · [简体中文](README.zh-CN.md)
@@ -17,14 +17,14 @@ Use $skill-installer to install https://github.com/makorise/codex-local-hub/tree
 ![Test coverage](https://img.shields.io/badge/coverage-100%25-16a34a.svg)
 
 <p align="center">
-  <img src="docs/assets/social-preview/codex-local-hub-social-preview.png" width="100%" alt="Codex Local Hub mobile dashboard for monitoring and controlling ChatGPT Codex tasks from a phone">
+  <img src="docs/assets/social-preview/codex-local-hub-social-preview.png" width="100%" alt="Codex Lookout mobile dashboard for monitoring and controlling ChatGPT Codex tasks from a phone">
 </p>
 
-Codex Lookout is an open-source **Codex mobile dashboard, task monitor, and phone remote control for macOS**. It turns a Mac running Codex into a private, phone-friendly task console on your local network. Scan the QR code in the macOS app to monitor task progress, review recent messages and visual deliveries, manage queued prompts, and continue a task without exposing your conversations to a third-party service. Downloads retain the Codex Local Hub app name for update compatibility.
+Codex Lookout is an open-source **Codex mobile dashboard, task monitor, and phone remote control for macOS**. It turns a Mac running Codex into a private, phone-friendly task console on your local network. Scan the QR code in the macOS app to monitor task progress, review recent messages and visual deliveries, manage queued prompts, and continue a task without exposing your conversations to a third-party service.
 
-中文用户可以把它理解为“**Codex 随身工作台**”：用手机查看和控制 Mac 上 ChatGPT/Codex 正在运行的任务，不用一直守着电脑。
+中文名称是“**Codex 瞭望台**”：用手机查看和控制 Mac 上 ChatGPT/Codex 正在运行的任务，不用一直守着电脑。
 
-> Codex Local Hub is an independent open-source project and is not affiliated with or endorsed by OpenAI.
+> Codex Lookout is an independent open-source project and is not affiliated with or endorsed by OpenAI.
 
 ## Stop babysitting long Codex tasks
 
@@ -41,21 +41,21 @@ Your Mac keeps doing the work while you keep living your life.
 ### 1. Start the host on your Mac
 
 <p align="center">
-  <img src="docs/assets/screenshots/mac-host.en.png" width="720" alt="Codex Local Hub macOS host app showing service status, a demo QR code, LAN address, and launch controls">
+  <img src="docs/assets/screenshots/mac-host.en.png" width="720" alt="Codex Lookout macOS host app showing service status, a demo QR code, LAN address, and launch controls">
 </p>
 <p align="center"><strong>Mac host app</strong> — start the local service, scan the LAN URL, and open the dashboard</p>
 
 ### 2. See every task at a glance
 
 <p align="center">
-  <img src="docs/assets/screenshots/desktop-home.en.png" width="920" alt="Codex Local Hub home screen showing usage, task counts, filters, task status, and an empty conversation panel before a task is selected">
+  <img src="docs/assets/screenshots/desktop-home.en.png" width="920" alt="Codex Lookout home screen showing usage, task counts, filters, task status, and an empty conversation panel before a task is selected">
 </p>
 <p align="center"><strong>Workspace home</strong> — usage, running work, queued tasks, and completed work stay visible together</p>
 
 ### 3. Open a task and continue the conversation
 
 <p align="center">
-  <img src="docs/assets/screenshots/desktop-dashboard.en.png" width="920" alt="Codex Local Hub task view showing a selected task, recent conversation, goal status, queue count, last prompt, and message composer">
+  <img src="docs/assets/screenshots/desktop-dashboard.en.png" width="920" alt="Codex Lookout task view showing a selected task, recent conversation, goal status, queue count, last prompt, and message composer">
 </p>
 <p align="center"><strong>Task conversation</strong> — review the latest visible messages, inspect the goal and queue, then send the next prompt</p>
 
@@ -63,8 +63,8 @@ Your Mac keeps doing the work while you keep living your life.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/assets/screenshots/mobile-dashboard.en.png" width="100%" alt="Codex Local Hub phone home screen showing current usage and task states"></td>
-    <td width="50%"><img src="docs/assets/screenshots/mobile-conversation.en.png" width="100%" alt="Codex Local Hub phone task view showing recent messages, goal status, queue count, last prompt, and message composer"></td>
+    <td width="50%"><img src="docs/assets/screenshots/mobile-dashboard.en.png" width="100%" alt="Codex Lookout phone home screen showing current usage and task states"></td>
+    <td width="50%"><img src="docs/assets/screenshots/mobile-conversation.en.png" width="100%" alt="Codex Lookout phone task view showing recent messages, goal status, queue count, last prompt, and message composer"></td>
   </tr>
   <tr>
     <td align="center"><strong>Phone home</strong> — choose a task from the compact dashboard</td>
@@ -81,7 +81,7 @@ The command at the top installs the reusable [`setup-codex-local-hub`](.agents/s
 If the source repository already exists on the Mac, use this shorter follow-up; the same skill will preserve changes and choose an in-place source upgrade or a clean fallback checkout:
 
 ```text
-Use $setup-codex-local-hub to update my existing Codex Local Hub source checkout and installed app. Fast-forward only if the checkout is clean; preserve every local change, run the full test suite, build the self-contained universal app, back up the installed version, replace it, relaunch it, and verify phone access. Do not ask me to download an installer manually.
+Use $setup-codex-local-hub to update my existing Codex Lookout source checkout and installed app. Fast-forward only if the checkout is clean; preserve every local change, run the full test suite, build the self-contained universal app, back up the installed version, replace it, relaunch it, and verify phone access. Do not ask me to download an installer manually.
 ```
 
 If Codex reports that the selected model is at capacity, wait while the task is still working. If it stops, choose another available model and send this in the same task:
@@ -92,16 +92,16 @@ Continue with $setup-codex-local-hub from the last verified setup stage. Reuse t
 
 ## How it works
 
-![Architecture diagram showing how Codex Local Hub is installed on a Mac, reads local Codex state, synchronizes over local Wi-Fi, and supports two-way control from a phone](docs/assets/how-it-works.svg)
+![Architecture diagram showing how Codex Lookout is installed on a Mac, reads local Codex state, synchronizes over local Wi-Fi, and supports two-way control from a phone](docs/assets/how-it-works.svg)
 
 1. **Install the host app.** The native macOS wrapper starts its bundled Node.js service on the Mac and shows a QR code containing the plain phone address.
 2. **Read local Codex data.** The service reads task, project, queue, goal, usage, and recent visible-message state from the local `~/.codex` databases. It uses the Codex CLI and app-server control channel for resume, queue, and steer actions; it does not scrape the ChatGPT web interface.
 3. **Synchronize on the LAN.** Scanning the QR code opens the dashboard directly. JSON endpoints provide current state, while server-sent events refresh it when work changes.
 4. **Control work from the phone.** Prompts and queue actions travel back to the Mac, where they are delivered to the selected Codex task. The service keeps only a small recent view for monitoring instead of building a second full chat archive.
 
-The current release is local-network only. The data path stays between the Mac and devices on the same trusted Wi-Fi; no hosted Codex Local Hub relay is involved.
+The current release is local-network only. The data path stays between the Mac and devices on the same trusted Wi-Fi; no hosted Codex Lookout relay is involved.
 
-## Why Codex Local Hub?
+## Why Codex Lookout?
 
 - **Phone-first monitoring** — see running, queued, paused, failed, and completed tasks.
 - **Two-way control** — send prompts, reorder or remove queued prompts, and steer an active task.
@@ -124,7 +124,7 @@ The current release is local-network only. The data path stays between the Mac a
 
 ## Enable the visual delivery skill
 
-The **Delivery inbox** is built into Codex Local Hub. The one-message setup above installs the companion [`deliver-to-codex-local-hub`](.agents/skills/deliver-to-codex-local-hub) skill automatically. It teaches Codex how to validate an existing screenshot or image and stage it for the inbox. It uses the app's bundled Node.js, so it does not add a global runtime dependency. The source file is never moved or modified, the inbox keeps only the latest 20 supported images, and its compact **Clear** control removes reviewed inbox copies without touching the originals.
+The **Delivery inbox** is built into Codex Lookout. The one-message setup above installs the companion [`deliver-to-codex-local-hub`](.agents/skills/deliver-to-codex-local-hub) skill automatically. It teaches Codex how to validate an existing screenshot or image and stage it for the inbox. It uses the app's bundled Node.js, so it does not add a global runtime dependency. The source file is never moved or modified, the inbox keeps only the latest 20 supported images, and its compact **Clear** control removes reviewed inbox copies without touching the originals.
 
 Recommended installation: send this message in Codex (it is not a Terminal command):
 
@@ -145,7 +145,7 @@ Codex normally detects the new skill automatically; restart Codex if it does not
 Use $deliver-to-codex-local-hub to send /absolute/path/to/screenshot.png to my phone as "Checkout result".
 ```
 
-Keep Codex Local Hub running. The image appears in **Delivery inbox** on the next refresh. Supported formats are PNG, JPEG, WebP, and GIF, up to 20 MB. See the [official OpenAI skill documentation](https://learn.chatgpt.com/docs/build-skills) for how Codex discovers and invokes skills.
+Keep Codex Lookout running. The image appears in **Delivery inbox** on the next refresh. Supported formats are PNG, JPEG, WebP, and GIF, up to 20 MB. See the [official OpenAI skill documentation](https://learn.chatgpt.com/docs/build-skills) for how Codex discovers and invokes skills.
 
 ## Requirements
 
@@ -160,7 +160,7 @@ For most users, the **Install with one message to Codex** flow near the top of t
 
 Stable GitHub Releases now provide checksum-verified core hot updates for existing installations. The attached universal DMG preview is not yet Apple-notarized, so new users should still prefer the one-message setup: it builds from source with the user's existing Node.js 22.22.2+ without installing, upgrading, relinking, or changing that Node environment. The built app contains its own Apple silicon and Intel runtimes. See the [installation guide](docs/INSTALL.md) and [macOS compatibility matrix](docs/COMPATIBILITY.md).
 
-The Mac app checks the latest stable GitHub Release at most once per day—no Codex Local Hub update server is required. A strictly newer version normally installs as a small, checksum-verified core hot update containing only the local service and web UI. The app switches versions atomically, restarts the service, and rolls back automatically if the new core cannot start. A full universal DMG is used only when the native Mac host must change. Drafts, prereleases, equal versions, and downgrades are ignored. **Check for updates** also supports a manual refresh.
+The Mac app checks the latest stable GitHub Release at most once per day—no Codex Lookout update server is required. A strictly newer version normally installs as a small, checksum-verified core hot update containing only the local service and web UI. The app switches versions atomically, restarts the service, and rolls back automatically if the new core cannot start. A full universal DMG is used only when the native Mac host must change. Drafts, prereleases, equal versions, and downgrades are ignored. **Check for updates** also supports a manual refresh.
 
 If you want Codex to perform a full install or host upgrade without manually downloading anything, use the same setup skill shown above. It prefers a notarized release package and can also safely fast-forward an existing clean source checkout, run all tests, rebuild, back up the installed app, replace it, and verify phone access. Local source changes are never overwritten.
 
@@ -179,7 +179,7 @@ The build uses the current Node.js only for repository-local install, tests, and
 Then:
 
 1. Keep the Mac and phone on the same Wi-Fi.
-2. Open **Codex Local Hub** on the Mac.
+2. Open **Codex Lookout** on the Mac.
 3. Scan the QR code with the phone camera.
 4. Optional: in Safari, choose **Share → Add to Home Screen**.
 
@@ -217,13 +217,13 @@ The coverage command enforces 100% line, branch, and function coverage for the c
 
 ## Current scope
 
-Codex Local Hub currently operates on the local network. Screen locking does not stop it, but sleep, shutdown, quitting the app, or leaving the LAN makes it unavailable. A TLS-secured public relay is planned; direct port exposure is intentionally unsupported.
+Codex Lookout currently operates on the local network. Screen locking does not stop it, but sleep, shutdown, quitting the app, or leaving the LAN makes it unavailable. A TLS-secured public relay is planned; direct port exposure is intentionally unsupported.
 
 ## FAQ
 
 ### Is this an official OpenAI or Codex product?
 
-No. Codex Local Hub is an independent open-source companion for local Codex workflows.
+No. Codex Lookout is an independent open-source companion for local Codex workflows.
 
 ### Does it expose chain-of-thought or copy my full chat history?
 
@@ -235,7 +235,9 @@ Not yet. The current release is LAN-only. Do not expose port `8787` directly to 
 
 ### Does locking the Mac stop synchronization?
 
-No. Locking the screen is supported. Sleep, shutdown, or quitting Codex Local Hub will stop access until the Mac is available again.
+No. Locking the screen is supported. Sleep, shutdown, or quitting Codex Lookout will stop access until the Mac is available again.
+
+> Previously released as Codex Local Hub. Internal identifiers remain unchanged for update compatibility.
 
 ## Roadmap
 

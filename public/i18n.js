@@ -1,6 +1,6 @@
 const messages = {
   'zh-CN': {
-    'brand.name': 'Codex 随身工作台',
+    'brand.name': 'Codex 瞭望台',
     'action.refresh': '刷新任务', 'action.close': '关闭', 'action.closeDetail': '关闭详情',
     'action.resume': '继续任务', 'action.back': '返回任务列表', 'action.send': '发送消息', 'action.switchLanguage': '切换为英文',
     'nav.taskList': '任务列表', 'nav.taskDetail': '任务详情', 'nav.taskFilter': '任务筛选',
@@ -51,7 +51,7 @@ const messages = {
     'resume.sending': '正在恢复任务…', 'resume.success': '任务已恢复执行', 'resume.failure': '恢复失败，请重试',
   },
   en: {
-    'brand.name': 'Codex Local Hub',
+    'brand.name': 'Codex Lookout',
     'action.refresh': 'Refresh tasks', 'action.close': 'Close', 'action.closeDetail': 'Close details',
     'action.resume': 'Resume', 'action.back': 'Back to tasks', 'action.send': 'Send message', 'action.switchLanguage': 'Switch to Chinese',
     'nav.taskList': 'Task list', 'nav.taskDetail': 'Task details', 'nav.taskFilter': 'Task filters',

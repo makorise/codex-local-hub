@@ -21,5 +21,5 @@ if command -v node >/dev/null 2>&1; then
   exec node "$script_dir/deliver-image.mjs" "$@"
 fi
 
-echo "Codex Local Hub's bundled Node.js runtime was not found. Install or launch Codex Local Hub first." >&2
+echo "Codex Lookout's bundled Node.js runtime was not found. Install or launch Codex Lookout first." >&2
 exit 1

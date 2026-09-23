@@ -281,7 +281,7 @@ export class CodexControlClient {
       send({
         id: 1,
         method: 'initialize',
-        params: { clientInfo: { name: 'codex-pocket-dashboard', title: 'Codex 掌上任务台', version: '0.2.0' } },
+        params: { clientInfo: { name: 'codex-pocket-dashboard', title: 'Codex Lookout', version: '0.2.0' } },
       });
     });
   }

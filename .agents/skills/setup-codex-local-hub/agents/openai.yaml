@@ -1,5 +1,5 @@
 interface:
-  display_name: "Set Up Codex Local Hub"
+  display_name: "Set Up Codex Lookout"
   short_description: "Install, update, launch, and verify the Mac host"
   brand_color: "#78A8FF"
-  default_prompt: "Use $setup-codex-local-hub to install or update Codex Local Hub on this Mac and verify phone access."
+  default_prompt: "Use $setup-codex-local-hub to install or update Codex Lookout on this Mac and verify phone access."

@@ -106,7 +106,7 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "Codex Local Hub"
+        window.title = "Codex Lookout"
         window.appearance = NSAppearance(named: .darkAqua)
         window.center()
         window.isReleasedWhenClosed = false
@@ -120,12 +120,12 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         root.translatesAutoresizingMaskIntoConstraints = false
         window.contentView = root
 
-        let badge = NSTextField(labelWithString: "CODEX LOCAL HUB · LAN")
+        let badge = NSTextField(labelWithString: "CODEX LOOKOUT · LAN")
         badge.font = .systemFont(ofSize: 11, weight: .semibold)
         badge.textColor = NSColor(calibratedRed: 0.49, green: 0.67, blue: 1, alpha: 1)
         badge.alignment = .center
 
-        let title = NSTextField(labelWithString: text("Codex 随身工作台", "Your Codex workspace, on your phone"))
+        let title = NSTextField(labelWithString: text("Codex 瞭望台", "Your Codex workspace, on your phone"))
         title.font = .systemFont(ofSize: 25, weight: .bold)
         title.textColor = .white
         title.alignment = .center
@@ -345,7 +345,7 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let lines = outputBuffer.components(separatedBy: .newlines)
         outputBuffer = lines.last ?? ""
         for line in lines.dropLast() {
-            if line.contains("Codex 掌上任务台已启动") {
+            if line.contains("Codex 瞭望台已启动") {
                 restartAttempts = 0
                 statusLabel.stringValue = text("服务运行中 · 任务正在实时同步", "Service online · tasks are syncing live")
                 statusDot.layer?.backgroundColor = NSColor.systemGreen.cgColor
@@ -485,7 +485,7 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard UserDefaults.standard.string(forKey: promptKey) != update.version else { return }
         UserDefaults.standard.set(update.version, forKey: promptKey)
         let alert = NSAlert()
-        alert.messageText = text("Codex Local Hub 有新版本", "A Codex Local Hub update is available")
+        alert.messageText = text("Codex 瞭望台有新版本", "A Codex Lookout update is available")
         alert.informativeText = canHotUpdate
             ? text("v\(update.version) 已发布。核心更新可以在后台完成，不需要重新安装程序。", "Version \(update.version) is ready. Its core can update in place without reinstalling the app.")
             : text("v\(update.version) 需要更新 Mac 宿主程序，将下载并打开完整安装包。", "Version \(update.version) requires a newer Mac host. The full installer will be downloaded and opened.")

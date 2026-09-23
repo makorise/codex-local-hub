@@ -18,7 +18,7 @@ test('web translations normalize, fall back and update content, placeholders and
   const dom = new JSDOM('<!doctype html><html><body><p data-i18n="brand.name"></p><input data-i18n-placeholder="composer.placeholder"><button data-i18n-aria="action.close"></button></body></html>');
   applyTranslations(dom.window.document);
   assert.equal(dom.window.document.documentElement.lang, 'en');
-  assert.equal(dom.window.document.querySelector('p').textContent, 'Codex Local Hub');
+  assert.equal(dom.window.document.querySelector('p').textContent, 'Codex Lookout');
   assert.equal(dom.window.document.querySelector('input').placeholder, 'Send a new prompt…');
   assert.equal(dom.window.document.querySelector('button').getAttribute('aria-label'), 'Close');
   assert.equal(setLanguage('zh-CN'), 'zh-CN');

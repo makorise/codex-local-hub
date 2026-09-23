@@ -88,7 +88,7 @@ export function requestAccount({
       if (!settled) finish(new Error(stderr.trim() || `Codex App Server 已退出（${code}）`));
     });
     try {
-      child.stdin.write(`${JSON.stringify({ method: 'initialize', id: 0, params: { clientInfo: { name: 'codex_local_hub', title: 'Codex Local Hub', version: '1.0.0' } } })}\n`);
+      child.stdin.write(`${JSON.stringify({ method: 'initialize', id: 0, params: { clientInfo: { name: 'codex_local_hub', title: 'Codex Lookout', version: '1.0.0' } } })}\n`);
       child.stdin.write(`${JSON.stringify({ method: 'initialized', params: {} })}\n`);
       child.stdin.write(`${JSON.stringify({ method: 'account/read', id: 2, params: {} })}\n`);
     } catch (error) {

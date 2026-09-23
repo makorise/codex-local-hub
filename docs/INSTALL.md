@@ -1,4 +1,4 @@
-# Installing Codex Local Hub on macOS
+# Installing Codex Lookout on macOS
 
 ## Recommended installation
 
@@ -10,7 +10,7 @@ Once a notarized DMG is available:
 
 1. Download `Codex-Local-Hub-<version>-universal.dmg` from GitHub Releases.
 2. Open the DMG.
-3. Drag **Codex Local Hub** to **Applications**.
+3. Drag **Codex Lookout** to **Applications**.
 4. Open the app and allow Local Network access when macOS asks.
 5. Scan the QR code with your phone while both devices use the same Wi-Fi.
 
@@ -30,7 +30,7 @@ Use **Check for updates** in the host window to bypass the daily throttle. Prere
 
 ## Why DMG instead of PKG?
 
-Codex Local Hub is a user-level app. It does not install system extensions, privileged helpers, or files outside its own app bundle and user data directory. A PKG would introduce administrator prompts without providing a user benefit.
+Codex Lookout is a user-level app. It does not install system extensions, privileged helpers, or files outside its own app bundle and user data directory. A PKG would introduce administrator prompts without providing a user benefit.
 
 ## Developer installation
 
@@ -65,7 +65,7 @@ mkdir -p "$HOME/.agents/skills"
 cp -R ".agents/skills/deliver-to-codex-local-hub" "$HOME/.agents/skills/"
 ```
 
-Restart Codex only if the skill does not appear automatically. Keep Codex Local Hub running, then ask Codex to send an existing PNG, JPEG, WebP, or GIF file to the delivery inbox. Images must not exceed 20 MB.
+Restart Codex only if the skill does not appear automatically. Keep Codex Lookout running, then ask Codex to send an existing PNG, JPEG, WebP, or GIF file to the delivery inbox. Images must not exceed 20 MB.
 
 ## Signing and notarization
 

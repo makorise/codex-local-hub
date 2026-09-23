@@ -1,6 +1,6 @@
 const INSTALL_PROMPTS = {
-  en: 'Use $skill-installer to install https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub, then use $setup-codex-local-hub in this task to install or update Codex Local Hub, launch it, and verify phone access. Preserve existing files and do not change my global Node.js environment.',
-  'zh-CN': '使用 $skill-installer 安装 https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub，然后在当前任务中使用 $setup-codex-local-hub：安装或更新 Codex Local Hub、启动程序并验证手机访问。保护已有文件，不要修改我的全局 Node.js 环境。',
+  en: 'Use $skill-installer to install https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub, then use $setup-codex-local-hub in this task to install or update Codex Lookout, launch it, and verify phone access. Preserve existing files and do not change my global Node.js environment.',
+  'zh-CN': '使用 $skill-installer 安装 https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub，然后在当前任务中使用 $setup-codex-local-hub：安装或更新 Codex 瞭望台、启动程序并验证手机访问。保护已有文件，不要修改我的全局 Node.js 环境。',
 };
 
 const COPY = {
@@ -19,7 +19,7 @@ const COPY = {
     'how.mac': 'Mac', 'how.macCopy': 'Codex keeps running', 'how.hubCopy': 'Syncs on trusted Wi-Fi', 'how.phone': 'Phone', 'how.phoneCopy': 'You decide what is next',
     'install.label': 'ONE-MESSAGE INSTALL', 'install.title': 'Paste once. Codex handles the rest.', 'install.copy': 'The setup skill installs or updates the app, starts it, and verifies phone access.',
     'install.requirements': 'macOS 15+ · Codex desktop · Same trusted Wi-Fi', 'install.promptLabel': 'PASTE INTO CODEX', 'install.copyButton': 'Copy',
-    'install.compatibility': 'Downloads keep the Codex Local Hub app name so existing installations can update safely.', 'install.copied': 'Installation prompt copied',
+    'install.compatibility': 'Previously released as Codex Local Hub. Internal identifiers remain unchanged for update compatibility.', 'install.copied': 'Installation prompt copied',
     'footer.note': 'Independent open-source project. Not affiliated with OpenAI.', 'footer.download': 'Download',
   },
   'zh-CN': {
@@ -37,7 +37,7 @@ const COPY = {
     'how.mac': 'Mac', 'how.macCopy': 'Codex 持续运行', 'how.hubCopy': '通过可信 Wi-Fi 同步', 'how.phone': '手机', 'how.phoneCopy': '你决定下一步',
     'install.label': '一句话完成安装', 'install.title': '复制一次，剩下的交给 Codex。', 'install.copy': 'Setup Skill 会自动安装或更新程序、启动服务并验证手机访问。',
     'install.requirements': 'macOS 15+ · Codex 桌面端 · 同一可信 Wi-Fi', 'install.promptLabel': '复制到 CODEX', 'install.copyButton': '复制',
-    'install.compatibility': '为保证已有安装可以安全升级，下载包仍保留 Codex Local Hub 应用名称。', 'install.copied': '安装词已复制',
+    'install.compatibility': '旧版本曾使用 Codex Local Hub 名称；内部标识保持不变，以兼容现有升级。', 'install.copied': '安装词已复制',
     'footer.note': '独立开源项目，与 OpenAI 没有隶属关系。', 'footer.download': '下载',
   },
 };

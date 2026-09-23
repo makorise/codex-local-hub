@@ -57,7 +57,7 @@ const { server } = createBridgeServer({ repository, token, requirePairing, publi
 
 server.listen(port, host, () => {
   const addresses = lanAddresses().map((address) => `http://${address}:${port}/`);
-  console.log('\nCodex Local Hub / Codex 掌上任务台已启动');
+  console.log('\nCodex Lookout / Codex 瞭望台已启动');
   console.log(`本机：http://127.0.0.1:${port}/`);
   for (const address of addresses) {
     console.log(`手机：${address}`);

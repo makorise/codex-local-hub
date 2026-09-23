@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible Codex Local Hub problem
+description: Report a reproducible Codex Lookout problem
 title: "[Bug]: "
 labels: [bug]
 body:

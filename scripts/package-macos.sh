@@ -11,7 +11,7 @@ BUNDLE_NODE=1 "$project_dir/scripts/build-macos-app.sh"
 /usr/bin/ditto "$app_path" "$stage_dir/Codex Local Hub.app"
 /bin/ln -s /Applications "$stage_dir/Applications"
 /bin/rm -f "$dmg_path"
-/usr/bin/hdiutil create -volname "Codex Local Hub" -srcfolder "$stage_dir" -ov -format UDZO "$dmg_path"
+/usr/bin/hdiutil create -volname "Codex Lookout" -srcfolder "$stage_dir" -ov -format UDZO "$dmg_path"
 
 if [[ -n "${DEVELOPER_ID_APPLICATION:-}" ]]; then
   /usr/bin/codesign --force --timestamp --sign "$DEVELOPER_ID_APPLICATION" "$dmg_path"

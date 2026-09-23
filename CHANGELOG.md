@@ -1,6 +1,12 @@
 # Changelog
 
-All notable changes to Codex Local Hub will be documented in this file.
+All notable changes to Codex Lookout will be documented in this file.
+
+## 0.2.11 - 2026-09-23
+
+- Unified every user-facing surface under the **Codex Lookout / Codex 瞭望台** brand while retaining repository paths, bundle identifiers, update storage, release asset names, and skill identifiers for compatibility.
+- Updated the phone dashboard, PWA metadata, native Mac host, permissions and update prompts, website, READMEs, bundled skills, issue templates, documentation, release titles, and bilingual screenshots.
+- Added regression tests that reject legacy display names on product surfaces and require a single explicit compatibility note in each language.
 
 ## 0.2.10 - 2026-09-23
 

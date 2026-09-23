@@ -1,11 +1,11 @@
 ---
 name: setup-codex-local-hub
-description: Install, update, launch, and verify Codex Local Hub on a Mac, including its phone dashboard and image-delivery skill. Use when a user wants Codex to complete the full Codex Local Hub setup instead of following manual Terminal steps.
+description: Install, update, launch, and verify Codex Lookout on a Mac, including its phone dashboard and image-delivery skill. Use when a user wants Codex to complete the full Codex Lookout setup instead of following manual Terminal steps.
 ---
 
-# Setup Codex Local Hub
+# Setup Codex Lookout
 
-Set up the official project from `https://github.com/makorise/codex-local-hub` as a user-level macOS application. Treat invocation as authorization to download this repository, install or update **Codex Local Hub**, install its bundled `deliver-to-codex-local-hub` skill, launch the app, and run local verification. It does not authorize disabling Gatekeeper, changing firewall or router settings, exposing port `8787` to the internet, deleting user data, or configuring an unrequested remote relay.
+Set up the official project from `https://github.com/makorise/codex-local-hub` as a user-level macOS application. Treat invocation as authorization to download this repository, install or update **Codex Lookout**, install its bundled `deliver-to-codex-local-hub` skill, launch the app, and run local verification. It does not authorize disabling Gatekeeper, changing firewall or router settings, exposing port `8787` to the internet, deleting user data, or configuring an unrequested remote relay.
 
 ## Resume safely after an interruption
 
@@ -38,7 +38,7 @@ For a source build:
 3. Verify the built application with `codesign --verify --deep --strict` and confirm the executable contains both `arm64` and `x86_64` slices using `lipo -info`.
 4. Install the verified app into `/Applications` when writable or `~/Applications` otherwise. If an older app is present, quit it cleanly and move it to a timestamped sibling backup before replacing it. Do not remove the backup until the replacement launches successfully.
 
-The installed application must contain its own official Node runtime for both Apple silicon and Intel. The app always selects its bundled architecture-specific runtime before looking at any system path, so launching Codex Local Hub must not depend on or alter the user's development toolchain. Confirm that the user's original `node` path and version are unchanged afterward.
+The installed application must contain its own official Node runtime for both Apple silicon and Intel. The app always selects its bundled architecture-specific runtime before looking at any system path, so launching Codex Lookout must not depend on or alter the user's development toolchain. Confirm that the user's original `node` path and version are unchanged afterward.
 
 Do not bypass a failed security check with `xattr`, `spctl --master-disable`, ad-hoc trust changes, or similar workarounds. A locally built app may use the repository's ad-hoc signature; a downloaded release must pass normal Gatekeeper assessment.
 
