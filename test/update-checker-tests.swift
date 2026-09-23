@@ -97,6 +97,12 @@ struct UpdateCheckerTests {
         else { expect(false, "second automatic check should be throttled") }
         expect(requestCount == 1, "performs at most one request during the daily interval")
 
+        checker.invalidateCache()
+        expect(checker.cachedUpdate() == nil, "manual refresh clears the cached release")
+        if case .available(let refreshed) = waitForCheck(checker) { expect(refreshed.version == "0.3.0", "checks the network immediately after cache invalidation") }
+        else { expect(false, "cache invalidation should make the next check refresh from the network") }
+        expect(requestCount == 2, "cache invalidation bypasses the previous daily throttle")
+
         StubURLProtocol.handler = { _ in
             (HTTPURLResponse(url: endpoint, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
         }

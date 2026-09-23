@@ -164,6 +164,15 @@ final class GitHubUpdateChecker {
         )
     }
 
+    func invalidateCache() {
+        defaults.removeObject(forKey: Key.checkedAt)
+        defaults.removeObject(forKey: Key.version)
+        defaults.removeObject(forKey: Key.pageURL)
+        defaults.removeObject(forKey: Key.noStableRelease)
+        store(nil, urlKey: Key.coreURL, nameKey: Key.coreName, digestKey: Key.coreSHA256)
+        store(nil, urlKey: Key.installerURL, nameKey: Key.installerName, digestKey: Key.installerSHA256)
+    }
+
     func check(force: Bool = false, completion: @escaping (UpdateCheckResult) -> Void) {
         let checkedAt = defaults.object(forKey: Key.checkedAt) as? Date
         guard Self.shouldCheck(lastCheckedAt: checkedAt, now: now(), force: force) else {

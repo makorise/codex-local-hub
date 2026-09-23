@@ -63,6 +63,7 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var pendingCoreActivation: CoreActivation?
     private var isSwitchingCore = false
     private var coreStartupWorkItem: DispatchWorkItem?
+    private let updatePromptKey = "CodexLocalHubLastPromptedUpdateVersion"
     private lazy var hostVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
     private lazy var coreStore = CoreUpdateStore(hostVersion: hostVersion)
 
@@ -482,9 +483,8 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
             ? text("核心热升级到 v\(update.version)", "Hot-update core to v\(update.version)")
             : text("完整升级到 v\(update.version)", "Full update to v\(update.version)")
         guard prompt else { return }
-        let promptKey = "CodexLocalHubLastPromptedUpdateVersion"
-        guard UserDefaults.standard.string(forKey: promptKey) != update.version else { return }
-        UserDefaults.standard.set(update.version, forKey: promptKey)
+        guard UserDefaults.standard.string(forKey: updatePromptKey) != update.version else { return }
+        UserDefaults.standard.set(update.version, forKey: updatePromptKey)
         let alert = NSAlert()
         alert.messageText = text("Codex 瞭望台有新版本", "A Codex Lookout update is available")
         alert.informativeText = canHotUpdate
@@ -585,6 +585,9 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard let activation = pendingCoreActivation else { return }
         coreStore.restore(directoryName: activation.previousDirectoryName)
         pendingCoreActivation = nil
+        availableUpdate = nil
+        updateChecker.invalidateCache()
+        UserDefaults.standard.removeObject(forKey: updatePromptKey)
         isSwitchingCore = false
         coreStartupWorkItem?.cancel()
         coreStartupWorkItem = nil
@@ -592,6 +595,14 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         restartAttempts = 0
         updateButton.isEnabled = true
         showTemporaryUpdateStatus(text("新核心启动失败，已自动回退", "New core failed to start. Rolled back automatically"))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.1) { [weak self] in
+            guard let self, self.availableUpdate == nil else { return }
+            self.versionLabel.stringValue = self.text(
+                "当前 v\(self.coreStore.effectiveVersion()) · 已清除失败更新，请重新检查",
+                "Current v\(self.coreStore.effectiveVersion()) · failed update cleared; check again"
+            )
+            self.updateButton.title = self.text("重新检查更新", "Check again")
+        }
         startServer()
     }
 
@@ -662,7 +673,9 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc private func checkForUpdatesManually() {
-        if availableUpdate != nil { applyAvailableUpdate() }
-        else { checkForUpdates(force: true) }
+        availableUpdate = nil
+        updateChecker.invalidateCache()
+        UserDefaults.standard.removeObject(forKey: updatePromptKey)
+        checkForUpdates(force: true)
     }
 }

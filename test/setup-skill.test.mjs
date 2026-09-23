@@ -14,6 +14,8 @@ test('setup skill migrates legacy updater hosts with a data-preserving full upgr
   assert.match(skill, /timestamped sibling backup/);
   assert.match(skill, /api\.github\.com\/repos\/makorise\/codex-local-hub\/releases\/latest/);
   assert.match(skill, /no longer contains the obsolete endpoint/);
+  assert.match(skill, /remove only `CodexLocalHubUpdateCheckedAt`/);
+  assert.match(skill, /do not delete Application Support or task data/);
 });
 
 test('release guidance does not promise hot updates to legacy repository clients', async () => {

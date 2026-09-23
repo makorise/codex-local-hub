@@ -2,6 +2,12 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.15 - 2026-09-23
+
+- Fixed legacy hosts repeatedly offering a cached older release instead of querying GitHub again when the update button was pressed.
+- Manual update checks now invalidate stale release metadata and always force a fresh request; failed core activation clears its cached release before offering retry.
+- Added a data-preserving stale-cache recovery path to the setup Skill and regression coverage for bypassing the daily update throttle.
+
 ## 0.2.14 - 2026-09-23
 
 - Fixed intermittent hot-update rollback when a host read process output across a split UTF-8 character boundary and discarded the readiness marker.
