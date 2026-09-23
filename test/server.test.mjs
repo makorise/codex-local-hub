@@ -71,7 +71,8 @@ test('bridge server serves authenticated API, static files, SSE and messages', a
     open: async (id) => id === 'image.png' ? { mime: 'image/png', size: 3, stream: () => Readable.from(Buffer.from('png')) } : null,
     clear: async () => 1,
   };
-  const bridge = createBridgeServer({ repository, token: 'secret', requirePairing: true, publicDir, deliveryInbox, pollMs: 60_000, runtimeInfo: { version: '0.2.4', source: 'hot-update' } });
+  const account = { available: true, name: 'alice', initial: 'A' };
+  const bridge = createBridgeServer({ repository, token: 'secret', requirePairing: true, publicDir, deliveryInbox, accountReader: async () => account, pollMs: 60_000, runtimeInfo: { version: '0.2.4', source: 'hot-update' } });
   await new Promise((resolve) => bridge.server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${bridge.server.address().port}`;
   t.after(async () => { bridge.server.closeAllConnections(); await new Promise((resolve) => bridge.server.close(resolve)); await rm(publicDir, { recursive: true }); });
@@ -80,6 +81,7 @@ test('bridge server serves authenticated API, static files, SSE and messages', a
   assert.deepEqual((await request(base, '/api/health?token=secret')).body, { ok: true, clients: 0, version: '0.2.4', source: 'hot-update' });
   assert.equal((await request(base, '/api/tasks', { headers: { authorization: 'Bearer secret' } })).body.tasks.length, 1);
   assert.deepEqual((await request(base, '/api/usage?token=secret')).body.usage, { available: false, limits: [] });
+  assert.deepEqual((await request(base, '/api/account?token=secret')).body.account, account);
   assert.equal((await request(base, '/api/deliveries?token=secret')).body.deliveries[0].title, '交付图');
   assert.deepEqual((await request(base, '/api/deliveries?token=secret', { method: 'DELETE' })).body, { deleted: 1 });
   const deliveredImage = await request(base, '/api/deliveries/files/image.png?token=secret');
@@ -182,6 +184,7 @@ test('bridge server allows direct trusted-LAN access by default', async (t) => {
 
   assert.equal((await request(base, '/api/health')).status, 200);
   assert.equal((await request(base, '/api/tasks')).body.tasks[0].title, 'Visible');
+  assert.deepEqual((await request(base, '/api/account')).body.account, { available: false, name: null, initial: null });
   assert.equal((await request(base, '/pair/anything', { redirect: 'manual' })).status, 404);
 });
 
@@ -197,7 +200,14 @@ test('bridge reports repository and message failures and closes active streams',
     deleteQueuedTask: async () => { throw new Error('delete failed'); },
     steerQueuedTask: async () => { throw steerFailure; },
   };
-  const bridge = createBridgeServer({ repository, token: '', publicDir, usageReader: async () => { throw new Error('usage failed'); }, pollMs: 60_000 });
+  const bridge = createBridgeServer({
+    repository,
+    token: '',
+    publicDir,
+    usageReader: async () => { throw new Error('usage failed'); },
+    accountReader: async () => { throw new Error('account failed'); },
+    pollMs: 60_000,
+  });
   await new Promise((resolve) => bridge.server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${bridge.server.address().port}`;
   t.after(async () => rm(publicDir, { recursive: true }));
@@ -211,6 +221,7 @@ test('bridge reports repository and message failures and closes active streams',
   assert.equal(unavailableSteer.status, 503);
   assert.equal(unavailableSteer.body.error, '控制通道不可用；消息仍保留在队列中');
   assert.equal((await request(base, '/api/usage')).status, 500);
+  assert.equal((await request(base, '/api/account')).status, 500);
 
   await new Promise((resolve, reject) => {
     const stream = get(`${base}/api/events`, (response) => {

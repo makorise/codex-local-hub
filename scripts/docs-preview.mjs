@@ -208,8 +208,8 @@ async function serveStatic(pathname, response, language) {
     if (requested === 'index.html') {
       const selected = language === 'zh-CN' ? 'zh-CN' : 'en';
       body = Buffer.from(String(body).replace(
-        '<script type="module" src="/app.js?v=24"></script>',
-        `<script>localStorage.setItem('codex-local-hub-language-choice', '${selected}');localStorage.setItem('codex-local-hub-install-dismissed', '1');</script>\n    <script type="module" src="/app.js?v=24"></script>`,
+        '<script type="module" src="/app.js?v=26"></script>',
+        `<script>localStorage.setItem('codex-local-hub-language-choice', '${selected}');localStorage.setItem('codex-local-hub-install-dismissed', '1');</script>\n    <script type="module" src="/app.js?v=26"></script>`,
       ));
     }
     response.writeHead(200, { 'content-type': mimeTypes[extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
@@ -232,6 +232,7 @@ const server = createServer(async (request, response) => {
     return json(response, { task: localizedDetail });
   }
   if (request.method === 'GET' && url.pathname === '/api/usage') return json(response, { usage });
+  if (request.method === 'GET' && url.pathname === '/api/account') return json(response, { account: { available: true, name: 'alex', initial: 'A' } });
   if (request.method === 'GET' && url.pathname === '/api/deliveries') return json(response, { deliveries: [] });
   if (request.method === 'GET' && url.pathname === '/api/events') {
     response.writeHead(200, {

@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { networkInterfaces } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createAccountReader, requestAccount } from './account.mjs';
 import { CodexRepository } from './repository.mjs';
 import { CodexAppToolsClient, CodexControlClient } from './control.mjs';
 import { DeliveryInbox } from './deliveries.mjs';
@@ -46,8 +47,9 @@ const repository = new CodexRepository({
   startTurn: (threadId, message, cwd) => control.resume(threadId, message, cwd),
 });
 const usageReader = createUsageReader({ request: () => requestRateLimits({ codexBin }) });
+const accountReader = createAccountReader({ request: () => requestAccount({ codexBin }) });
 const runtimeInfo = await resolveRuntimeInfo({ root });
-const { server } = createBridgeServer({ repository, token, requirePairing, publicDir: join(root, 'public'), usageReader, deliveryInbox, runtimeInfo });
+const { server } = createBridgeServer({ repository, token, requirePairing, publicDir: join(root, 'public'), usageReader, accountReader, deliveryInbox, runtimeInfo });
 
 server.listen(port, host, () => {
   const addresses = lanAddresses().map((address) => `http://${address}:${port}/`);

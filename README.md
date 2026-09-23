@@ -108,6 +108,7 @@ The current release is local-network only. The data path stays between the Mac a
 - **Interrupted-task recovery** — resume a paused task with one tap.
 - **Visual delivery inbox** — review the latest screenshots and image results on your phone.
 - **Usage visibility** — see current Codex usage and reset times.
+- **Account awareness** — confirm which local Codex account is active without exposing its email, account ID, or credentials to the dashboard.
 - **Privacy by default** — task data stays on your Mac and local network.
 - **Focused history** — only the latest 20 visible messages and images are presented; hidden reasoning is never mirrored.
 - **English and Simplified Chinese** — follows the device language on first launch, with a remembered manual switch in the header.

@@ -2,6 +2,12 @@
 
 All notable changes to Codex Local Hub will be documented in this file.
 
+## 0.2.9 - 2026-09-23
+
+- Added a compact current-account badge beside the live connection state on desktop and phone.
+- Derived only a sanitized display name and initial on the Mac; full email addresses, account IDs, access tokens, and credentials are never returned to the dashboard.
+- Added failure-safe hiding, responsive truncation, bilingual accessibility labels, and complete backend/frontend/privacy regression coverage.
+
 ## 0.2.8 - 2026-09-22
 
 - Moved the official source, installation skills, release channel, and product website to the Makorise GitHub organization.

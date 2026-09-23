@@ -84,6 +84,7 @@ async function setup({ failing = new Map(), empty = false, taskCount = 1 } = {})
     if (failing.has(url.pathname)) return response({ error: failing.get(url.pathname) }, 500);
     if (url.pathname === '/api/tasks') return response({ tasks: empty ? [] : availableTasks, syncedAt: Date.now() });
     if (url.pathname === '/api/usage') return response({ usage: empty ? { available: false, limits: [] } : { planType: 'pro', limits: [{ label: '周', usedPercent: 20, remainingPercent: 80, resetsAt: Date.now() + 60_000 }] } });
+    if (url.pathname === '/api/account') return response({ account: empty ? { available: false, name: null, initial: null } : { available: true, name: 'alice', initial: 'A' } });
     if (url.pathname === '/api/deliveries' && options.method === 'DELETE') {
       const deleted = deliveries.length;
       deliveries = [];
@@ -158,12 +159,17 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   ui.renderList();
   assert.equal(document.querySelector('#detail-pane').classList.contains('is-open'), true);
   assert.equal(document.querySelector('#usage-summary').textContent, '周窗口剩余 80%');
+  assert.equal(document.querySelector('#account-badge').hidden, false);
+  assert.equal(document.querySelector('#account-name').textContent, 'alice');
+  assert.equal(document.querySelector('#account-initial').textContent, 'A');
+  assert.equal(document.querySelector('#account-badge').getAttribute('aria-label'), '当前 Codex 账号：alice');
   assert.equal(document.querySelectorAll('.delivery-thumb').length, 2);
   assert.equal(document.querySelector('#delivery-inbox').hidden, false);
   document.querySelector('#language-button').click();
   assert.equal(document.documentElement.lang, 'en');
   assert.equal(document.querySelector('[data-filter="all"]').textContent, 'All');
   assert.equal(document.querySelector('#connection-text').textContent.includes('Synced'), true);
+  assert.equal(document.querySelector('#account-badge').getAttribute('aria-label'), 'Current Codex account: alice');
   assert.equal(document.querySelector('#usage-summary').textContent, 'Weekly window: 80% remaining');
   assert.equal(document.querySelector('#delivery-count').textContent, '2 images');
   assert.equal(document.querySelector('.task-card-foot span').textContent, 'Making progress');
@@ -204,6 +210,14 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.equal(ui.localizedError('中文错误', 'error.sync'), '中文错误');
   assert.equal(ui.localizedProgress(task({ progress: { state: 'mystery', label: '未知', tone: 'slate' } })), '未知');
   assert.equal(ui.usageWindowLabel({ label: '自定义' }), '自定义');
+  ui.state.account = { available: true, name: 'bob', initial: '' };
+  ui.renderAccount();
+  assert.equal(document.querySelector('#account-initial').textContent, '#');
+  ui.state.account = null;
+  ui.renderAccount();
+  assert.equal(document.querySelector('#account-badge').hidden, true);
+  await ui.loadAccount();
+  assert.equal(document.querySelector('#account-name').textContent, 'alice');
   assert.equal(await ui.sendTaskMessage(''), null);
 
   Object.defineProperty(dom.window, 'innerWidth', { configurable: true, value: 390 });
@@ -521,12 +535,15 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter' }));
 
   failures.set('/api/usage', 'usage failed');
+  failures.set('/api/account', 'account failed');
   failures.set('/api/deliveries', 'delivery failed');
   failures.set('/api/messages', 'send failed');
   failures.set(`/api/tasks/${task().id}/queue`, 'reorder failed');
   const currentThumbnail = document.querySelector('.delivery-thumb');
   await ui.loadUsage();
   assert.equal(document.querySelector('#usage-card').hidden, true);
+  await ui.loadAccount();
+  assert.equal(document.querySelector('#account-badge').hidden, true);
   await ui.loadDeliveries();
   assert.equal(document.querySelector('#delivery-inbox').hidden, false);
   assert.equal(document.querySelector('.delivery-thumb'), currentThumbnail);

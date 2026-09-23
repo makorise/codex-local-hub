@@ -15,7 +15,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/app-icon-192.png" />
-    <link rel="stylesheet" href="/styles.css?v=23" />
+    <link rel="stylesheet" href="/styles.css?v=24" />
     <title>Codex Local Hub</title>
   </head>
   <body>
@@ -25,7 +25,10 @@
           <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
           <div>
             <h1 data-i18n="brand.name">Codex 随身工作台</h1>
-            <p><span id="connection-dot" class="connection-dot"></span><span id="connection-text" data-i18n="connection.connecting">正在连接 Mac</span></p>
+            <p>
+              <span class="connection-state"><span id="connection-dot" class="connection-dot"></span><span id="connection-text" data-i18n="connection.connecting">正在连接 Mac</span></span>
+              <span id="account-badge" class="account-badge" hidden><i id="account-initial" aria-hidden="true"></i><span id="account-name"></span></span>
+            </p>
           </div>
         </div>
         <div class="top-actions">
@@ -168,6 +171,6 @@
         <div id="modal-content" class="modal-content"></div>
       </section>
     </div>
-    <script type="module" src="/app.js?v=25"></script>
+    <script type="module" src="/app.js?v=26"></script>
   </body>
 </html>

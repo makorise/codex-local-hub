@@ -6,6 +6,7 @@ const state = {
   filter: 'all',
   details: new Map(),
   usage: null,
+  account: null,
   deliveries: [],
   syncedAt: null,
 };
@@ -250,6 +251,7 @@ function switchLanguage() {
   renderList();
   renderDetail();
   renderUsage();
+  renderAccount();
   renderDeliveries();
   resetDeliveryClearButton();
   if (state.syncedAt) {
@@ -369,6 +371,27 @@ async function loadUsage() {
     state.usage = null;
     renderUsage();
   }
+}
+
+function renderAccount() {
+  const badge = $('#account-badge');
+  const account = state.account;
+  badge.hidden = !account?.available || !account.name;
+  if (badge.hidden) return;
+  $('#account-name').textContent = account.name;
+  $('#account-initial').textContent = account.initial || '#';
+  badge.setAttribute('aria-label', t('account.aria', { name: account.name }));
+}
+
+async function loadAccount() {
+  try {
+    const response = await fetch(api('/api/account'));
+    if (!response.ok) throw new Error('account');
+    state.account = (await response.json()).account;
+  } catch {
+    state.account = null;
+  }
+  renderAccount();
 }
 
 function renderDeliveries() {
@@ -736,6 +759,7 @@ async function startDashboard() {
     await loadTasks();
     connectEvents();
     loadUsage();
+    loadAccount();
     loadDeliveries();
     setInterval(loadUsage, 60_000);
     setInterval(loadDeliveries, 5_000);
@@ -786,6 +810,8 @@ export {
   usageWindowLabel,
   renderUsage,
   loadUsage,
+  renderAccount,
+  loadAccount,
   renderDeliveries,
   deliverySignature,
   loadDeliveries,

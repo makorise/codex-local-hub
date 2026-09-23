@@ -82,6 +82,7 @@ export function createBridgeServer({
   requirePairing = false,
   publicDir,
   usageReader = async () => ({ available: false, limits: [] }),
+  accountReader = async () => ({ available: false, name: null, initial: null }),
   deliveryInbox = { list: async () => [], open: async () => null, clear: async () => 0 },
   createServer = nodeCreateServer,
   pollMs = 1500,
@@ -137,6 +138,9 @@ export function createBridgeServer({
       }
       if (request.method === 'GET' && url.pathname === '/api/usage') {
         return json(response, 200, { usage: await usageReader() });
+      }
+      if (request.method === 'GET' && url.pathname === '/api/account') {
+        return json(response, 200, { account: await accountReader() });
       }
       if (request.method === 'GET' && url.pathname === '/api/deliveries') {
         return json(response, 200, { deliveries: await deliveryInbox.list() });
