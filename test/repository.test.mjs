@@ -48,12 +48,13 @@ test('repository falls back when optional Codex databases are not initialized', 
   assert.equal((await repository.listTasks())[0].title, 'Task');
   assert.match(calls[1][2], /NULL AS latest_user/);
 
-  repository.execFile = async () => { throw Object.assign(new Error('unable to open database file'), { stderr: '' }); };
+  repository.execFile = async (command) => {
+    if (command === 'sqlite3') throw Object.assign(new Error('unable to open database file'), { stderr: '' });
+    return { stdout: 'queued' };
+  };
   assert.deepEqual(await repository.loadMessages(row.id), []);
   assert.deepEqual(await repository.loadQueuedTasks(row.id), []);
-  repository.details.set(row.id, { cwd: '/work' });
-  repository.startTurn = async (...args) => args;
-  assert.deepEqual((await repository.sendMessage(row.id, 'continue')).result, [row.id, 'continue', '/work']);
+  assert.equal((await repository.sendMessage(row.id, 'continue')).output, 'queued');
 
   assert.equal(isOptionalDataUnavailable(optionalError), true);
   assert.equal(isOptionalDataUnavailable({ stderr: 'no such table: main.queued_items' }), true);
@@ -83,26 +84,11 @@ test('repository handles empty lists, misses and queue stdout or stderr', async 
   });
   assert.deepEqual(await repository.listTasks(), []);
   assert.equal(await repository.getTask('missing'), null);
-  assert.deepEqual(await repository.sendMessage(row.id, 'hello'), { accepted: true, mode: 'queued', output: 'queued', warning: '当前 Codex 不支持启动任务' });
+  assert.deepEqual(await repository.sendMessage(row.id, 'hello'), { accepted: true, mode: 'queued', output: 'queued' });
   queueResponse = { stdout: 'ok', stderr: 'ignored' };
   assert.equal((await repository.sendMessage(row.id, 'hello')).output, 'ok');
   queueResponse = {};
   assert.equal((await repository.sendMessage(row.id, 'hello')).output, '');
-  const started = new CodexRepository({
-    stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals',
-    execFile: async () => ({ stdout: '' }),
-    startTurn: async (...args) => ({ turn: args }),
-  });
-  started.details.set(row.id, { cwd: '/work' });
-  assert.deepEqual(await started.sendMessage(row.id, 'run'), { accepted: true, mode: 'started', result: { turn: [row.id, 'run', '/work'] } });
-  const loadedCwd = new CodexRepository({
-    stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals',
-    execFile: async (_command, args) => args[2].includes('SELECT cwd') ? { stdout: '[{"cwd":"/loaded"}]' } : { stdout: '' },
-    startTurn: async (...args) => args,
-  });
-  assert.deepEqual((await loadedCwd.sendMessage(row.id, 'load')).result, [row.id, 'load', '/loaded']);
-  loadedCwd.execFile = async () => ({ stdout: '[{}]' });
-  assert.equal(await loadedCwd.threadCwd('uncached'), process.cwd());
   const active = new CodexRepository({
     stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals',
     execFile: async (command) => command === 'sqlite3' ? { stdout: '[{"turn_id":"active"}]' } : { stderr: 'waiting' },
@@ -263,13 +249,38 @@ test('queued task steering targets the active turn and removes only the steered 
   assert.deepEqual(steered.result, { accepted: true });
   assert.deepEqual(steered.queuedTasks, []);
 
-  await execFile('sqlite3', [queueDb, `INSERT INTO queued_items VALUES ('cccccccccccccccccccc', '${threadId}', '{"UserInput":{"content":[{"type":"text","text":"preserve me"}]}}', 1, 3, 3);`]);
+  assert.deepEqual(await repository.startQueuedTaskIfIdle(threadId), { started: false, reason: 'active' });
   await execFile('sqlite3', [historyDb, `UPDATE thread_turns SET status = 'completed';`]);
+  assert.deepEqual(await repository.startQueuedTaskIfIdle(threadId), { started: false, reason: 'empty' });
+  await execFile('sqlite3', [queueDb, `INSERT INTO queued_items VALUES ('dddddddddddddddddddd', '${threadId}', '{"UserInput":{"content":[{"type":"text","text":"start safely"}]}}', 1, 3, 3);`]);
+  const automatic = await repository.startQueuedTaskIfIdle(threadId);
+  assert.equal(automatic.started, true);
+  assert.equal(automatic.itemId, 'dddddddddddddddddddd');
+  assert.deepEqual(starts.at(-1), [threadId, 'start safely', '/work']);
+  assert.deepEqual(await repository.loadQueuedTasks(threadId), []);
+
+  await execFile('sqlite3', [queueDb, `INSERT INTO queued_items VALUES ('cccccccccccccccccccc', '${threadId}', '{"UserInput":{"content":[{"type":"text","text":"preserve me"}]}}', 1, 3, 3);`]);
   const unsupported = new CodexRepository({ stateDb: '/state', queueDb, historyDb, goalsDb: '/goals' });
   unsupported.details.set(threadId, { cwd: '/work' });
   const preserved = await unsupported.loadQueuedTasks(threadId);
   await assert.rejects(unsupported.steerQueuedTask(threadId, preserved[0].id, preserved[0].queueRevision), (error) => error.statusCode === 503);
   assert.deepEqual((await unsupported.loadQueuedTasks(threadId)).map((item) => item.text), ['preserve me']);
+  await assert.rejects(unsupported.startQueuedTaskIfIdle(threadId), (error) => error.statusCode === 503);
+  assert.deepEqual((await unsupported.loadQueuedTasks(threadId)).map((item) => item.text), ['preserve me']);
   await execFile('sqlite3', [historyDb, `INSERT INTO thread_turns VALUES ('${threadId}', 'turn-new', 'inProgress', 3);`]);
   await assert.rejects(unsupported.steerQueuedTask(threadId, preserved[0].id, preserved[0].queueRevision), (error) => error.statusCode === 503);
+});
+
+test('thread working directory uses cached, stored and process fallbacks', async () => {
+  const repository = new CodexRepository({
+    stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals',
+    execFile: async () => ({ stdout: '[{"cwd":"/stored"}]' }),
+  });
+  repository.details.set('cached', { cwd: '/cached' });
+  assert.equal(await repository.threadCwd('cached'), '/cached');
+  assert.equal(await repository.threadCwd('stored'), '/stored');
+  repository.execFile = async () => ({ stdout: '[{}]' });
+  assert.equal(await repository.threadCwd('fallback'), process.cwd());
+  repository.execFile = async () => ({ stdout: '' });
+  assert.equal(await repository.threadCwd('empty'), process.cwd());
 });

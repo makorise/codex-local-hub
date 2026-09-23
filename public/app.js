@@ -39,6 +39,7 @@ const input = $('#message-input');
 let toastTimer;
 let source;
 let queueNotice = null;
+let optimisticSequence = 0;
 
 function api(path) {
   return new URL(path, location.origin);
@@ -491,16 +492,41 @@ async function loadTasks() {
   updateTasks(await response.json());
 }
 
-async function sendTaskMessage(message) {
-  if (!message || !state.selectedId) return null;
+async function sendTaskMessage(message, threadId = state.selectedId) {
+  if (!message || !threadId) return null;
   const response = await fetch(api('/api/messages'), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ threadId: state.selectedId, message }),
+    body: JSON.stringify({ threadId, message }),
   });
   const result = await response.json();
   if (!response.ok) throw new Error(localizedError(result.error, 'error.send'));
   return result;
+}
+
+function addOptimisticQueueItem(threadId, text) {
+  const full = state.details.get(threadId) || { messages: [], queuedTasks: [] };
+  const queuedTasks = full.queuedTasks || [];
+  const item = {
+    id: `optimistic-${Date.now()}-${++optimisticSequence}`,
+    role: 'user',
+    text,
+    timestamp: Date.now(),
+    pending: true,
+    optimistic: true,
+    queueOrder: queuedTasks.length + 1,
+    queueRevision: queueRevision(queuedTasks),
+  };
+  if (!state.details.has(threadId)) state.details.set(threadId, full);
+  applyQueuedTasks([...queuedTasks, item], threadId);
+  return item.id;
+}
+
+function removeOptimisticQueueItem(threadId, itemId) {
+  const full = state.details.get(threadId);
+  if (!full) return false;
+  applyQueuedTasks((full.queuedTasks || []).filter((item) => item.id !== itemId), threadId);
+  return true;
 }
 
 function connectEvents() {
@@ -508,6 +534,10 @@ function connectEvents() {
   source = new EventSource(api('/api/events'));
   source.addEventListener('tasks', (event) => updateTasks(JSON.parse(event.data)));
   source.addEventListener('sync-error', (event) => showToast(localizedError(JSON.parse(event.data).error, 'error.sync')));
+  source.addEventListener('queue-error', (event) => {
+    const payload = JSON.parse(event.data);
+    if (payload.threadId === state.selectedId) showToast(t('composer.delayed'));
+  });
   source.onerror = () => setConnection(false, t('connection.reconnecting'));
 }
 
@@ -534,12 +564,12 @@ function queueRevision(queuedTasks) {
   return queuedTasks[0]?.queueRevision ?? 0;
 }
 
-function applyQueuedTasks(queuedTasks) {
-  const full = state.details.get(state.selectedId);
-  if (full) state.details.set(state.selectedId, { ...full, queuedTasks });
-  state.tasks = state.tasks.map((task) => task.id === state.selectedId ? { ...task, queuedCount: queuedTasks.length } : task);
+function applyQueuedTasks(queuedTasks, threadId = state.selectedId) {
+  const full = state.details.get(threadId);
+  if (full) state.details.set(threadId, { ...full, queuedTasks });
+  state.tasks = state.tasks.map((task) => task.id === threadId ? { ...task, queuedCount: queuedTasks.length } : task);
   renderList();
-  renderDetail();
+  if (threadId === state.selectedId) renderDetail();
 }
 
 function renderQueueManager() {
@@ -553,23 +583,23 @@ function renderQueueManager() {
     ${queueNotice ? `<div class="queue-notice" data-tone="${escapeHtml(queueNotice.tone)}" role="status">${escapeHtml(queueNotice.text)}</div>` : ''}
     <ol class="queue-manager-list">
       ${queuedTasks.map((message, index) => `
-        <li data-queue-id="${escapeHtml(message.id)}">
+        <li data-queue-id="${escapeHtml(message.id)}" class="${message.optimistic ? 'is-saving' : ''}">
           <span class="queue-rank"><strong>${index + 1}</strong><small>${escapeHtml(t('queue.priority'))}</small></span>
           <button class="queue-copy" type="button" data-action="expand" aria-label="${escapeHtml(t('queue.expand'))}">
             <strong>${escapeHtml(message.text)}</strong>
-            <small>${relativeTime(message.timestamp)} · ${escapeHtml(t('queue.viewFull'))}</small>
+            <small>${message.optimistic ? escapeHtml(t('queue.saving')) : `${relativeTime(message.timestamp)} · ${escapeHtml(t('queue.viewFull'))}`}</small>
           </button>
           <span class="queue-controls">
-            <button type="button" data-action="up" aria-label="${escapeHtml(t('queue.raise'))}" ${index === 0 ? 'disabled' : ''}>
+            <button type="button" data-action="up" aria-label="${escapeHtml(t('queue.raise'))}" ${index === 0 || message.optimistic ? 'disabled' : ''}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 14 5-5 5 5" /></svg>
             </button>
-            <button type="button" data-action="down" aria-label="${escapeHtml(t('queue.lower'))}" ${index === queuedTasks.length - 1 ? 'disabled' : ''}>
+            <button type="button" data-action="down" aria-label="${escapeHtml(t('queue.lower'))}" ${index === queuedTasks.length - 1 || message.optimistic ? 'disabled' : ''}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
             </button>
-            <button class="queue-steer" type="button" data-action="steer" aria-label="${escapeHtml(t('queue.steer'))}">
+            <button class="queue-steer" type="button" data-action="steer" aria-label="${escapeHtml(t('queue.steer'))}" ${message.optimistic ? 'disabled' : ''}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 2-8 12h7l-1 8 8-12h-7l1-8Z" /></svg>
             </button>
-            <button class="queue-delete" type="button" data-action="delete" aria-label="${escapeHtml(t('queue.delete'))}">
+            <button class="queue-delete" type="button" data-action="delete" aria-label="${escapeHtml(t('queue.delete'))}" ${message.optimistic ? 'disabled' : ''}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" /></svg>
               <span>${escapeHtml(t('queue.deleteLabel'))}</span>
             </button>
@@ -742,17 +772,24 @@ $('#message-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const message = input.value.trim();
   if (!message || !state.selectedId) return;
+  const threadId = state.selectedId;
+  const optimisticId = addOptimisticQueueItem(threadId, message);
+  input.value = '';
+  resizeComposer();
   const button = $('#send-button');
   button.disabled = true;
-  $('#composer-hint').textContent = t('composer.sending');
+  $('#composer-hint').textContent = t('composer.saving');
   try {
-    const result = await sendTaskMessage(message);
-    input.value = '';
-    resizeComposer();
-    const started = result.mode === 'started';
-    showToast(t(started ? 'composer.startedToast' : 'composer.queuedToast'));
-    $('#composer-hint').textContent = t(started ? 'composer.startedHint' : 'composer.queuedHint');
+    await sendTaskMessage(message, threadId);
+    showToast(t('composer.queuedToast'));
+    $('#composer-hint').textContent = t('composer.queuedHint');
+    await loadDetail(threadId).catch(() => undefined);
   } catch (error) {
+    removeOptimisticQueueItem(threadId, optimisticId);
+    if (!input.value.trim() && state.selectedId === threadId) {
+      input.value = message;
+      resizeComposer();
+    }
     showToast(localizedError(error.message, 'error.send'));
     $('#composer-hint').textContent = t('composer.failure');
   } finally {
@@ -958,6 +995,8 @@ export {
   showDelivery,
   loadTasks,
   sendTaskMessage,
+  addOptimisticQueueItem,
+  removeOptimisticQueueItem,
   connectEvents,
   showToast,
   showContent,

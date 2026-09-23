@@ -190,23 +190,21 @@ SELECT valid FROM mutation_guard;`;
   }
 
   async sendMessage(threadId, message) {
-    const activeSql = `SELECT turn_id FROM thread_turns WHERE thread_id = '${escapeSqlite(threadId)}' AND status = 'inProgress' ORDER BY rollout_ordinal DESC LIMIT 1;`;
-    let activeOutput = '';
-    try {
-      ({ stdout: activeOutput = '' } = await this.execFile('sqlite3', ['-json', this.historyDb, activeSql], { maxBuffer: 1024 * 1024 }));
-    } catch (error) {
-      if (!isOptionalDataUnavailable(error)) throw error;
-    }
-    const activeTurn = activeOutput.trim() ? JSON.parse(activeOutput)[0]?.turn_id : null;
-    if (!activeTurn) {
-      try {
-        return { accepted: true, mode: 'started', result: await this.startTurn(threadId, message, await this.threadCwd(threadId)) };
-      } catch (error) {
-        const queued = await this.queueMessage(threadId, message);
-        return { ...queued, warning: error.message };
-      }
-    }
+    // Persist first so the phone can return without waiting for a completed
+    // task to create its next Codex turn. A background dispatcher starts idle
+    // threads only after this durable queue write succeeds.
     return this.queueMessage(threadId, message);
+  }
+
+  async startQueuedTaskIfIdle(threadId) {
+    if (await this.activeTurnId(threadId)) return { started: false, reason: 'active' };
+    const queuedTasks = await this.loadQueuedTasks(threadId);
+    const item = queuedTasks[0];
+    if (!item) return { started: false, reason: 'empty' };
+    const result = await this.startTurn(threadId, item.text, await this.threadCwd(threadId));
+    const sql = `DELETE FROM queued_items WHERE thread_id = '${escapeSqlite(threadId)}' AND id = '${escapeSqlite(item.id)}';`;
+    await this.execFile('sqlite3', [this.queueDb, sql], { maxBuffer: 1024 * 1024 });
+    return { started: true, itemId: item.id, result };
   }
 
   async stopTask(threadId) {

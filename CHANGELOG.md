@@ -2,6 +2,12 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.17 - 2026-09-23
+
+- Added instant optimistic queue feedback on phones so sending a prompt never makes the interface appear frozen.
+- Changed completed-task delivery to persist the prompt in Codex's queue first, return immediately, and start the next turn safely in the background.
+- Added automatic retry with queue preservation and bilingual delayed-start feedback, backed by complete regression coverage.
+
 ## 0.2.16 - 2026-09-23
 
 - Added phone controls to stop a running task and archive a task without returning to the Mac.

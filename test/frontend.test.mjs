@@ -370,13 +370,18 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   document.querySelector('#message-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(textarea.value, '');
-  assert.match(document.querySelector('#composer-hint').textContent, /正在启动/);
+  assert.match(document.querySelector('#composer-hint').textContent, /消息已保存/);
   assert.ok(calls.some(([path, method]) => path === '/api/messages' && method === 'POST'));
   setMessageMode('queued');
   textarea.value = '稍后处理';
   document.querySelector('#message-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
   await new Promise((resolve) => setImmediate(resolve));
-  assert.match(document.querySelector('#composer-hint').textContent, /按顺序执行/);
+  assert.match(document.querySelector('#composer-hint').textContent, /按顺序处理/);
+  failures.set(`/api/tasks/${task().id}`, 'detail refresh failed');
+  textarea.value = '详情稍后刷新';
+  document.querySelector('#message-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
+  await new Promise((resolve) => setImmediate(resolve));
+  failures.delete(`/api/tasks/${task().id}`);
 
   ui.state.tasks = [task({ progress: { state: 'paused', label: '已暂停', tone: 'amber' } })];
   ui.state.selectedId = task().id;
@@ -402,6 +407,9 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   const source = FakeEventSource.instances.at(-1);
   source.emit('tasks', { tasks: [task({ title: '更新后的任务', updatedAt: Date.now() + 1 })], syncedAt: Date.now() });
   source.emit('sync-error', { error: '暂时断开' });
+  source.emit('queue-error', { threadId: task().id, error: 'slow' });
+  assert.match(document.querySelector('#toast').textContent, /安全保留/);
+  source.emit('queue-error', { threadId: 'another-task', error: 'ignored' });
   source.onerror();
   assert.equal(document.querySelector('#connection-text').textContent, '正在重新连接');
   ui.connectEvents();
@@ -608,6 +616,7 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   ui.renderList();
   assert.match(document.querySelector('#task-list').textContent, /没有符合条件/);
   assert.equal(ui.queueRevision([]), 0);
+  assert.equal(await ui.sendTaskMessage('有内容', null), null);
   assert.equal(ui.taskViewChanged(null, null), false);
   assert.equal(ui.taskViewChanged(null, task()), true);
 
@@ -626,6 +635,18 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   document.querySelector('#message-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
   await new Promise((resolve) => setImmediate(resolve));
   assert.match(document.querySelector('#composer-hint').textContent, /发送失败/);
+  assert.equal(textarea.value, '失败消息');
+  textarea.value = '仍会失败';
+  document.querySelector('#message-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
+  textarea.value = '用户已经输入的新内容';
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(textarea.value, '用户已经输入的新内容');
+  textarea.value = '切换页面时失败';
+  document.querySelector('#message-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
+  ui.state.selectedId = 'another-thread';
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(textarea.value, '');
+  ui.state.selectedId = task().id;
   failures.set('/api/messages', '');
   textarea.value = '默认失败消息';
   document.querySelector('#message-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
@@ -634,6 +655,27 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   textarea.value = '   ';
   document.querySelector('#message-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
 
+  ui.applyQueuedTasks([]);
+  ui.applyQueuedTasks([], 'no-detail-thread');
+  assert.equal(ui.removeOptimisticQueueItem('missing-thread', 'missing-item'), false);
+  const detachedId = ui.addOptimisticQueueItem('detached-thread', '后台任务');
+  assert.equal(ui.state.details.get('detached-thread').queuedTasks[0].id, detachedId);
+  ui.state.details.set('queue-less-thread', { messages: [] });
+  assert.equal(ui.removeOptimisticQueueItem('queue-less-thread', 'missing-item'), true);
+  ui.state.details.set('queue-less-thread', { messages: [] });
+  ui.addOptimisticQueueItem('queue-less-thread', '默认队列');
+  ui.state.details.set(task().id, { messages: [], queuedTasks: [] });
+  const optimisticId = ui.addOptimisticQueueItem(task().id, '立即出现');
+  ui.renderQueueManager();
+  assert.match(document.querySelector('.queue-copy small').textContent, /安全写入/);
+  assert.equal(document.querySelector('[data-action="steer"]').disabled, true);
+  assert.equal(ui.removeOptimisticQueueItem(task().id, optimisticId), true);
+  const regular = queue();
+  ui.applyQueuedTasks([regular[0], { ...regular[1], id: 'optimistic-middle', optimistic: true }, regular[2]]);
+  ui.renderQueueManager();
+  const savingRow = document.querySelector('[data-queue-id="optimistic-middle"]');
+  assert.equal(savingRow.querySelector('[data-action="up"]').disabled, true);
+  assert.equal(savingRow.querySelector('[data-action="down"]').disabled, true);
   ui.applyQueuedTasks([]);
   ui.renderQueueManager();
   assert.match(document.querySelector('#modal-content').textContent, /队列已清空/);

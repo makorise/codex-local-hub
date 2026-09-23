@@ -205,6 +205,105 @@ test('bridge server allows direct trusted-LAN access by default', async (t) => {
   assert.equal((await request(base, '/pair/anything', { redirect: 'manual' })).status, 404);
 });
 
+test('queued prompts dispatch in the background with deduplication and retry backoff', async (t) => {
+  const publicDir = await mkdtemp(join(tmpdir(), 'bridge-dispatch-'));
+  await writeFile(join(publicDir, 'index.html'), '<h1>dispatch</h1>');
+  let clock = 100;
+  let tasks = [];
+  let outcome = { started: false, reason: 'active' };
+  const calls = [];
+  const deferred = [];
+  const repository = {
+    listTasks: async () => tasks,
+    startQueuedTaskIfIdle: async (id) => {
+      calls.push(id);
+      if (outcome instanceof Error) throw outcome;
+      if (outcome.started) tasks = [];
+      return outcome;
+    },
+  };
+  const bridge = createBridgeServer({
+    repository,
+    publicDir,
+    now: () => clock,
+    defer: (callback) => deferred.push(callback),
+    pollMs: 60_000,
+  });
+  await new Promise((resolve) => bridge.server.listen(0, '127.0.0.1', resolve));
+  t.after(async () => {
+    bridge.server.closeAllConnections();
+    await new Promise((resolve) => bridge.server.close(resolve));
+    await rm(publicDir, { recursive: true });
+  });
+
+  assert.equal(bridge.scheduleQueuedStart(), false);
+  assert.equal(bridge.scheduleQueuedStart({ id: 'thread', queuedCount: 0, progress: { state: 'queued' } }), false);
+  assert.equal(bridge.scheduleQueuedStart({ id: 'thread', queuedCount: 1, progress: { state: 'running' } }), false);
+  const queued = { id: 'thread', queuedCount: 1, progress: { state: 'queued' } };
+  assert.equal(bridge.scheduleQueuedStart(queued), true);
+  assert.equal(bridge.scheduleQueuedStart(queued), false);
+  await deferred.shift()();
+  assert.deepEqual(calls, ['thread']);
+
+  outcome = { started: true };
+  tasks = [queued];
+  await bridge.refresh();
+  await deferred.shift()();
+  assert.deepEqual(tasks, []);
+
+  outcome = new Error('slow start');
+  tasks = [queued];
+  await bridge.refresh();
+  const base = `http://127.0.0.1:${bridge.server.address().port}`;
+  const eventResponse = await fetch(`${base}/api/events`);
+  const eventReader = eventResponse.body.getReader();
+  await eventReader.read();
+  const queueErrorFrame = eventReader.read();
+  await deferred.shift()();
+  assert.match(new TextDecoder().decode((await queueErrorFrame).value), /event: queue-error/);
+  assert.equal(bridge.scheduleQueuedStart(queued), false);
+  clock += 5_001;
+  outcome = Object.assign(new Error(''), { message: '' });
+  assert.equal(bridge.scheduleQueuedStart(queued), true);
+  await deferred.shift()();
+  await eventReader.cancel();
+});
+
+test('queued prompt dispatcher uses production clock and scheduler defaults', async (t) => {
+  const publicDir = await mkdtemp(join(tmpdir(), 'bridge-dispatch-defaults-'));
+  await writeFile(join(publicDir, 'index.html'), '<h1>defaults</h1>');
+  let calls = 0;
+  let failList = false;
+  const bridge = createBridgeServer({
+    repository: {
+      listTasks: async () => {
+        if (failList) throw new Error('refresh failed');
+        return [];
+      },
+      sendMessage: async () => ({ accepted: true, mode: 'queued' }),
+      startQueuedTaskIfIdle: async () => { calls += 1; return { started: false, reason: 'active' }; },
+    },
+    publicDir,
+    pollMs: 60_000,
+  });
+  await new Promise((resolve) => bridge.server.listen(0, '127.0.0.1', resolve));
+  t.after(async () => {
+    bridge.server.closeAllConnections();
+    await new Promise((resolve) => bridge.server.close(resolve));
+    await rm(publicDir, { recursive: true });
+  });
+  assert.equal(bridge.scheduleQueuedStart({ id: 'default-thread', queuedCount: 1, progress: { state: 'queued' } }), true);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(calls, 1);
+  failList = true;
+  const base = `http://127.0.0.1:${bridge.server.address().port}`;
+  assert.equal((await request(base, '/api/messages', {
+    method: 'POST',
+    body: JSON.stringify({ threadId: '1234567890abcdef1234', message: 'persist first' }),
+  })).status, 202);
+  await new Promise((resolve) => setImmediate(resolve));
+});
+
 test('bridge reports repository and message failures and closes active streams', async (t) => {
   const publicDir = await mkdtemp(join(tmpdir(), 'bridge-errors-'));
   let failure = new Error('sync failed');
