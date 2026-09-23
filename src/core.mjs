@@ -1,4 +1,10 @@
 export const MAX_MESSAGE_LENGTH = 12_000;
+export const CORE_READY_MARKER = 'CODEX_LOOKOUT_READY';
+export const LEGACY_HOST_READY_MARKER = 'Codex 掌上任务台已启动';
+
+export function coreReadySignal() {
+  return `${CORE_READY_MARKER} ${LEGACY_HOST_READY_MARKER}`;
+}
 
 export function truncate(value, length = 180) {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim();

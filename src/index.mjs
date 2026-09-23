@@ -9,6 +9,7 @@ import { CodexAppToolsClient, CodexControlClient } from './control.mjs';
 import { DeliveryInbox } from './deliveries.mjs';
 import { createBridgeServer, resolveRuntimeInfo } from './server.mjs';
 import { createUsageHistoryStore, createUsageReader, requestRateLimits } from './usage.mjs';
+import { coreReadySignal } from './core.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const home = process.env.HOME;
@@ -57,6 +58,7 @@ const { server } = createBridgeServer({ repository, token, requirePairing, publi
 
 server.listen(port, host, () => {
   const addresses = lanAddresses().map((address) => `http://${address}:${port}/`);
+  console.log(`\n${coreReadySignal()}`);
   console.log('\nCodex Lookout / Codex 瞭望台已启动');
   console.log(`本机：http://127.0.0.1:${port}/`);
   for (const address of addresses) {

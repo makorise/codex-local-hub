@@ -2,8 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MAX_MESSAGE_LENGTH,
+  CORE_READY_MARKER,
+  LEGACY_HOST_READY_MARKER,
   activityLabel,
   cleanUserMessage,
+  coreReadySignal,
   extractMessageText,
   folderName,
   formatDuration,
@@ -16,6 +19,14 @@ import {
   truncate,
   validateMessageInput,
 } from '../src/core.mjs';
+
+test('core readiness signal supports both stable and v0.2.8 host detection', () => {
+  const signal = coreReadySignal();
+  assert.equal(CORE_READY_MARKER, 'CODEX_LOOKOUT_READY');
+  assert.equal(LEGACY_HOST_READY_MARKER, 'Codex 掌上任务台已启动');
+  assert.match(signal, /CODEX_LOOKOUT_READY/);
+  assert.match(signal, /Codex 掌上任务台已启动/);
+});
 
 test('text helpers normalize, extract and filter visible messages', () => {
   assert.equal(truncate(null), '');

@@ -2,6 +2,12 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.13 - 2026-09-23
+
+- Fixed 0.2.8 hosts falsely rolling back a healthy core update after the product rename changed the human-readable startup text.
+- Added a stable, brand-independent core readiness marker while retaining the previous host marker internally for backward compatibility.
+- Added regression coverage for both the 0.2.8 host handshake and future brand-independent startup detection.
+
 ## 0.2.12 - 2026-09-23
 
 - Added a one-time, data-preserving full-host migration for installations whose native updater still points to the retired personal repository.

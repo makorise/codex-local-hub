@@ -345,7 +345,7 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let lines = outputBuffer.components(separatedBy: .newlines)
         outputBuffer = lines.last ?? ""
         for line in lines.dropLast() {
-            if line.contains("Codex 瞭望台已启动") {
+            if line.contains("CODEX_LOOKOUT_READY") || line.contains("Codex 瞭望台已启动") {
                 restartAttempts = 0
                 statusLabel.stringValue = text("服务运行中 · 任务正在实时同步", "Service online · tasks are syncing live")
                 statusDot.layer?.backgroundColor = NSColor.systemGreen.cgColor
