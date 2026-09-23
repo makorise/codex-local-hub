@@ -16,6 +16,8 @@ test('setup skill migrates legacy updater hosts with a data-preserving full upgr
   assert.match(skill, /no longer contains the obsolete endpoint/);
   assert.match(skill, /remove only `CodexLocalHubUpdateCheckedAt`/);
   assert.match(skill, /do not delete Application Support or task data/);
+  assert.match(skill, /native `CFBundleShortVersionString` is older than `0\.2\.15`/);
+  assert.match(skill, /both must be current before declaring the update path repaired/);
 });
 
 test('release guidance does not promise hot updates to legacy repository clients', async () => {

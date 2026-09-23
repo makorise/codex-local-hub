@@ -88,6 +88,14 @@ test('product website localizes, animates and copies the one-message installer',
 
   await module.copyInstallPrompt();
   assert.equal(clipboardWrites.length, 2);
+  document.querySelector('[data-copy-recovery]').click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(clipboardWrites.length, 3);
+  assert.match(clipboardWrites[2], /repair my stuck Codex Lookout update/);
+  assert.match(clipboardWrites[2], /native host is older than 0\.2\.15/);
+  assert.equal(document.querySelector('[data-toast]').textContent, 'Repair prompt copied');
+  await module.copyRecoveryPrompt();
+  assert.equal(clipboardWrites.length, 4);
   module.showToast('Direct toast');
   assert.equal(document.querySelector('[data-toast]').textContent, 'Direct toast');
   assert.equal(module.normalizeLanguage(null), 'en');

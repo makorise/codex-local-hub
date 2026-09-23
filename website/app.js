@@ -3,6 +3,11 @@ const INSTALL_PROMPTS = {
   'zh-CN': '使用 $skill-installer 安装 https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub，然后在当前任务中使用 $setup-codex-local-hub：安装或更新 Codex 瞭望台、启动程序并验证手机访问。保护已有文件，不要修改我的全局 Node.js 环境。',
 };
 
+const RECOVERY_PROMPTS = {
+  en: 'Use $skill-installer to install https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub, then use $setup-codex-local-hub to repair my stuck Codex Lookout update. Detect the native host and active core versions, clear only stale update metadata, complete a data-preserving full host upgrade when the native host is older than 0.2.15, relaunch it, and verify /api/health and phone access. Do not change my global Node.js environment.',
+  'zh-CN': '使用 $skill-installer 安装 https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub，然后使用 $setup-codex-local-hub 修复我卡住的 Codex 瞭望台更新。检查原生宿主和当前核心版本，只清理过期更新元数据；如果原生宿主低于 0.2.15，完成一次保留数据的完整宿主升级，重新启动并验证 /api/health 和手机访问。不要修改我的全局 Node.js 环境。',
+};
+
 const COPY = {
   en: {
     'a11y.skip': 'Skip to content', 'nav.features': 'Features', 'nav.how': 'How it works', 'nav.install': 'Install',
@@ -18,8 +23,8 @@ const COPY = {
     'how.copy': 'A lightweight local service reads the useful Codex state and sends your actions back to the selected task. No hosted dashboard and no second chat archive.',
     'how.mac': 'Mac', 'how.macCopy': 'Codex keeps running', 'how.hubCopy': 'Syncs on trusted Wi-Fi', 'how.phone': 'Phone', 'how.phoneCopy': 'You decide what is next',
     'install.label': 'ONE-MESSAGE INSTALL', 'install.title': 'Paste once. Codex handles the rest.', 'install.copy': 'The setup skill installs or updates the app, starts it, and verifies phone access.',
-    'install.requirements': 'macOS 15+ · Codex desktop · Same trusted Wi-Fi', 'install.promptLabel': 'PASTE INTO CODEX', 'install.copyButton': 'Copy',
-    'install.compatibility': 'Previously released as Codex Local Hub. Internal identifiers remain unchanged for update compatibility.', 'install.copied': 'Installation prompt copied',
+    'install.requirements': 'macOS 15+ · Codex desktop · Same trusted Wi-Fi', 'install.promptLabel': 'PASTE INTO CODEX', 'install.copyButton': 'Copy', 'install.recovery': 'Update stuck? Copy the repair prompt',
+    'install.compatibility': 'Previously released as Codex Local Hub. Internal identifiers remain unchanged for update compatibility.', 'install.copied': 'Installation prompt copied', 'install.recoveryCopied': 'Repair prompt copied',
     'footer.note': 'Independent open-source project. Not affiliated with OpenAI.', 'footer.download': 'Download',
   },
   'zh-CN': {
@@ -36,8 +41,8 @@ const COPY = {
     'how.copy': '轻量本地服务读取必要的 Codex 状态，再把操作送回指定任务。没有托管面板，也不复制完整对话。',
     'how.mac': 'Mac', 'how.macCopy': 'Codex 持续运行', 'how.hubCopy': '通过可信 Wi-Fi 同步', 'how.phone': '手机', 'how.phoneCopy': '你决定下一步',
     'install.label': '一句话完成安装', 'install.title': '复制一次，剩下的交给 Codex。', 'install.copy': 'Setup Skill 会自动安装或更新程序、启动服务并验证手机访问。',
-    'install.requirements': 'macOS 15+ · Codex 桌面端 · 同一可信 Wi-Fi', 'install.promptLabel': '复制到 CODEX', 'install.copyButton': '复制',
-    'install.compatibility': '旧版本曾使用 Codex Local Hub 名称；内部标识保持不变，以兼容现有升级。', 'install.copied': '安装词已复制',
+    'install.requirements': 'macOS 15+ · Codex 桌面端 · 同一可信 Wi-Fi', 'install.promptLabel': '复制到 CODEX', 'install.copyButton': '复制', 'install.recovery': '更新卡住？复制修复提示词',
+    'install.compatibility': '旧版本曾使用 Codex Local Hub 名称；内部标识保持不变，以兼容现有升级。', 'install.copied': '安装词已复制', 'install.recoveryCopied': '修复提示词已复制',
     'footer.note': '独立开源项目，与 OpenAI 没有隶属关系。', 'footer.download': '下载',
   },
 };
@@ -83,7 +88,13 @@ export async function copyInstallPrompt() {
   showToast(COPY[language]['install.copied']);
 }
 
+export async function copyRecoveryPrompt() {
+  await navigator.clipboard.writeText(RECOVERY_PROMPTS[language]);
+  showToast(COPY[language]['install.recoveryCopied']);
+}
+
 document.querySelectorAll('[data-copy-prompt]').forEach((button) => button.addEventListener('click', () => copyInstallPrompt()));
+document.querySelector('[data-copy-recovery]').addEventListener('click', () => copyRecoveryPrompt());
 
 const observer = new IntersectionObserver((entries) => {
   entries.forEach((entry) => {
