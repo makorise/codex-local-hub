@@ -5,7 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { CodexRepository, escapeSqlite, isOptionalDataUnavailable, parseHistoryMessage } from '../src/repository.mjs';
+import { CodexRepository, escapeSqlite, isClosedTurnError, isOptionalDataUnavailable, parseHistoryMessage } from '../src/repository.mjs';
 
 const execFile = promisify(nodeExecFile);
 
@@ -111,7 +111,7 @@ test('task and project management uses Codex controls without deleting workspace
     stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals',
     execFile: async (_command, args) => {
       const sql = args[2];
-      if (sql.includes('SELECT turn_id')) return { stdout: activeTurn ? JSON.stringify([{ turn_id: activeTurn }]) : '' };
+      if (sql.includes('SELECT turn_id')) return { stdout: activeTurn ? JSON.stringify([{ turn_id: activeTurn, status: 'inProgress' }]) : '' };
       if (sql.includes('SELECT id, name FROM projects')) return { stdout: projectRow ? JSON.stringify([projectRow]) : '' };
       return { stdout: '' };
     },
@@ -151,10 +151,15 @@ test('task and project management uses Codex controls without deleting workspace
   repository.execFile = async () => ({ stdout: '[]' });
   assert.equal(await repository.activeTurnId(row.id), null);
 
+  repository.execFile = async () => ({ stdout: '[{"turn_id":"old","status":"completed"}]' });
+  assert.equal(await repository.activeTurnId(row.id), null);
+  repository.execFile = async () => ({ stdout: '[{"status":"inProgress"}]' });
+  assert.equal(await repository.activeTurnId(row.id), null);
+
   const unsupported = new CodexRepository({
     stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals',
     execFile: async (_command, args) => args[2].includes('SELECT turn_id')
-      ? { stdout: '[{"turn_id":"turn"}]' }
+      ? { stdout: '[{"turn_id":"turn","status":"inProgress"}]' }
       : { stdout: '[{"id":"project","name":"name"}]' },
   });
   unsupported.details.set(row.id, row);
@@ -170,6 +175,14 @@ test('history messages parse user, assistant, queued and invalid records', () =>
   assert.deepEqual(parseHistoryMessage({ queue_item_id: 'queue-id', queue_order: 2, queue_revision: 7, created_at_ms: 4, item_type: 'queuedMessage', item_json: '{"UserInput":{"content":[{"type":"text","text":"<in-app-browser-context>x</in-app-browser-context>\\n## My request:\\nclean"}]}}', pending: 1 }), { id: 'queue-id', role: 'user', text: 'clean', timestamp: 4, pending: true, queueOrder: 2, queueRevision: 7 });
   assert.equal(parseHistoryMessage({ created_at_ms: 5, item_type: 'agentMessage', item_json: '{}', pending: 0 }), null);
   assert.equal(parseHistoryMessage({ item_json: '{' }), null);
+});
+
+test('closed turn errors are recognized without hiding unrelated failures', () => {
+  assert.equal(isClosedTurnError(new Error('interaction is closed')), true);
+  assert.equal(isClosedTurnError(new Error('turn completed before steer')), true);
+  assert.equal(isClosedTurnError(new Error('当前回合已关闭')), true);
+  assert.equal(isClosedTurnError(new Error('network unavailable')), false);
+  assert.equal(isClosedTurnError(null), false);
 });
 
 test('history loaders return empty collections when databases have no rows', async () => {
@@ -248,6 +261,14 @@ test('queued task steering targets the active turn and removes only the steered 
   assert.deepEqual(calls, [[threadId, 'turn-active', 'keep me']]);
   assert.deepEqual(steered.result, { accepted: true });
   assert.deepEqual(steered.queuedTasks, []);
+
+  await execFile('sqlite3', [queueDb, `INSERT INTO queued_items VALUES ('eeeeeeeeeeeeeeeeeeee', '${threadId}', '{"UserInput":{"content":[{"type":"text","text":"recover closed turn"}]}}', 1, 3, 3);`]);
+  repository.steerMessage = async () => { throw new Error('interaction is closed'); };
+  const closedItem = (await repository.loadQueuedTasks(threadId))[0];
+  const recovered = await repository.steerQueuedTask(threadId, closedItem.id, closedItem.queueRevision);
+  assert.equal(recovered.result.started, true);
+  assert.deepEqual(starts.at(-1), [threadId, 'recover closed turn', '/work']);
+  assert.deepEqual(recovered.queuedTasks, []);
 
   assert.deepEqual(await repository.startQueuedTaskIfIdle(threadId), { started: false, reason: 'active' });
   await execFile('sqlite3', [historyDb, `UPDATE thread_turns SET status = 'completed';`]);

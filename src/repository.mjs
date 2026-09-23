@@ -178,12 +178,18 @@ SELECT valid FROM mutation_guard;`;
     const queuedTasks = await this.loadQueuedTasks(threadId);
     const item = queuedTasks.find((message) => message.id === itemId);
     if (!item || item.queueRevision !== revision) throw Object.assign(new Error('任务队列已变化，请刷新后重试'), { statusCode: 409 });
-    const activeSql = `SELECT turn_id FROM thread_turns WHERE thread_id = '${escapeSqlite(threadId)}' AND status = 'inProgress' ORDER BY rollout_ordinal DESC LIMIT 1;`;
-    const { stdout } = await this.execFile('sqlite3', ['-json', this.historyDb, activeSql], { maxBuffer: 1024 * 1024 });
-    const activeTurn = stdout.trim() ? JSON.parse(stdout)[0]?.turn_id : null;
-    const result = activeTurn
-      ? await this.steerMessage(threadId, activeTurn, item.text)
-      : await this.startTurn(threadId, item.text, await this.threadCwd(threadId));
+    const activeTurn = await this.activeTurnId(threadId);
+    let result;
+    if (activeTurn) {
+      try {
+        result = await this.steerMessage(threadId, activeTurn, item.text);
+      } catch (error) {
+        if (!isClosedTurnError(error)) throw error;
+        result = await this.startTurn(threadId, item.text, await this.threadCwd(threadId));
+      }
+    } else {
+      result = await this.startTurn(threadId, item.text, await this.threadCwd(threadId));
+    }
     const deleteSql = `DELETE FROM queued_items WHERE thread_id = '${escapeSqlite(threadId)}' AND id = '${escapeSqlite(itemId)}';`;
     await this.execFile('sqlite3', [this.queueDb, deleteSql], { maxBuffer: 1024 * 1024 });
     return { result, queuedTasks: await this.loadQueuedTasks(threadId) };
@@ -236,7 +242,7 @@ SELECT valid FROM mutation_guard;`;
   }
 
   async activeTurnId(threadId) {
-    const sql = `SELECT turn_id FROM thread_turns WHERE thread_id = '${escapeSqlite(threadId)}' AND status = 'inProgress' ORDER BY rollout_ordinal DESC LIMIT 1;`;
+    const sql = `SELECT turn_id, status FROM thread_turns WHERE thread_id = '${escapeSqlite(threadId)}' ORDER BY rollout_ordinal DESC LIMIT 1;`;
     let stdout = '';
     try {
       ({ stdout = '' } = await this.execFile('sqlite3', ['-json', this.historyDb, sql], { maxBuffer: 1024 * 1024 }));
@@ -244,7 +250,9 @@ SELECT valid FROM mutation_guard;`;
       if (isOptionalDataUnavailable(error)) return null;
       throw error;
     }
-    return stdout.trim() ? JSON.parse(stdout)[0]?.turn_id || null : null;
+    if (!stdout.trim()) return null;
+    const latest = JSON.parse(stdout)[0];
+    return latest?.status === 'inProgress' ? latest.turn_id || null : null;
   }
 
   async queueMessage(threadId, message) {
@@ -290,4 +298,8 @@ export function isOptionalDataUnavailable(error) {
   const detail = `${error?.message || ''}\n${error?.stderr || ''}`;
   return /no such table: (?:queue_db\.|history_db\.|goal_db\.|main\.)?(?:queued_items|queued_thread_revisions|thread_turns|thread_items|thread_goals|projects|project_roots|thread_sections)\b/i.test(detail)
     || /unable to open database(?: file)?/i.test(detail);
+}
+
+export function isClosedTurnError(error) {
+  return /(?:thread|turn|interaction|channel).*(?:closed|completed|interrupted|not found)|(?:closed|completed|interrupted).*(?:thread|turn|interaction|channel)|已关闭|已经关闭|已完成|已中断|找不到.*(?:任务|回合)/i.test(String(error?.message || error || ''));
 }

@@ -2,6 +2,12 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.18 - 2026-09-23
+
+- Fixed Steer surfacing a raw “closed” error when Codex closed or interrupted the target turn between status sync and the phone tap.
+- Steer now checks only the latest recorded turn and safely starts the queued prompt as a new turn when the previous interaction has just closed.
+- Preserves queued prompts on every failed control path and adds full regression coverage for closed-turn recovery.
+
 ## 0.2.17 - 2026-09-23
 
 - Added instant optimistic queue feedback on phones so sending a prompt never makes the interface appear frozen.
