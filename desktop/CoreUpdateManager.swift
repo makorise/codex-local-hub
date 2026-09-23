@@ -59,7 +59,10 @@ final class CoreUpdateStore {
     }
 
     func activeServerRoot() -> URL? {
-        guard let directory = activeDirectory(), validatedManifest(at: directory) != nil else {
+        guard let directory = activeDirectory(),
+              let manifest = validatedManifest(at: directory),
+              let coreVersion = SemanticVersion(manifest.version),
+              coreVersion > hostVersion else {
             defaults.removeObject(forKey: Self.activeDirectoryKey)
             return nil
         }

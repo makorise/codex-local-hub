@@ -28,6 +28,10 @@ struct CoreUpdateTests {
         expect(store.activeServerRoot()?.appendingPathComponent("src/index.mjs").pathExtension == "mjs", "activates an extracted server root")
         expect(store.effectiveVersion() == "0.2.3", "reports the effective core version")
 
+        let upgradedHost = CoreUpdateStore(hostVersion: "0.2.3", defaults: defaults, applicationSupport: temporary)
+        expect(upgradedHost.activeServerRoot() == nil, "ignores and clears a hot-update core that is not newer than the host")
+        expect(upgradedHost.effectiveVersion() == "0.2.3", "uses the upgraded bundled host version after clearing a stale core")
+
         store.restore(directoryName: nil)
         expect(store.activeServerRoot() == nil, "can atomically restore the bundled core")
         do {

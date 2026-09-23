@@ -2,6 +2,12 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.12 - 2026-09-23
+
+- Added a one-time, data-preserving full-host migration for installations whose native updater still points to the retired personal repository.
+- Fixed full upgrades continuing to launch an older hot-updated core from Application Support instead of the newer core bundled with the Mac host.
+- Added regression coverage for legacy updater detection and stale-core cleanup after a host upgrade.
+
 ## 0.2.11 - 2026-09-23
 
 - Unified every user-facing surface under the **Codex Lookout / Codex 瞭望台** brand while retaining repository paths, bundle identifiers, update storage, release asset names, and skill identifiers for compatibility.
@@ -25,7 +31,7 @@ All notable changes to Codex Lookout will be documented in this file.
 
 - Moved the official source, installation skills, release channel, and product website to the Makorise GitHub organization.
 - Updated the native updater, documentation, package metadata, website links, SEO metadata, and social preview to use the organization-owned URLs.
-- Preserved the old personal repository as a compatibility pointer while new installations and future hot updates use `makorise/codex-local-hub`.
+- Moved new installations and future hot updates to `makorise/codex-local-hub`; installations whose native updater predates the move require one complete host migration.
 
 ## 0.2.7 - 2026-09-22
 
