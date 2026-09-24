@@ -15,7 +15,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/app-icon-192.png" />
-    <link rel="stylesheet" href="/styles.css?v=29" />
+    <link rel="stylesheet" href="/styles.css?v=30" />
     <title>Codex Lookout</title>
   </head>
   <body>
@@ -124,7 +124,10 @@
               <section class="conversation-card">
                 <div class="conversation-heading">
                   <div class="section-label" data-i18n="conversation.title">对话记录</div>
-                  <span data-i18n="conversation.hint">越上越早 · 最多 20 条</span>
+                  <div class="conversation-heading-meta">
+                    <span data-i18n="conversation.hint">越上越早 · 最多 20 条</span>
+                    <button id="new-message-indicator" class="new-message-indicator" type="button" hidden data-i18n="conversation.newMessages">有新消息 ↓</button>
+                  </div>
                 </div>
                 <div id="recent-messages" class="recent-messages"></div>
               </section>
@@ -180,6 +183,6 @@
         <div id="modal-content" class="modal-content"></div>
       </section>
     </div>
-    <script type="module" src="/app.js?v=32"></script>
+    <script type="module" src="/app.js?v=33"></script>
   </body>
 </html>

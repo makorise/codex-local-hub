@@ -191,7 +191,9 @@ button { color: inherit; }
 .text-preview svg, .queued-tasks svg { width: 18px; height: 18px; flex: 0 0 auto; fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .conversation-card { min-height: 100%; display: flex; flex-direction: column; }
 .conversation-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.conversation-heading > span { color: #687386; font-size: .68rem; }
+.conversation-heading-meta { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; color: #687386; font-size: .68rem; }
+.new-message-indicator { flex: 0 0 auto; padding: 5px 9px; border: 1px solid rgba(113,145,255,.22); border-radius: 999px; background: rgba(91,121,255,.12); color: #aebdff; font: inherit; cursor: pointer; }
+.new-message-indicator[hidden] { display: none; }
 .recent-messages { display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; margin-top: auto; padding-top: 14px; }
 .message-row { display: flex; }
 .message-row.is-user { justify-content: flex-end; }

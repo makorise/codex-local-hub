@@ -205,20 +205,46 @@ function captureConversationScroll(followLatest = false) {
   const scroller = $('.detail-scroll');
   if (!scroller) return null;
   const maxScrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+  const scrollerTop = scroller.getBoundingClientRect().top;
+  const anchor = [...$('#recent-messages').querySelectorAll('.message-row')]
+    .find((row) => row.getBoundingClientRect().bottom > scrollerTop + 1);
   return {
     followLatest: followLatest || maxScrollTop - scroller.scrollTop <= 8,
     scrollTop: Math.max(0, scroller.scrollTop),
+    anchorId: anchor?.dataset.messageId || null,
+    anchorOffset: anchor ? anchor.getBoundingClientRect().top - scrollerTop : 0,
   };
 }
 
 function restoreConversationScroll(snapshot) {
   if (!snapshot) return;
-  requestAnimationFrame(() => {
-    const scroller = $('.detail-scroll');
-    if (!scroller) return;
-    const maxScrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
-    scroller.scrollTop = snapshot.followLatest ? maxScrollTop : Math.min(snapshot.scrollTop, maxScrollTop);
-  });
+  const scroller = $('.detail-scroll');
+  if (!scroller) return;
+  const maxScrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+  if (snapshot.followLatest) {
+    scroller.scrollTop = maxScrollTop;
+    return;
+  }
+  const anchor = snapshot.anchorId
+    ? [...$('#recent-messages').querySelectorAll('.message-row')].find((row) => row.dataset.messageId === snapshot.anchorId)
+    : null;
+  if (anchor) {
+    const currentOffset = anchor.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+    scroller.scrollTop = Math.min(Math.max(0, snapshot.scrollTop + currentOffset - snapshot.anchorOffset), maxScrollTop);
+    return;
+  }
+  scroller.scrollTop = Math.min(snapshot.scrollTop, maxScrollTop);
+}
+
+function messageSignature(messages = []) {
+  return messages.map((message) => [message.id, message.role, message.text, message.timestamp, Boolean(message.pending)].join('\u001f')).join('\u001e');
+}
+
+function scrollConversationToLatest() {
+  const scroller = $('.detail-scroll');
+  if (!scroller) return;
+  scroller.scrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+  $('#new-message-indicator').hidden = true;
 }
 
 function renderDetail({ followLatest = false } = {}) {
@@ -255,14 +281,28 @@ function renderDetail({ followLatest = false } = {}) {
   $('#queue-card').hidden = queuedTasks.length === 0;
   $('#queue-count-label').textContent = t('queue.count', { count: queuedTasks.length });
   $('#queue-card').setAttribute('aria-label', t('queue.aria', { count: queuedTasks.length }));
-  $('#recent-messages').innerHTML = messages.length ? messages.map((message) => `
-    <div class="message-row ${message.role === 'user' ? 'is-user' : 'is-assistant'}">
-      <div class="message-bubble">
-        <p>${escapeHtml(message.text)}</p>
-        <time>${message.role === 'user' ? t('conversation.user') : 'Codex'} · ${relativeTime(message.timestamp)}</time>
-      </div>
-    </div>`).join('') : `<div class="list-empty">${escapeHtml(t('conversation.loading'))}</div>`;
-  restoreConversationScroll(scrollSnapshot);
+  const messageList = $('#recent-messages');
+  const signature = messageSignature(messages);
+  const sameTask = messageList.dataset.taskId === task.id;
+  if (!sameTask || messageList.dataset.signature !== signature) {
+    const previousLastMessageId = sameTask ? messageList.dataset.lastMessageId : '';
+    const lastMessageId = String(messages.at(-1)?.id || '');
+    messageList.innerHTML = messages.length ? messages.map((message) => `
+      <div class="message-row ${message.role === 'user' ? 'is-user' : 'is-assistant'}" data-message-id="${escapeHtml(message.id)}">
+        <div class="message-bubble">
+          <p>${escapeHtml(message.text)}</p>
+          <time>${message.role === 'user' ? t('conversation.user') : 'Codex'} · ${relativeTime(message.timestamp)}</time>
+        </div>
+      </div>`).join('') : `<div class="list-empty">${escapeHtml(t('conversation.loading'))}</div>`;
+    messageList.dataset.taskId = task.id;
+    messageList.dataset.signature = signature;
+    messageList.dataset.lastMessageId = lastMessageId;
+    const receivedNewMessage = previousLastMessageId && lastMessageId && previousLastMessageId !== lastMessageId;
+    $('#new-message-indicator').hidden = !receivedNewMessage || scrollSnapshot.followLatest;
+    restoreConversationScroll(scrollSnapshot);
+  } else if (followLatest) {
+    scrollConversationToLatest();
+  }
 }
 
 function switchLanguage() {
@@ -270,6 +310,7 @@ function switchLanguage() {
   setLanguage(next);
   localStorage.setItem('codex-local-hub-language-choice', next);
   applyTranslations();
+  delete $('#recent-messages').dataset.signature;
   $('#language-button').textContent = languageButtonLabel();
   renderList();
   renderDetail();
@@ -926,6 +967,11 @@ $('#usage-card').addEventListener('click', () => {
 $('#modal-close').addEventListener('click', closeContent);
 $('.modal-backdrop').addEventListener('click', closeContent);
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeContent(); });
+$('#new-message-indicator').addEventListener('click', scrollConversationToLatest);
+$('.detail-scroll').addEventListener('scroll', () => {
+  const scroller = $('.detail-scroll');
+  if (scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop <= 8) $('#new-message-indicator').hidden = true;
+}, { passive: true });
 
 async function startDashboard() {
   renderInstallTip();
@@ -974,6 +1020,8 @@ export {
   renderDetail,
   captureConversationScroll,
   restoreConversationScroll,
+  messageSignature,
+  scrollConversationToLatest,
   switchLanguage,
   languageButtonLabel,
   shouldShowInstallTip,

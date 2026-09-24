@@ -2,6 +2,12 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.23 - 2026-09-24
+
+- Stopped live task-status refreshes from rebuilding the conversation while someone is scrolling through older messages.
+- New messages now preserve the currently visible message as a stable visual anchor instead of restoring a stale numeric scroll position after the finger has moved.
+- Added a compact “New messages” control so readers can stay in history until they choose to return to the latest message, with complete mobile-scroll regression coverage.
+
 ## 0.2.22 - 2026-09-24
 
 - Removed the conflicting background wake-up loop that repeatedly showed “Startup is taking longer” even while Codex Desktop was already taking over the queued prompt.
