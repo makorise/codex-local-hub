@@ -113,7 +113,11 @@ export function createBridgeServer({
         if (result.started) await refresh();
       } catch (error) {
         retryAfter.set(task.id, now() + 5_000);
-        emit('queue-error', { threadId: task.id, error: error.message || '任务暂未启动，消息仍保留在队列中' });
+        emit('queue-error', {
+          threadId: task.id,
+          reason: error.code === 'DESKTOP_CONTROL_UNAVAILABLE' ? 'desktop-control-unavailable' : 'start-delayed',
+          error: error.message || '任务暂未启动，消息仍保留在队列中',
+        });
       } finally {
         dispatching.delete(task.id);
       }

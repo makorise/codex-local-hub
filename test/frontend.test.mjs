@@ -365,13 +365,13 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   document.querySelector('#message-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(textarea.value, '');
-  assert.match(document.querySelector('#composer-hint').textContent, /消息已保存/);
+  assert.match(document.querySelector('#composer-hint').textContent, /桌面通道可用后开始/);
   assert.ok(calls.some(([path, method]) => path === '/api/messages' && method === 'POST'));
   setMessageMode('queued');
   textarea.value = '稍后处理';
   document.querySelector('#message-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
   await new Promise((resolve) => setImmediate(resolve));
-  assert.match(document.querySelector('#composer-hint').textContent, /按顺序处理/);
+  assert.match(document.querySelector('#composer-hint').textContent, /桌面通道可用后开始/);
   failures.set(`/api/tasks/${task().id}`, 'detail refresh failed');
   textarea.value = '详情稍后刷新';
   document.querySelector('#message-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
@@ -404,6 +404,8 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   source.emit('sync-error', { error: '暂时断开' });
   source.emit('queue-error', { threadId: task().id, error: 'slow' });
   assert.match(document.querySelector('#toast').textContent, /安全保留/);
+  source.emit('queue-error', { threadId: task().id, reason: 'desktop-control-unavailable', error: 'desktop unavailable' });
+  assert.match(document.querySelector('#toast').textContent, /不会另开执行器/);
   source.emit('queue-error', { threadId: 'another-task', error: 'ignored' });
   source.onerror();
   assert.equal(document.querySelector('#connection-text').textContent, '正在重新连接');

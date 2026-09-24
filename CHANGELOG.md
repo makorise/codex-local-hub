@@ -2,6 +2,12 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.20 - 2026-09-24
+
+- Removed the unsafe idle-task fallback that launched `codex exec resume` as a second writer and could make Codex Desktop report “This is open in another app.”
+- Idle queued prompts now start only through the native Codex Desktop control channel; if that channel is unavailable, the prompt remains durable in the queue with an explicit waiting state and no competing executor is launched.
+- Rejects stale desktop pipe paths, refreshes the phone shell cache, and adds regression coverage proving that background dispatch never spawns the competing CLI path.
+
 ## 0.2.19 - 2026-09-23
 
 - Replaced the misleading seven-day locally observed percentage chart with an exact “Tokens today” summary read from Codex session logs on this Mac.

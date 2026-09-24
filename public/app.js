@@ -521,7 +521,7 @@ function connectEvents() {
   source.addEventListener('sync-error', (event) => showToast(localizedError(JSON.parse(event.data).error, 'error.sync')));
   source.addEventListener('queue-error', (event) => {
     const payload = JSON.parse(event.data);
-    if (payload.threadId === state.selectedId) showToast(t('composer.delayed'));
+    if (payload.threadId === state.selectedId) showToast(t(payload.reason === 'desktop-control-unavailable' ? 'composer.waitingDesktop' : 'composer.delayed'));
   });
   source.onerror = () => setConnection(false, t('connection.reconnecting'));
 }

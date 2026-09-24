@@ -8,6 +8,7 @@ import {
   appToolsError,
   controlProcessError,
   controlProtocolError,
+  desktopControlUnavailable,
   discoverAppToolsPipe,
 } from '../src/control.mjs';
 
@@ -110,6 +111,7 @@ test('Codex app tools channel discovers the desktop pipe and sends the prompt', 
   const client = new CodexAppToolsClient({
     codexBin: '/Applications/ChatGPT.app/Contents/Resources/codex',
     execFileSync: () => 'one CODEX_APP_TOOLS_PIPE_PATH=/tmp/old.sock two\nCODEX_APP_TOOLS_PIPE_PATH=/tmp/current.sock',
+    existsSync: (path) => path === '/tmp/current.sock',
     environment: { CODEX_SESSION_ID: 'session-caller' },
     spawn: (...args) => { spawned = args; return child; },
   });
@@ -140,7 +142,7 @@ test('Codex app tools channel discovers the desktop pipe and sends the prompt', 
   child.emit('error', new Error('late desktop error'));
 
   assert.equal(discoverAppToolsPipe({ configured: ' /tmp/configured.sock ', existsSync: () => true }), '/tmp/configured.sock');
-  assert.equal(discoverAppToolsPipe({ configured: '/tmp/stale.sock', existsSync: () => false, execFileSync: () => 'CODEX_APP_TOOLS_PIPE_PATH=/tmp/live.sock' }), '/tmp/live.sock');
+  assert.equal(discoverAppToolsPipe({ configured: '/tmp/stale.sock', existsSync: (path) => path === '/tmp/live.sock', execFileSync: () => 'CODEX_APP_TOOLS_PIPE_PATH=/tmp/dead.sock CODEX_APP_TOOLS_PIPE_PATH=/tmp/live.sock' }), '/tmp/live.sock');
   assert.equal(discoverAppToolsPipe({ configured: '', execFileSync: () => 'no pipe here' }), '');
   assert.equal(discoverAppToolsPipe({ configured: '', execFileSync: () => { throw new Error('ps failed'); } }), '');
   const savedPipe = process.env.CODEX_APP_TOOLS_PIPE_PATH;
@@ -182,6 +184,7 @@ test('Codex app tools channel discovers the desktop pipe and sends the prompt', 
   const fallbackClient = new CodexAppToolsClient({
     pipePath: '/tmp/direct.sock',
     environment: {},
+    existsSync: () => true,
     spawn: (_command, args) => {
       assert.equal(args[2], 'target-thread');
       return fallbackChild;
@@ -194,6 +197,7 @@ test('Codex app tools channel discovers the desktop pipe and sends the prompt', 
     pipePath: '/tmp/stale.sock',
     environment: {},
     execFileSync: () => 'CODEX_APP_TOOLS_PIPE_PATH=/tmp/live.sock',
+    existsSync: () => true,
     spawn: () => {
       retryCount += 1;
       if (retryCount === 1) {
@@ -276,7 +280,7 @@ test('Codex app tools channel preserves the queue on desktop failures', async ()
     },
   ];
   for (const scenario of scenarios) {
-    const client = new CodexAppToolsClient({ pipePath: '/tmp/codex.sock', spawn: scenario.make, timeoutMs: 100 });
+    const client = new CodexAppToolsClient({ pipePath: '/tmp/codex.sock', existsSync: () => true, spawn: scenario.make, timeoutMs: 100 });
     await assert.rejects(client.sendMessage('thread', 'text'), scenario.expected);
   }
 
@@ -285,6 +289,7 @@ test('Codex app tools channel preserves the queue on desktop failures', async ()
   const timeoutChild = childProcess();
   const timeout = new CodexAppToolsClient({
     pipePath: '/tmp/codex.sock',
+    existsSync: () => true,
     spawn: () => timeoutChild,
     setTimer: (callback) => { timeoutCallback = callback; return 11; },
     clearTimer: (id) => { assert.equal(id, 11); cleared = true; },
@@ -376,38 +381,35 @@ test('Codex control reports protocol, process and timeout failures', async () =>
   assert.equal(controlProtocolError('', 'fallback', 502).message, 'fallback');
 });
 
-test('Codex control resumes an idle task and keeps it running in the project directory', async () => {
-  let spawned;
-  const child = childProcess();
+test('Codex control resumes idle tasks only through the desktop owner', async () => {
+  const calls = [];
+  const appTools = {
+    sendMessage: async (...args) => {
+      calls.push(args);
+      return { accepted: true, mode: 'steered', via: 'codex-app' };
+    },
+  };
+  let spawned = false;
   const client = new CodexControlClient({
-    codexBin: '/codex',
-    spawn: (...args) => { spawned = args; return child; },
+    appTools,
+    spawn: () => { spawned = true; return childProcess(); },
   });
-  const pending = client.resume('thread-1', '继续执行', '/work');
-  child.stdout.write('not-json\n{"type":"thread.started"}\n{"type":"turn.started"}\n');
-  assert.deepEqual(await pending, { accepted: true, threadId: 'thread-1' });
-  assert.deepEqual(spawned, ['/codex', ['exec', 'resume', '--json', 'thread-1', '继续执行'], { stdio: ['ignore', 'pipe', 'pipe'], cwd: '/work' }]);
-  assert.equal(client.runs.has(child), true);
-  child.emit('error', new Error('late error'));
-  child.emit('exit', 0);
-  assert.equal(client.runs.size, 0);
-
-  const failedChild = childProcess();
-  const failed = new CodexControlClient({ spawn: () => failedChild });
-  const rejected = failed.resume('thread-2', '失败', '');
-  failedChild.stderr.write('resume failed');
-  failedChild.emit('exit', 2);
-  await assert.rejects(rejected, /resume failed/);
-
-  let timeoutCallback;
-  const timeoutChild = childProcess();
-  const timeout = new CodexControlClient({
-    spawn: () => timeoutChild,
-    setTimer: (callback) => { timeoutCallback = callback; return 9; },
-    clearTimer: (id) => assert.equal(id, 9),
+  assert.deepEqual(await client.resume('thread-1', '继续执行', '/work'), {
+    accepted: true,
+    mode: 'steered',
+    via: 'codex-app',
   });
-  const timedOut = timeout.resume('thread-3', '超时');
-  timeoutCallback();
-  await assert.rejects(timedOut, (error) => error.statusCode === 504);
-  assert.equal(timeoutChild.killed, true);
+  assert.deepEqual(calls, [['thread-1', '继续执行']]);
+  assert.equal(spawned, false);
+
+  const unavailable = new CodexControlClient({
+    spawn: () => { spawned = true; return childProcess(); },
+  });
+  await assert.rejects(unavailable.resume('thread-2', '不要抢占'), (error) => (
+    error.statusCode === 503
+    && error.code === 'DESKTOP_CONTROL_UNAVAILABLE'
+    && /不会启动另一个执行器/.test(error.message)
+  ));
+  assert.equal(spawned, false);
+  assert.equal(desktopControlUnavailable().code, 'DESKTOP_CONTROL_UNAVAILABLE');
 });

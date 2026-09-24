@@ -43,13 +43,13 @@ export class CodexAppToolsClient {
 
   sendMessageOnce(threadId, text) {
     return new Promise((resolve, reject) => {
-      const pipePath = this.pipePath || discoverAppToolsPipe({
-        configured: this.environment.CODEX_APP_TOOLS_PIPE_PATH || '',
+      const pipePath = discoverAppToolsPipe({
+        configured: this.pipePath || this.environment.CODEX_APP_TOOLS_PIPE_PATH || '',
         execFileSync: this.execFileSync,
         existsSync: this.existsSync,
       });
       if (!pipePath) {
-        reject(Object.assign(new Error('未找到 Codex 桌面端消息通道；请确认 Codex 正在运行，排队消息仍保留'), { statusCode: 503 }));
+        reject(desktopControlUnavailable());
         return;
       }
       this.pipePath = pipePath;
@@ -115,7 +115,7 @@ export class CodexAppToolsClient {
         params: {
           protocolVersion: '2025-11-25',
           capabilities: {},
-          clientInfo: { name: 'codex-local-hub', version: '0.2.19' },
+          clientInfo: { name: 'codex-local-hub', version: '0.2.20' },
         },
       });
     });
@@ -131,10 +131,18 @@ export function discoverAppToolsPipe({
   if (configuredPath && existsSync(configuredPath)) return configuredPath;
   try {
     const processes = String(execFileSync('/bin/ps', ['eww', '-ax'], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }));
-    return [...processes.matchAll(/CODEX_APP_TOOLS_PIPE_PATH=([^\s]+)/g)].at(-1)?.[1] || '';
+    const candidates = [...processes.matchAll(/CODEX_APP_TOOLS_PIPE_PATH=([^\s]+)/g)].map((match) => match[1]);
+    return candidates.reverse().find((path) => existsSync(path)) || '';
   } catch {
     return '';
   }
+}
+
+export function desktopControlUnavailable() {
+  return Object.assign(new Error('Codex 桌面端原生控制通道暂不可用；消息仍在队列中，不会启动另一个执行器'), {
+    statusCode: 503,
+    code: 'DESKTOP_CONTROL_UNAVAILABLE',
+  });
 }
 
 export function appToolsError(detail, fallback = 'Codex 桌面端消息发送失败') {
@@ -151,7 +159,6 @@ export class CodexControlClient {
     this.timeoutMs = timeoutMs;
     this.setTimer = setTimer;
     this.clearTimer = clearTimer;
-    this.runs = new Set();
   }
 
   steer(threadId, expectedTurnId, text) {
@@ -163,45 +170,9 @@ export class CodexControlClient {
     });
   }
 
-  resume(threadId, text, cwd) {
-    return new Promise((resolve, reject) => {
-      const args = ['exec', 'resume', '--json', threadId, text];
-      const options = { stdio: ['ignore', 'pipe', 'pipe'] };
-      if (cwd) options.cwd = cwd;
-      const child = this.spawn(this.codexBin, args, options);
-      this.runs.add(child);
-      let buffer = '';
-      let stderr = '';
-      let settled = false;
-      const finish = (error, result) => {
-        if (settled) return;
-        settled = true;
-        this.clearTimer(timer);
-        if (error) {
-          child.kill?.();
-          reject(error);
-        } else {
-          resolve(result);
-        }
-      };
-      const timer = this.setTimer(() => finish(Object.assign(new Error('Codex 任务启动超时；消息仍保留在队列中'), { statusCode: 504 })), this.timeoutMs);
-      child.stdout.on('data', (chunk) => {
-        buffer += chunk.toString();
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          let event;
-          try { event = JSON.parse(line); } catch { continue; }
-          if (event.type === 'turn.started') finish(null, { accepted: true, threadId });
-        }
-      });
-      child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
-      child.on('error', (error) => finish(controlProcessError(error.message, null)));
-      child.on('exit', (code) => {
-        this.runs.delete(child);
-        if (!settled) finish(controlProcessError(stderr, code));
-      });
-    });
+  resume(threadId, text) {
+    if (!this.appTools) return Promise.reject(desktopControlUnavailable());
+    return this.appTools.sendMessage(threadId, text);
   }
 
   async start(threadId, text) {
@@ -294,7 +265,7 @@ export class CodexControlClient {
         id: 1,
         method: 'initialize',
         params: {
-          clientInfo: { name: 'codex-pocket-dashboard', title: 'Codex Lookout', version: '0.2.19' },
+          clientInfo: { name: 'codex-pocket-dashboard', title: 'Codex Lookout', version: '0.2.20' },
           capabilities: { experimentalApi: true },
         },
       });

@@ -260,8 +260,14 @@ test('queued prompts dispatch in the background with deduplication and retry bac
   await eventReader.read();
   const queueErrorFrame = eventReader.read();
   await deferred.shift()();
-  assert.match(new TextDecoder().decode((await queueErrorFrame).value), /event: queue-error/);
+  assert.match(new TextDecoder().decode((await queueErrorFrame).value), /"reason":"start-delayed"/);
   assert.equal(bridge.scheduleQueuedStart(queued), false);
+  clock += 5_001;
+  outcome = Object.assign(new Error('desktop unavailable'), { code: 'DESKTOP_CONTROL_UNAVAILABLE' });
+  const desktopErrorFrame = eventReader.read();
+  assert.equal(bridge.scheduleQueuedStart(queued), true);
+  await deferred.shift()();
+  assert.match(new TextDecoder().decode((await desktopErrorFrame).value), /"reason":"desktop-control-unavailable"/);
   clock += 5_001;
   outcome = Object.assign(new Error(''), { message: '' });
   assert.equal(bridge.scheduleQueuedStart(queued), true);
