@@ -11,7 +11,9 @@ test('task pane has bounded desktop and touch scrolling styles', () => {
   assert.match(styles, /html \{[^}]*touch-action: pan-x pan-y;/);
   assert.match(styles, /\.task-pane \{[^}]*overflow-y: auto;[^}]*overscroll-behavior-y: contain;[^}]*-webkit-overflow-scrolling: touch;/);
   assert.match(styles, /@media \(max-width: 760px\)[\s\S]*\.task-pane \{[^}]*height: 100%;[^}]*overflow-y: auto;[^}]*touch-action: pan-y;/);
-  assert.match(styles, /@media \(max-width: 760px\)[\s\S]*\.detail-scroll \{[^}]*overflow-y: scroll;[^}]*touch-action: pan-y;/);
+  assert.match(styles, /\.task-detail \{[^}]*overflow: hidden;[^}]*overscroll-behavior: none;/);
+  assert.match(styles, /@media \(max-width: 760px\)[\s\S]*\.detail-scroll \{[^}]*overflow-y: auto;[^}]*overscroll-behavior: contain;[^}]*touch-action: pan-y;/);
+  assert.match(styles, /\.composer-dock \{[^}]*overscroll-behavior: none;/);
   assert.match(styles, /\.account-badge span \{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/);
   assert.match(styles, /@media \(max-width: 760px\)[\s\S]*\.account-badge \{[^}]*max-width: 92px;/);
   assert.match(styles, /\.summary-row \{[^}]*min-height: 44px;[^}]*margin-bottom: 8px;/);

@@ -198,10 +198,31 @@ function selectTask(id) {
   renderDetail();
   detailPane.classList.add('is-open');
   history.replaceState(null, '', `#${id}`);
-  loadDetail(id).catch((error) => showToast(error.message));
+  loadDetail(id, { followLatest: true }).catch((error) => showToast(error.message));
 }
 
-function renderDetail() {
+function captureConversationScroll(followLatest = false) {
+  const scroller = $('.detail-scroll');
+  if (!scroller) return null;
+  const maxScrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+  return {
+    followLatest: followLatest || maxScrollTop - scroller.scrollTop <= 8,
+    scrollTop: Math.max(0, scroller.scrollTop),
+  };
+}
+
+function restoreConversationScroll(snapshot) {
+  if (!snapshot) return;
+  requestAnimationFrame(() => {
+    const scroller = $('.detail-scroll');
+    if (!scroller) return;
+    const maxScrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+    scroller.scrollTop = snapshot.followLatest ? maxScrollTop : Math.min(snapshot.scrollTop, maxScrollTop);
+  });
+}
+
+function renderDetail({ followLatest = false } = {}) {
+  const scrollSnapshot = captureConversationScroll(followLatest);
   const task = state.tasks.find((item) => item.id === state.selectedId);
   if (!task) {
     detailPane.classList.add('is-empty');
@@ -241,6 +262,7 @@ function renderDetail() {
         <time>${message.role === 'user' ? t('conversation.user') : 'Codex'} · ${relativeTime(message.timestamp)}</time>
       </div>
     </div>`).join('') : `<div class="list-empty">${escapeHtml(t('conversation.loading'))}</div>`;
+  restoreConversationScroll(scrollSnapshot);
 }
 
 function switchLanguage() {
@@ -309,17 +331,13 @@ function taskViewChanged(previous, current) {
     || previous.goal?.status?.state !== current.goal?.status?.state;
 }
 
-async function loadDetail(id) {
+async function loadDetail(id, { followLatest = false } = {}) {
   const response = await fetch(api(`/api/tasks/${id}`));
   const payload = await response.json();
   if (!response.ok) throw new Error(localizedError(payload.error, 'error.readTask'));
   state.details.set(id, payload.task);
   if (state.selectedId === id) {
-    renderDetail();
-    requestAnimationFrame(() => {
-      const scroller = $('.detail-scroll');
-      scroller.scrollTop = scroller.scrollHeight;
-    });
+    renderDetail({ followLatest });
   }
 }
 
@@ -747,7 +765,7 @@ function closeContent() {
 
 function resizeComposer() {
   const scroller = $('.detail-scroll');
-  const keepAtBottom = scroller && scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop < 32;
+  const keepAtBottom = scroller && scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop <= 8;
   input.style.height = 'auto';
   input.style.height = `${Math.min(input.scrollHeight, 96)}px`;
   if (keepAtBottom) requestAnimationFrame(() => { scroller.scrollTop = scroller.scrollHeight; });
@@ -768,7 +786,7 @@ $('#message-form').addEventListener('submit', async (event) => {
     await sendTaskMessage(message, threadId);
     showToast(t('composer.queuedToast'));
     $('#composer-hint').textContent = t('composer.queuedHint');
-    await loadDetail(threadId).catch(() => undefined);
+    await loadDetail(threadId, { followLatest: true }).catch(() => undefined);
   } catch (error) {
     removeOptimisticQueueItem(threadId, optimisticId);
     if (!input.value.trim() && state.selectedId === threadId) {
@@ -958,6 +976,8 @@ export {
   renderList,
   selectTask,
   renderDetail,
+  captureConversationScroll,
+  restoreConversationScroll,
   switchLanguage,
   languageButtonLabel,
   shouldShowInstallTip,

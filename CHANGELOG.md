@@ -2,6 +2,12 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.21 - 2026-09-24
+
+- Fixed live task refreshes pulling the conversation back to the newest message while the user was scrolling through older history.
+- The conversation now follows the latest message only on first open or while already at the bottom; otherwise it preserves the reader's exact scroll position across message and status updates.
+- Isolated mobile conversation overscroll from the fixed composer dock and added complete regression coverage for manual-history and follow-latest behavior.
+
 ## 0.2.20 - 2026-09-24
 
 - Removed the unsafe idle-task fallback that launched `codex exec resume` as a second writer and could make Codex Desktop report “This is open in another app.”

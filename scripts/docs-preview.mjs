@@ -217,8 +217,8 @@ async function serveStatic(pathname, response, language) {
     if (requested === 'index.html') {
       const selected = language === 'zh-CN' ? 'zh-CN' : 'en';
       body = Buffer.from(String(body).replace(
-        '<script type="module" src="/app.js?v=31"></script>',
-        `<script>localStorage.setItem('codex-local-hub-language-choice', '${selected}');localStorage.setItem('codex-local-hub-install-dismissed', '1');</script>\n    <script type="module" src="/app.js?v=31"></script>`,
+        '<script type="module" src="/app.js?v=32"></script>',
+        `<script>localStorage.setItem('codex-local-hub-language-choice', '${selected}');localStorage.setItem('codex-local-hub-install-dismissed', '1');</script>\n    <script type="module" src="/app.js?v=32"></script>`,
       ));
     }
     response.writeHead(200, { 'content-type': mimeTypes[extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });

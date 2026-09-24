@@ -296,6 +296,28 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.equal(document.querySelector('#recent-messages').textContent.includes('结果'), true);
   document.querySelector('.task-card').click();
   await new Promise((resolve) => setImmediate(resolve));
+  const detailScroller = document.querySelector('.detail-scroll');
+  Object.defineProperties(detailScroller, {
+    scrollHeight: { configurable: true, value: 1_000 },
+    clientHeight: { configurable: true, value: 300 },
+    scrollTop: { configurable: true, writable: true, value: 240 },
+  });
+  await ui.loadDetail(task().id);
+  assert.equal(detailScroller.scrollTop, 240);
+  detailScroller.scrollTop = 696;
+  assert.equal(ui.captureConversationScroll().followLatest, true);
+  detailScroller.scrollTop = 240;
+  await ui.loadDetail(task().id, { followLatest: true });
+  assert.equal(detailScroller.scrollTop, 700);
+  ui.restoreConversationScroll(null);
+  detailScroller.scrollTop = -4;
+  assert.equal(ui.captureConversationScroll().scrollTop, 0);
+  const detailScrollerParent = detailScroller.parentNode;
+  const detailScrollerNext = detailScroller.nextSibling;
+  detailScroller.remove();
+  assert.equal(ui.captureConversationScroll(), null);
+  ui.restoreConversationScroll({ followLatest: true, scrollTop: 0 });
+  detailScrollerParent.insertBefore(detailScroller, detailScrollerNext);
   assert.equal(ui.escapeHtml('<a>\'"&'), '&lt;a&gt;&#39;&quot;&amp;');
   assert.equal(ui.escapeHtml(null), '');
   assert.equal(ui.api('/api/tasks').pathname, '/api/tasks');
