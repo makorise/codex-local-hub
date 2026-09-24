@@ -225,7 +225,7 @@ test('queue mutations reorder and delete atomically with revision conflict prote
   await assert.rejects(repository.deleteQueuedTask('1234567890abcdef1234', 'dddddddddddddddddddd', afterDelete[0].queueRevision), (error) => error.statusCode === 409);
 });
 
-test('queued task steering targets the active turn and removes only the steered item', async (t) => {
+test('queued task steering safely moves work to the front for Codex Desktop', async (t) => {
   const directory = await mkdtemp(join(tmpdir(), 'bridge-steer-'));
   const queueDb = join(directory, 'queue.sqlite');
   const historyDb = join(directory, 'history.sqlite');
@@ -236,60 +236,20 @@ test('queued task steering targets the active turn and removes only the steered 
     CREATE TABLE queued_thread_revisions (revision INTEGER PRIMARY KEY AUTOINCREMENT, thread_id TEXT NOT NULL UNIQUE);
     CREATE TRIGGER queued_items_revision_after_insert AFTER INSERT ON queued_items BEGIN INSERT INTO queued_thread_revisions (thread_id) VALUES (NEW.thread_id) ON CONFLICT(thread_id) DO UPDATE SET revision = (SELECT COALESCE(MAX(revision), 0) + 1 FROM queued_thread_revisions); END;
     CREATE TRIGGER queued_items_revision_after_delete AFTER DELETE ON queued_items BEGIN INSERT INTO queued_thread_revisions (thread_id) VALUES (OLD.thread_id) ON CONFLICT(thread_id) DO UPDATE SET revision = (SELECT COALESCE(MAX(revision), 0) + 1 FROM queued_thread_revisions); END;
+    CREATE TRIGGER queued_items_revision_after_update AFTER UPDATE ON queued_items BEGIN INSERT INTO queued_thread_revisions (thread_id) VALUES (NEW.thread_id) ON CONFLICT(thread_id) DO UPDATE SET revision = (SELECT COALESCE(MAX(revision), 0) + 1 FROM queued_thread_revisions); END;
     INSERT INTO queued_items VALUES
       ('aaaaaaaaaaaaaaaaaaaa', '${threadId}', '{"UserInput":{"content":[{"type":"text","text":"steer me"}]}}', 1, 1, 1),
       ('bbbbbbbbbbbbbbbbbbbb', '${threadId}', '{"UserInput":{"content":[{"type":"text","text":"keep me"}]}}', 2, 2, 2);
   `]);
-  await execFile('sqlite3', [historyDb, 'CREATE TABLE thread_turns (thread_id TEXT, turn_id TEXT, status TEXT, rollout_ordinal INTEGER);']);
-  const calls = [];
-  const starts = [];
-  const repository = new CodexRepository({
-    stateDb: '/state', queueDb, historyDb, goalsDb: '/goals',
-    steerMessage: async (...args) => { calls.push(args); return { accepted: true }; },
-    startTurn: async (...args) => { starts.push(args); return { started: true }; },
-  });
-  repository.details.set(threadId, { cwd: '/work' });
+  const repository = new CodexRepository({ stateDb: '/state', queueDb, historyDb, goalsDb: '/goals' });
   const initial = await repository.loadQueuedTasks(threadId);
   await assert.rejects(repository.steerQueuedTask(threadId, initial[0].id, initial[0].queueRevision + 1), (error) => error.statusCode === 409);
-  const started = await repository.steerQueuedTask(threadId, initial[0].id, initial[0].queueRevision);
-  assert.deepEqual(starts, [[threadId, 'steer me', '/work']]);
-  assert.deepEqual(started.result, { started: true });
-  assert.deepEqual(started.queuedTasks.map((item) => item.text), ['keep me']);
-  await execFile('sqlite3', [historyDb, `INSERT INTO thread_turns VALUES ('${threadId}', 'turn-old', 'completed', 1), ('${threadId}', 'turn-active', 'inProgress', 2);`]);
-  const remaining = await repository.loadQueuedTasks(threadId);
-  const steered = await repository.steerQueuedTask(threadId, remaining[0].id, remaining[0].queueRevision);
-  assert.deepEqual(calls, [[threadId, 'turn-active', 'keep me']]);
-  assert.deepEqual(steered.result, { accepted: true });
-  assert.deepEqual(steered.queuedTasks, []);
-
-  await execFile('sqlite3', [queueDb, `INSERT INTO queued_items VALUES ('eeeeeeeeeeeeeeeeeeee', '${threadId}', '{"UserInput":{"content":[{"type":"text","text":"recover closed turn"}]}}', 1, 3, 3);`]);
-  repository.steerMessage = async () => { throw new Error('interaction is closed'); };
-  const closedItem = (await repository.loadQueuedTasks(threadId))[0];
-  const recovered = await repository.steerQueuedTask(threadId, closedItem.id, closedItem.queueRevision);
-  assert.equal(recovered.result.started, true);
-  assert.deepEqual(starts.at(-1), [threadId, 'recover closed turn', '/work']);
-  assert.deepEqual(recovered.queuedTasks, []);
-
-  assert.deepEqual(await repository.startQueuedTaskIfIdle(threadId), { started: false, reason: 'active' });
-  await execFile('sqlite3', [historyDb, `UPDATE thread_turns SET status = 'completed';`]);
-  assert.deepEqual(await repository.startQueuedTaskIfIdle(threadId), { started: false, reason: 'empty' });
-  await execFile('sqlite3', [queueDb, `INSERT INTO queued_items VALUES ('dddddddddddddddddddd', '${threadId}', '{"UserInput":{"content":[{"type":"text","text":"start safely"}]}}', 1, 3, 3);`]);
-  const automatic = await repository.startQueuedTaskIfIdle(threadId);
-  assert.equal(automatic.started, true);
-  assert.equal(automatic.itemId, 'dddddddddddddddddddd');
-  assert.deepEqual(starts.at(-1), [threadId, 'start safely', '/work']);
-  assert.deepEqual(await repository.loadQueuedTasks(threadId), []);
-
-  await execFile('sqlite3', [queueDb, `INSERT INTO queued_items VALUES ('cccccccccccccccccccc', '${threadId}', '{"UserInput":{"content":[{"type":"text","text":"preserve me"}]}}', 1, 3, 3);`]);
-  const unsupported = new CodexRepository({ stateDb: '/state', queueDb, historyDb, goalsDb: '/goals' });
-  unsupported.details.set(threadId, { cwd: '/work' });
-  const preserved = await unsupported.loadQueuedTasks(threadId);
-  await assert.rejects(unsupported.steerQueuedTask(threadId, preserved[0].id, preserved[0].queueRevision), (error) => error.statusCode === 503);
-  assert.deepEqual((await unsupported.loadQueuedTasks(threadId)).map((item) => item.text), ['preserve me']);
-  await assert.rejects(unsupported.startQueuedTaskIfIdle(threadId), (error) => error.statusCode === 503);
-  assert.deepEqual((await unsupported.loadQueuedTasks(threadId)).map((item) => item.text), ['preserve me']);
-  await execFile('sqlite3', [historyDb, `INSERT INTO thread_turns VALUES ('${threadId}', 'turn-new', 'inProgress', 3);`]);
-  await assert.rejects(unsupported.steerQueuedTask(threadId, preserved[0].id, preserved[0].queueRevision), (error) => error.statusCode === 503);
+  const alreadyFirst = await repository.steerQueuedTask(threadId, initial[0].id, initial[0].queueRevision);
+  assert.deepEqual(alreadyFirst.result, { accepted: true, mode: 'already-first' });
+  assert.deepEqual(alreadyFirst.queuedTasks.map((item) => item.text), ['steer me', 'keep me']);
+  const prioritized = await repository.steerQueuedTask(threadId, initial[1].id, initial[0].queueRevision);
+  assert.deepEqual(prioritized.result, { accepted: true, mode: 'prioritized' });
+  assert.deepEqual(prioritized.queuedTasks.map((item) => item.text), ['keep me', 'steer me']);
 });
 
 test('thread working directory uses cached, stored and process fallbacks', async () => {

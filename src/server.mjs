@@ -87,44 +87,12 @@ export function createBridgeServer({
   createServer = nodeCreateServer,
   pollMs = 1500,
   runtimeInfo = { version: 'unknown', source: 'bundled' },
-  now = Date.now,
   defer = setImmediate,
 }) {
   const clients = new Set();
   let cachedTasks = [];
   let cachedSignature = '';
   let timer = null;
-  const dispatching = new Set();
-  const retryAfter = new Map();
-
-  function emit(name, payload) {
-    const frame = `event: ${name}\ndata: ${safeJson(payload)}\n\n`;
-    for (const client of clients) client.write(frame);
-  }
-
-  function scheduleQueuedStart(task) {
-    if (!repository.startQueuedTaskIfIdle || !task?.id || !task.queuedCount || task.progress?.state === 'running') return false;
-    if (dispatching.has(task.id) || (retryAfter.get(task.id) || 0) > now()) return false;
-    dispatching.add(task.id);
-    defer(async () => {
-      try {
-        const result = await repository.startQueuedTaskIfIdle(task.id);
-        retryAfter.delete(task.id);
-        if (result.started) await refresh();
-      } catch (error) {
-        retryAfter.set(task.id, now() + 5_000);
-        emit('queue-error', {
-          threadId: task.id,
-          reason: error.code === 'DESKTOP_CONTROL_UNAVAILABLE' ? 'desktop-control-unavailable' : 'start-delayed',
-          error: error.message || '任务暂未启动，消息仍保留在队列中',
-        });
-      } finally {
-        dispatching.delete(task.id);
-      }
-    });
-    return true;
-  }
-
   async function refresh() {
     try {
       cachedTasks = await repository.listTasks();
@@ -134,7 +102,6 @@ export function createBridgeServer({
         const frame = `event: tasks\ndata: ${safeJson({ tasks: cachedTasks, syncedAt: Date.now() })}\n\n`;
         for (const client of clients) client.write(frame);
       }
-      for (const task of cachedTasks) scheduleQueuedStart(task);
       return cachedTasks;
     } catch (error) {
       const frame = `event: sync-error\ndata: ${safeJson({ error: error.message })}\n\n`;
@@ -285,8 +252,6 @@ export function createBridgeServer({
     if (timer) clearInterval(timer);
     for (const client of clients) client.end();
     clients.clear();
-    dispatching.clear();
-    retryAfter.clear();
   });
-  return { server, refresh, getCachedTasks: () => cachedTasks, scheduleQueuedStart };
+  return { server, refresh, getCachedTasks: () => cachedTasks };
 }

@@ -111,8 +111,8 @@ async function setup({ failing = new Map(), empty = false, taskCount = 1 } = {})
     }
     if (url.pathname.endsWith('/steer') && options.method === 'POST') {
       const itemId = url.pathname.split('/').at(-2);
-      queued = queued.filter((item) => item.id !== itemId).map((item) => ({ ...item, queueRevision: 11 }));
-      return response({ result: { accepted: true }, queuedTasks: queued });
+      queued = [queued.find((item) => item.id === itemId), ...queued.filter((item) => item.id !== itemId)].filter(Boolean).map((item, index) => ({ ...item, queueOrder: index + 1, queueRevision: 11 }));
+      return response({ result: { accepted: true, mode: 'prioritized' }, queuedTasks: queued });
     }
     if (url.pathname.startsWith(`/api/tasks/${task().id}/queue/`) && options.method === 'DELETE') {
       queued = queued.filter((item) => !url.pathname.endsWith(item.id)).map((item) => ({ ...item, queueRevision: 10 }));
@@ -345,9 +345,9 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   document.querySelector('#queue-card').click();
   assert.equal(document.querySelectorAll('.queue-manager-list li').length, 3);
   const steerFailurePath = `/api/tasks/${task().id}/queue/${queue()[0].id}/steer`;
-  failures.set(steerFailurePath, '当前任务由 ChatGPT 桌面端执行，尚未开放 steer 控制通道；消息仍保留在队列中');
+  failures.set(steerFailurePath, '优先级调整失败；消息仍保留在队列中');
   document.querySelector('[data-action="steer"]').click();
-  assert.match(document.querySelector('.queue-notice').textContent, /正在插入当前执行回合/);
+  assert.match(document.querySelector('.queue-notice').textContent, /正在提升优先级/);
   assert.equal(document.querySelector('#modal-content').classList.contains('is-busy'), true);
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(document.querySelectorAll('.queue-manager-list li').length, 3);
@@ -366,7 +366,7 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   await ui.deleteQueueItem(document.querySelector('[data-queue-id]').dataset.queueId);
   assert.equal(document.querySelectorAll('.queue-manager-list li').length, 2);
   await ui.steerQueueItem(document.querySelector('[data-queue-id]').dataset.queueId);
-  assert.equal(document.querySelectorAll('.queue-manager-list li').length, 1);
+  assert.equal(document.querySelectorAll('.queue-manager-list li').length, 2);
 
   document.querySelector('#modal-close').click();
   assert.equal(document.querySelector('#content-modal').hidden, true);
@@ -387,13 +387,13 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   document.querySelector('#message-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(textarea.value, '');
-  assert.match(document.querySelector('#composer-hint').textContent, /桌面通道可用后开始/);
+  assert.match(document.querySelector('#composer-hint').textContent, /桌面端自动接管/);
   assert.ok(calls.some(([path, method]) => path === '/api/messages' && method === 'POST'));
   setMessageMode('queued');
   textarea.value = '稍后处理';
   document.querySelector('#message-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
   await new Promise((resolve) => setImmediate(resolve));
-  assert.match(document.querySelector('#composer-hint').textContent, /桌面通道可用后开始/);
+  assert.match(document.querySelector('#composer-hint').textContent, /桌面端自动接管/);
   failures.set(`/api/tasks/${task().id}`, 'detail refresh failed');
   textarea.value = '详情稍后刷新';
   document.querySelector('#message-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
@@ -424,11 +424,6 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   const source = FakeEventSource.instances.at(-1);
   source.emit('tasks', { tasks: [task({ title: '更新后的任务', updatedAt: Date.now() + 1 })], syncedAt: Date.now() });
   source.emit('sync-error', { error: '暂时断开' });
-  source.emit('queue-error', { threadId: task().id, error: 'slow' });
-  assert.match(document.querySelector('#toast').textContent, /安全保留/);
-  source.emit('queue-error', { threadId: task().id, reason: 'desktop-control-unavailable', error: 'desktop unavailable' });
-  assert.match(document.querySelector('#toast').textContent, /不会另开执行器/);
-  source.emit('queue-error', { threadId: 'another-task', error: 'ignored' });
   source.onerror();
   assert.equal(document.querySelector('#connection-text').textContent, '正在重新连接');
   ui.connectEvents();
@@ -563,7 +558,7 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   failures.set(`/api/tasks/${task().id}/queue/${queue()[0].id}/steer`, 'steer failed');
   await assert.rejects(ui.steerQueueItem(queue()[0].id), /steer failed/);
   failures.set(`/api/tasks/${task().id}/queue/${queue()[0].id}/steer`, '');
-  await assert.rejects(ui.steerQueueItem(queue()[0].id), /立即执行失败/);
+  await assert.rejects(ui.steerQueueItem(queue()[0].id), /调整优先级失败/);
   failures.delete(`/api/tasks/${task().id}/queue/${queue()[0].id}/steer`);
   ui.state.details.delete(task().id);
   failures.set(`/api/tasks/${task().id}/queue/${queue()[0].id}/steer`, 'no detail');

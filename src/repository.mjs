@@ -53,8 +53,6 @@ export class CodexRepository {
     codexBin = 'codex',
     execFile = defaultExec,
     now = () => Date.now(),
-    steerMessage = async () => { throw Object.assign(new Error('当前 Codex 不支持立即执行'), { statusCode: 503 }); },
-    startTurn = async () => { throw Object.assign(new Error('当前 Codex 不支持启动任务'), { statusCode: 503 }); },
     archiveTask = async () => { throw Object.assign(new Error('当前 Codex 不支持归档任务'), { statusCode: 503 }); },
     interruptTurn = async () => { throw Object.assign(new Error('当前 Codex 不支持停止任务'), { statusCode: 503 }); },
     deleteProject = async () => { throw Object.assign(new Error('当前 Codex 不支持删除项目'), { statusCode: 503 }); },
@@ -66,8 +64,6 @@ export class CodexRepository {
     this.codexBin = codexBin;
     this.execFile = execFile;
     this.now = now;
-    this.steerMessage = steerMessage;
-    this.startTurn = startTurn;
     this.archiveTask = archiveTask;
     this.interruptTurn = interruptTurn;
     this.deleteProject = deleteProject;
@@ -178,21 +174,12 @@ SELECT valid FROM mutation_guard;`;
     const queuedTasks = await this.loadQueuedTasks(threadId);
     const item = queuedTasks.find((message) => message.id === itemId);
     if (!item || item.queueRevision !== revision) throw Object.assign(new Error('任务队列已变化，请刷新后重试'), { statusCode: 409 });
-    const activeTurn = await this.activeTurnId(threadId);
-    let result;
-    if (activeTurn) {
-      try {
-        result = await this.steerMessage(threadId, activeTurn, item.text);
-      } catch (error) {
-        if (!isClosedTurnError(error)) throw error;
-        result = await this.startTurn(threadId, item.text, await this.threadCwd(threadId));
-      }
-    } else {
-      result = await this.startTurn(threadId, item.text, await this.threadCwd(threadId));
+    if (queuedTasks[0].id === itemId) {
+      return { result: { accepted: true, mode: 'already-first' }, queuedTasks };
     }
-    const deleteSql = `DELETE FROM queued_items WHERE thread_id = '${escapeSqlite(threadId)}' AND id = '${escapeSqlite(itemId)}';`;
-    await this.execFile('sqlite3', [this.queueDb, deleteSql], { maxBuffer: 1024 * 1024 });
-    return { result, queuedTasks: await this.loadQueuedTasks(threadId) };
+    const itemIds = [itemId, ...queuedTasks.filter((message) => message.id !== itemId).map((message) => message.id)];
+    const reordered = await this.reorderQueuedTasks(threadId, itemIds, revision);
+    return { result: { accepted: true, mode: 'prioritized' }, queuedTasks: reordered };
   }
 
   async sendMessage(threadId, message) {
@@ -200,17 +187,6 @@ SELECT valid FROM mutation_guard;`;
     // task to create its next Codex turn. A background dispatcher starts idle
     // threads only after this durable queue write succeeds.
     return this.queueMessage(threadId, message);
-  }
-
-  async startQueuedTaskIfIdle(threadId) {
-    if (await this.activeTurnId(threadId)) return { started: false, reason: 'active' };
-    const queuedTasks = await this.loadQueuedTasks(threadId);
-    const item = queuedTasks[0];
-    if (!item) return { started: false, reason: 'empty' };
-    const result = await this.startTurn(threadId, item.text, await this.threadCwd(threadId));
-    const sql = `DELETE FROM queued_items WHERE thread_id = '${escapeSqlite(threadId)}' AND id = '${escapeSqlite(item.id)}';`;
-    await this.execFile('sqlite3', [this.queueDb, sql], { maxBuffer: 1024 * 1024 });
-    return { started: true, itemId: item.id, result };
   }
 
   async stopTask(threadId) {

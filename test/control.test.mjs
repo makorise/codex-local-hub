@@ -8,6 +8,7 @@ import {
   appToolsError,
   controlProcessError,
   controlProtocolError,
+  deliveryStatusUnknown,
   desktopControlUnavailable,
   discoverAppToolsPipe,
 } from '../src/control.mjs';
@@ -151,6 +152,7 @@ test('Codex app tools channel discovers the desktop pipe and sends the prompt', 
   if (savedPipe === undefined) delete process.env.CODEX_APP_TOOLS_PIPE_PATH;
   else process.env.CODEX_APP_TOOLS_PIPE_PATH = savedPipe;
   assert.equal(appToolsError('', 'fallback').message, 'fallback');
+  assert.equal(deliveryStatusUnknown().code, 'DELIVERY_STATUS_UNKNOWN');
 
   const environmentChild = childProcess((line, process) => {
     const message = JSON.parse(line);
@@ -299,6 +301,24 @@ test('Codex app tools channel preserves the queue on desktop failures', async ()
   await assert.rejects(pending, (error) => error.statusCode === 504);
   assert.equal(cleared, true);
   assert.equal(timeoutChild.killed, true);
+
+  let uncertainTimeoutCallback;
+  let uncertainSpawns = 0;
+  const uncertainChild = childProcess((line, child) => {
+    if (JSON.parse(line).id === 1) child.stdout.write('{"id":1,"result":{}}\n');
+  });
+  const uncertain = new CodexAppToolsClient({
+    pipePath: '/tmp/codex.sock',
+    existsSync: () => true,
+    spawn: () => { uncertainSpawns += 1; return uncertainChild; },
+    setTimer: (callback) => { uncertainTimeoutCallback = callback; return 12; },
+    clearTimer: () => undefined,
+  });
+  const uncertainPending = uncertain.sendMessage('thread', 'text');
+  await new Promise((resolve) => setImmediate(resolve));
+  uncertainTimeoutCallback();
+  await assert.rejects(uncertainPending, (error) => error.code === 'DELIVERY_STATUS_UNKNOWN');
+  assert.equal(uncertainSpawns, 1);
 });
 
 test('Codex control reports protocol, process and timeout failures', async () => {

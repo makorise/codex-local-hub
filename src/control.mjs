@@ -14,7 +14,7 @@ export class CodexAppToolsClient {
     execFileSync = nodeExecFileSync,
     existsSync = nodeExistsSync,
     environment = process.env,
-    timeoutMs = 15_000,
+    timeoutMs = 60_000,
     setTimer = setTimeout,
     clearTimer = clearTimeout,
   } = {}) {
@@ -35,6 +35,7 @@ export class CodexAppToolsClient {
     try {
       return await this.sendMessageOnce(threadId, text);
     } catch (error) {
+      if (error.code === 'DELIVERY_STATUS_UNKNOWN') throw error;
       if (!/pipe closed|ENOENT|ECONNREFUSED|socket hang up/i.test(error.message)) throw error;
       this.pipePath = '';
       return this.sendMessageOnce(threadId, text);
@@ -62,7 +63,11 @@ export class CodexAppToolsClient {
       let buffer = '';
       let stderr = '';
       let settled = false;
+      let deliveryRequested = false;
       const send = (message) => child.stdin.write(`${JSON.stringify(message)}\n`);
+      const transportError = (detail, fallback) => deliveryRequested
+        ? deliveryStatusUnknown(detail)
+        : appToolsError(detail, fallback);
       const finish = (error, result) => {
         if (settled) return;
         settled = true;
@@ -72,9 +77,11 @@ export class CodexAppToolsClient {
         if (error) reject(error);
         else resolve(result);
       };
-      const timer = this.setTimer(() => finish(Object.assign(new Error('Codex 桌面端响应超时；排队消息仍保留'), { statusCode: 504 })), this.timeoutMs);
+      const timer = this.setTimer(() => finish(deliveryRequested
+        ? deliveryStatusUnknown('Codex 桌面端仍在确认接收')
+        : Object.assign(new Error('Codex 桌面端连接超时；排队消息仍保留'), { statusCode: 504 })), this.timeoutMs);
 
-      child.stdin.on('error', (error) => finish(appToolsError(error.message)));
+      child.stdin.on('error', (error) => finish(transportError(error.message)));
       child.stdout.on('data', (chunk) => {
         buffer += chunk.toString();
         const lines = buffer.split('\n');
@@ -86,6 +93,7 @@ export class CodexAppToolsClient {
           if (message.id === 1) {
             if (message.error) return finish(appToolsError(message.error.message, 'Codex 桌面端连接失败'));
             send({ jsonrpc: '2.0', method: 'notifications/initialized' });
+            deliveryRequested = true;
             send({
               jsonrpc: '2.0',
               id: 2,
@@ -104,9 +112,9 @@ export class CodexAppToolsClient {
         }
       });
       child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
-      child.on('error', (error) => finish(appToolsError(error.message)));
+      child.on('error', (error) => finish(transportError(error.message)));
       child.on('exit', (code) => {
-        if (!settled) finish(appToolsError(stderr, `Codex 桌面端消息通道退出（${code ?? '未知'}）`));
+        if (!settled) finish(transportError(stderr, `Codex 桌面端消息通道退出（${code ?? '未知'}）`));
       });
       send({
         jsonrpc: '2.0',
@@ -148,6 +156,14 @@ export function desktopControlUnavailable() {
 export function appToolsError(detail, fallback = 'Codex 桌面端消息发送失败') {
   const message = String(detail || '').trim();
   return Object.assign(new Error(message || fallback), { statusCode: 502 });
+}
+
+export function deliveryStatusUnknown(detail = '') {
+  const reason = String(detail || '').trim();
+  return Object.assign(new Error(`${reason ? `${reason}；` : ''}正在核对是否已送达，消息暂时保留在队列中`), {
+    statusCode: 504,
+    code: 'DELIVERY_STATUS_UNKNOWN',
+  });
 }
 
 export class CodexControlClient {

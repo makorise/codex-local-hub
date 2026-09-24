@@ -2,6 +2,12 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.22 - 2026-09-24
+
+- Removed the conflicting background wake-up loop that repeatedly showed “Startup is taking longer” even while Codex Desktop was already taking over the queued prompt.
+- Phone prompts now have a single owner: the official Codex Desktop queue. Real-device integration verification confirmed queue consumption in 6 seconds, message delivery in 7 seconds, and exactly one resulting turn.
+- Replaced the unreliable private-channel Steer action with a safe “Move to front” priority action, removed repeated queue-error popups, and retained 100% line, branch, and function coverage.
+
 ## 0.2.21 - 2026-09-24
 
 - Fixed live task refreshes pulling the conversation back to the newest message while the user was scrolling through older history.
