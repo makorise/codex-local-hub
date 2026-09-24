@@ -2,6 +2,12 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.24 - 2026-09-24
+
+- Fully freezes the rendered conversation while someone is reading older messages, so incoming messages cannot reflow the list or interrupt touch momentum.
+- Stages incoming content behind the “New messages” control and applies it only when the reader taps the control or returns to the bottom.
+- Adds regression coverage proving the visible message nodes and scroll position remain untouched during a live arrival.
+
 ## 0.2.23 - 2026-09-24
 
 - Stopped live task-status refreshes from rebuilding the conversation while someone is scrolling through older messages.

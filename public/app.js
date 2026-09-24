@@ -243,8 +243,13 @@ function messageSignature(messages = []) {
 function scrollConversationToLatest() {
   const scroller = $('.detail-scroll');
   if (!scroller) return;
+  const indicator = $('#new-message-indicator');
+  if (!indicator.hidden) {
+    delete $('#recent-messages').dataset.signature;
+    renderDetail({ followLatest: true });
+  }
   scroller.scrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
-  $('#new-message-indicator').hidden = true;
+  indicator.hidden = true;
 }
 
 function renderDetail({ followLatest = false } = {}) {
@@ -284,9 +289,14 @@ function renderDetail({ followLatest = false } = {}) {
   const messageList = $('#recent-messages');
   const signature = messageSignature(messages);
   const sameTask = messageList.dataset.taskId === task.id;
+  const previousLastMessageId = sameTask ? messageList.dataset.lastMessageId : '';
+  const lastMessageId = String(messages.at(-1)?.id || '');
+  const receivedNewMessage = previousLastMessageId && lastMessageId && previousLastMessageId !== lastMessageId;
+  if (receivedNewMessage && !scrollSnapshot.followLatest) {
+    $('#new-message-indicator').hidden = false;
+    return;
+  }
   if (!sameTask || messageList.dataset.signature !== signature) {
-    const previousLastMessageId = sameTask ? messageList.dataset.lastMessageId : '';
-    const lastMessageId = String(messages.at(-1)?.id || '');
     messageList.innerHTML = messages.length ? messages.map((message) => `
       <div class="message-row ${message.role === 'user' ? 'is-user' : 'is-assistant'}" data-message-id="${escapeHtml(message.id)}">
         <div class="message-bubble">
@@ -297,8 +307,7 @@ function renderDetail({ followLatest = false } = {}) {
     messageList.dataset.taskId = task.id;
     messageList.dataset.signature = signature;
     messageList.dataset.lastMessageId = lastMessageId;
-    const receivedNewMessage = previousLastMessageId && lastMessageId && previousLastMessageId !== lastMessageId;
-    $('#new-message-indicator').hidden = !receivedNewMessage || scrollSnapshot.followLatest;
+    $('#new-message-indicator').hidden = true;
     restoreConversationScroll(scrollSnapshot);
   } else if (followLatest) {
     scrollConversationToLatest();
@@ -970,7 +979,7 @@ document.addEventListener('keydown', (event) => { if (event.key === 'Escape') cl
 $('#new-message-indicator').addEventListener('click', scrollConversationToLatest);
 $('.detail-scroll').addEventListener('scroll', () => {
   const scroller = $('.detail-scroll');
-  if (scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop <= 8) $('#new-message-indicator').hidden = true;
+  if (scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop <= 8) scrollConversationToLatest();
 }, { passive: true });
 
 async function startDashboard() {

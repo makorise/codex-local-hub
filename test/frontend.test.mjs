@@ -327,18 +327,29 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   const anchored = ui.captureConversationScroll();
   assert.equal(anchored.anchorId, 'm1');
   assert.equal(anchored.anchorOffset, 40);
+  const editedMessage = { ...stableMessage, text: '结果已更新' };
   ui.state.details.set(task().id, {
-    messages: [stableMessage, { id: 'm2', role: 'assistant', text: '新消息', timestamp: 2, pending: false }],
+    messages: [editedMessage],
     queuedTasks: queue(),
   });
   ui.renderDetail();
   assert.equal(detailScroller.scrollTop, 210);
+  const anchoredMessageRow = document.querySelector('.message-row');
+  ui.state.details.set(task().id, {
+    messages: [editedMessage, { id: 'm2', role: 'assistant', text: '新消息', timestamp: 2, pending: false }],
+    queuedTasks: queue(),
+  });
+  ui.renderDetail();
+  assert.equal(detailScroller.scrollTop, 210);
+  assert.equal(document.querySelector('.message-row'), anchoredMessageRow);
+  assert.doesNotMatch(document.querySelector('#recent-messages').textContent, /新消息/);
   assert.equal(document.querySelector('#new-message-indicator').hidden, false);
   dom.window.HTMLElement.prototype.getBoundingClientRect = originalRect;
 
   document.querySelector('#new-message-indicator').click();
   assert.equal(detailScroller.scrollTop, 700);
   assert.equal(document.querySelector('#new-message-indicator').hidden, true);
+  assert.match(document.querySelector('#recent-messages').textContent, /新消息/);
   document.querySelector('#new-message-indicator').hidden = false;
   detailScroller.scrollTop = 100;
   detailScroller.dispatchEvent(new dom.window.Event('scroll'));
