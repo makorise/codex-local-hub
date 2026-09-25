@@ -19,4 +19,6 @@ test('task pane has bounded desktop and touch scrolling styles', () => {
   assert.match(styles, /\.summary-row \{[^}]*min-height: 44px;[^}]*margin-bottom: 8px;/);
   assert.match(styles, /\.summary-row div \{[^}]*padding: 7px 9px;[^}]*display: flex;/);
   assert.match(styles, /\.usage-today \{[^}]*min-height: 28px;[^}]*justify-content: space-between;/);
+  assert.match(styles, /\.task-card\.is-unread:not\(\.is-selected\) \{[^}]*border-color:/);
+  assert.match(styles, /\.unread-dot \{[^}]*width: 7px;[^}]*background: var\(--blue\);/);
 });

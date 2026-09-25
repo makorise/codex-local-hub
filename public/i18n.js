@@ -1,6 +1,6 @@
 const messages = {
   'zh-CN': {
-    'brand.name': 'Codex 瞭望台',
+    'brand.name': 'Codex 瞭望台', 'brand.unreadTitle': '({count}) Codex 瞭望台',
     'action.refresh': '刷新任务', 'action.close': '关闭', 'action.closeDetail': '关闭详情',
     'action.resume': '继续任务', 'action.back': '返回任务列表', 'action.send': '发送消息', 'action.switchLanguage': '切换为英文',
     'nav.taskList': '任务列表', 'nav.taskDetail': '任务详情', 'nav.taskFilter': '任务筛选',
@@ -17,7 +17,7 @@ const messages = {
     'delivery.view': '查看图片：{title}', 'delivery.kicker': '图片交付', 'delivery.original': '查看原图', 'delivery.loadFailure': '交付信箱读取失败',
     'delivery.clear': '清空', 'delivery.clearAria': '清空交付信箱', 'delivery.confirmClear': '确认', 'delivery.confirmClearAria': '再次点击确认清空交付信箱',
     'delivery.cleared': '已清空 {count} 张图片', 'delivery.clearFailure': '清空交付信箱失败',
-    'summary.running': '正在进行', 'summary.queued': '等待处理', 'summary.all': '全部任务',
+    'summary.running': '正在进行', 'summary.queued': '等待处理', 'summary.all': '全部任务', 'task.unread': '有新进展',
     'filter.all': '全部', 'filter.running': '进行中', 'filter.queued': '已排队', 'filter.done': '已完成',
     'project.uncategorized': '未分类', 'project.taskCountOne': '1 个任务', 'project.taskCountOther': '{count} 个任务',
     'project.toggle': '{action}{project}，{countLabel}', 'project.expand': '展开', 'project.collapse': '折叠',
@@ -58,7 +58,7 @@ const messages = {
     'manage.stopFailure': '停止任务失败', 'manage.archiveFailure': '归档任务失败', 'manage.projectDeleteFailure': '删除项目失败',
   },
   en: {
-    'brand.name': 'Codex Lookout',
+    'brand.name': 'Codex Lookout', 'brand.unreadTitle': '({count}) Codex Lookout',
     'action.refresh': 'Refresh tasks', 'action.close': 'Close', 'action.closeDetail': 'Close details',
     'action.resume': 'Resume', 'action.back': 'Back to tasks', 'action.send': 'Send message', 'action.switchLanguage': 'Switch to Chinese',
     'nav.taskList': 'Task list', 'nav.taskDetail': 'Task details', 'nav.taskFilter': 'Task filters',
@@ -75,7 +75,7 @@ const messages = {
     'delivery.view': 'View image: {title}', 'delivery.kicker': 'Image delivery', 'delivery.original': 'View original', 'delivery.loadFailure': 'Could not load the delivery inbox',
     'delivery.clear': 'Clear', 'delivery.clearAria': 'Clear the delivery inbox', 'delivery.confirmClear': 'Confirm', 'delivery.confirmClearAria': 'Tap again to clear the delivery inbox',
     'delivery.cleared': 'Cleared {count} images', 'delivery.clearFailure': 'Could not clear the delivery inbox',
-    'summary.running': 'Running', 'summary.queued': 'Queued', 'summary.all': 'All tasks',
+    'summary.running': 'Running', 'summary.queued': 'Queued', 'summary.all': 'All tasks', 'task.unread': 'New activity',
     'filter.all': 'All', 'filter.running': 'Running', 'filter.queued': 'Queued', 'filter.done': 'Completed',
     'project.uncategorized': 'Uncategorized', 'project.taskCountOne': '1 task', 'project.taskCountOther': '{count} tasks',
     'project.toggle': '{action} {project}, {countLabel}', 'project.expand': 'Expand', 'project.collapse': 'Collapse',

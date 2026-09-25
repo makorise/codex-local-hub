@@ -9,6 +9,8 @@ const state = {
   account: null,
   deliveries: [],
   syncedAt: null,
+  unreadTaskIds: new Set(),
+  hasSyncedTasks: false,
 };
 
 function stripTokenFromUrl() {
@@ -141,13 +143,59 @@ function setProjectCollapsed(name, collapsed) {
   else localStorage.removeItem(projectCollapseKey(name));
 }
 
+function taskReadKey(id) {
+  return `codex-lookout-task-read:${id}`;
+}
+
+function updateUnreadPresentation() {
+  const count = state.unreadTaskIds.size;
+  document.title = count ? t('brand.unreadTitle', { count }) : t('brand.name');
+  return count;
+}
+
+function markTaskRead(task) {
+  if (!task) return false;
+  const changed = state.unreadTaskIds.delete(task.id);
+  localStorage.setItem(taskReadKey(task.id), String(Math.max(0, Number(task.updatedAt) || Date.now())));
+  updateUnreadPresentation();
+  return changed;
+}
+
+function isTaskActivelyViewed(id) {
+  return state.selectedId === id && detailPane.classList.contains('is-open') && !document.hidden;
+}
+
+function syncUnreadTasks(previousTasks, nextTasks, initialSync = false) {
+  const nextIds = new Set(nextTasks.map((task) => task.id));
+  for (const id of state.unreadTaskIds) {
+    if (!nextIds.has(id)) state.unreadTaskIds.delete(id);
+  }
+  nextTasks.forEach((task) => {
+    const previous = previousTasks.get(task.id);
+    const readAt = Math.max(0, Number(localStorage.getItem(taskReadKey(task.id))) || 0);
+    if (isTaskActivelyViewed(task.id)) {
+      markTaskRead(task);
+    } else if (initialSync) {
+      if (readAt && Number(task.updatedAt) > readAt) state.unreadTaskIds.add(task.id);
+      else if (!readAt) localStorage.setItem(taskReadKey(task.id), String(Math.max(0, Number(task.updatedAt) || Date.now())));
+    } else if (!previous || taskViewChanged(previous, task)) {
+      state.unreadTaskIds.add(task.id);
+    }
+  });
+  return updateUnreadPresentation();
+}
+
 function renderTaskCard(task, showProject = false) {
   const project = projectLabel(projectName(task));
+  const unread = state.unreadTaskIds.has(task.id);
   return `
-    <button class="task-card ${showProject ? 'shows-project' : ''} ${task.id === state.selectedId ? 'is-selected' : ''}" type="button" data-id="${escapeHtml(task.id)}">
+    <button class="task-card ${showProject ? 'shows-project' : ''} ${task.id === state.selectedId ? 'is-selected' : ''} ${unread ? 'is-unread' : ''}" type="button" data-id="${escapeHtml(task.id)}">
       <div class="task-card-top">
         ${showProject ? `<span class="task-project">${escapeHtml(project)}</span>` : ''}
-        <span class="status-pill" data-tone="${escapeHtml(task.progress.tone)}">${escapeHtml(localizedProgress(task))}</span>
+        <span class="task-card-badges">
+          ${unread ? `<span class="unread-dot" role="status" aria-label="${escapeHtml(t('task.unread'))}" title="${escapeHtml(t('task.unread'))}"></span>` : ''}
+          <span class="status-pill" data-tone="${escapeHtml(task.progress.tone)}">${escapeHtml(localizedProgress(task))}</span>
+        </span>
       </div>
       <h3>${escapeHtml(task.title)}</h3>
       <p>${escapeHtml(task.latestTask || t('empty.task'))}</p>
@@ -157,6 +205,7 @@ function renderTaskCard(task, showProject = false) {
 
 function renderList() {
   const tasks = visibleTasks();
+  updateUnreadPresentation();
   $('#active-count').textContent = state.tasks.filter((task) => task.progress.state === 'running').length;
   $('#queued-count').textContent = state.tasks.reduce((total, task) => total + task.queuedCount, 0);
   $('#task-count').textContent = state.tasks.length;
@@ -194,6 +243,7 @@ function renderList() {
 
 function selectTask(id) {
   state.selectedId = id;
+  markTaskRead(state.tasks.find((task) => task.id === id));
   renderList();
   renderDetail();
   detailPane.classList.add('is-open');
@@ -352,8 +402,12 @@ function registerServiceWorker() {
 }
 
 function updateTasks(payload) {
+  const previousTasks = new Map(state.tasks.map((task) => [task.id, task]));
+  const initialSync = !state.hasSyncedTasks;
   const previous = state.tasks.find((task) => task.id === state.selectedId);
   state.tasks = payload.tasks || [];
+  state.hasSyncedTasks = true;
+  syncUnreadTasks(previousTasks, state.tasks, initialSync);
   state.syncedAt = payload.syncedAt;
   const time = new Date(payload.syncedAt).toLocaleTimeString(getLanguage(), { hour: '2-digit', minute: '2-digit' });
   setConnection(true, t('connection.synced', { time }));
@@ -976,6 +1030,12 @@ $('#usage-card').addEventListener('click', () => {
 $('#modal-close').addEventListener('click', closeContent);
 $('.modal-backdrop').addEventListener('click', closeContent);
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeContent(); });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    markTaskRead(state.tasks.find((task) => task.id === state.selectedId));
+    renderList();
+  }
+});
 $('#new-message-indicator').addEventListener('click', scrollConversationToLatest);
 $('.detail-scroll').addEventListener('scroll', () => {
   const scroller = $('.detail-scroll');
@@ -1023,6 +1083,11 @@ export {
   projectCollapseKey,
   isProjectCollapsed,
   setProjectCollapsed,
+  taskReadKey,
+  updateUnreadPresentation,
+  markTaskRead,
+  isTaskActivelyViewed,
+  syncUnreadTasks,
   renderTaskCard,
   renderList,
   selectTask,

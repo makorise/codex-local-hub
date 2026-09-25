@@ -2,6 +2,12 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.25 - 2026-09-25
+
+- Added a restrained unread-activity signal to task cards so background progress is visible without opening every task.
+- Opening a task clears its unread state automatically; read state persists locally across refreshes without uploading or duplicating conversation history.
+- The browser or Home Screen app title now shows the number of tasks with unread activity, while the first launch establishes a quiet baseline instead of marking old tasks unread.
+
 ## 0.2.24 - 2026-09-24
 
 - Fully freezes the rendered conversation while someone is reading older messages, so incoming messages cannot reflow the list or interrupt touch momentum.
