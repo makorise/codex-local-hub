@@ -201,15 +201,18 @@ test('bridge server allows direct trusted-LAN access by default', async (t) => {
 
   assert.equal((await request(base, '/api/health')).status, 200);
   assert.equal((await request(base, '/api/tasks')).body.tasks[0].title, 'Visible');
+  assert.equal(bridge.scheduleIdleWake('missing-control'), false);
   assert.deepEqual((await request(base, '/api/account')).body.account, { available: false, name: null, initial: null });
   assert.equal((await request(base, '/pair/anything', { redirect: 'manual' })).status, 404);
 });
 
-test('queued prompts remain owned by the native Codex Desktop queue', async (t) => {
+test('queued prompts wake idle tasks once through the native Codex Desktop owner', async (t) => {
   const publicDir = await mkdtemp(join(tmpdir(), 'bridge-native-queue-'));
   await writeFile(join(publicDir, 'index.html'), '<h1>native queue</h1>');
   let launchCalls = 0;
   let failRefresh = false;
+  let wakeResult = { started: true };
+  let wakeFailure = null;
   const deferred = [];
   const repository = {
     listTasks: async () => {
@@ -217,7 +220,11 @@ test('queued prompts remain owned by the native Codex Desktop queue', async (t) 
       return [{ id: 'thread', queuedCount: 1, progress: { state: 'queued' } }];
     },
     sendMessage: async () => ({ accepted: true, mode: 'queued' }),
-    startQueuedTaskIfIdle: async () => { launchCalls += 1; },
+    wakeQueuedTaskIfIdle: async () => {
+      launchCalls += 1;
+      if (wakeFailure) throw wakeFailure;
+      return wakeResult;
+    },
   };
   const bridge = createBridgeServer({ repository, publicDir, defer: (callback) => deferred.push(callback), pollMs: 60_000 });
   await new Promise((resolve) => bridge.server.listen(0, '127.0.0.1', resolve));
@@ -232,9 +239,23 @@ test('queued prompts remain owned by the native Codex Desktop queue', async (t) 
     method: 'POST',
     body: JSON.stringify({ threadId: '1234567890abcdef1234', message: 'persist first' }),
   })).status, 202);
+  assert.equal((await request(base, '/api/messages', {
+    method: 'POST',
+    body: JSON.stringify({ threadId: '1234567890abcdef1234', message: 'persist second' }),
+  })).status, 202);
+  assert.equal(launchCalls, 0);
+  await deferred.shift()();
+  assert.equal(launchCalls, 1);
+
+  wakeResult = { started: false, reason: 'active' };
+  assert.equal(bridge.scheduleIdleWake('active-thread'), true);
+  await deferred.pop()();
+  wakeFailure = new Error('desktop busy');
+  assert.equal(bridge.scheduleIdleWake('failed-thread'), true);
+  await deferred.pop()();
   failRefresh = true;
   await deferred.shift()();
-  assert.equal(launchCalls, 0);
+  assert.equal(launchCalls, 3);
 });
 
 test('bridge reports repository and message failures and closes active streams', async (t) => {

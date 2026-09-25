@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAccountReader, requestAccount } from './account.mjs';
 import { CodexRepository } from './repository.mjs';
-import { CodexControlClient } from './control.mjs';
+import { CodexAppToolsClient, CodexControlClient } from './control.mjs';
 import { DeliveryInbox } from './deliveries.mjs';
 import { createBridgeServer, resolveRuntimeInfo } from './server.mjs';
 import { createTodayTokenReader, createUsageReader, requestRateLimits } from './usage.mjs';
@@ -17,9 +17,11 @@ const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || '0.0.0.0';
 const requirePairing = process.env.BRIDGE_REQUIRE_PAIRING === '1';
 const codexBin = process.env.CODEX_BIN || '/Applications/ChatGPT.app/Contents/Resources/codex';
+const appTools = new CodexAppToolsClient({ codexBin });
 const control = new CodexControlClient({
   codexBin,
   socketPath: process.env.CODEX_APP_SERVER_SOCKET || '',
+  appTools,
 });
 
 if (!home) throw new Error('HOME 环境变量不可用');
@@ -40,6 +42,7 @@ const repository = new CodexRepository({
   historyDb: process.env.CODEX_HISTORY_DB || join(home, '.codex', 'thread_history_1.sqlite'),
   goalsDb: process.env.CODEX_GOALS_DB || join(home, '.codex', 'goals_1.sqlite'),
   codexBin,
+  steerMessage: (threadId, turnId, message) => control.steer(threadId, turnId, message),
   archiveTask: (threadId) => control.archiveThread(threadId),
   interruptTurn: (threadId, turnId) => control.interruptTurn(threadId, turnId),
   deleteProject: (projectId) => control.deleteProject(projectId),

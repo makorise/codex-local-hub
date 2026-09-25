@@ -2,6 +2,14 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.26 - 2026-09-25
+
+- Restored the queue lightning action as a real Codex Desktop delivery: it steers a running turn or starts the selected idle task instead of only changing queue order.
+- Phone prompts now make one non-blocking native wake attempt after the durable queue write, so sleeping tasks start without making the phone wait or launching a competing Codex process.
+- Per-task wake locking prevents rapid submissions from starting the same queued item twice; failed wakes stay queued without a retry-popup loop.
+- A queued message is removed only after Codex Desktop confirms receipt; rejected or unavailable deliveries remain safely queued.
+- Restored accurate Chinese and English action, progress, success, and failure copy with full line, branch, and function test coverage.
+
 ## 0.2.25 - 2026-09-25
 
 - Added a restrained unread-activity signal to task cards so background progress is visible without opening every task.

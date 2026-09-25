@@ -93,6 +93,25 @@ export function createBridgeServer({
   let cachedTasks = [];
   let cachedSignature = '';
   let timer = null;
+  const wakingThreads = new Set();
+
+  function scheduleIdleWake(threadId) {
+    if (!repository.wakeQueuedTaskIfIdle || wakingThreads.has(threadId)) return false;
+    wakingThreads.add(threadId);
+    defer(async () => {
+      try {
+        const result = await repository.wakeQueuedTaskIfIdle(threadId);
+        if (result.started) await refresh();
+      } catch {
+        // The durable native queue remains the source of truth. Do not retry
+        // in a loop or surface repeated errors while Codex Desktop is busy.
+      } finally {
+        wakingThreads.delete(threadId);
+      }
+    });
+    return true;
+  }
+
   async function refresh() {
     try {
       cachedTasks = await repository.listTasks();
@@ -205,6 +224,7 @@ export function createBridgeServer({
         if (!checked.ok) return json(response, 400, { error: checked.error });
         const result = await repository.sendMessage(checked.threadId, checked.message);
         json(response, 202, result);
+        scheduleIdleWake(checked.threadId);
         defer(() => refresh().catch(() => undefined));
         return;
       }
@@ -252,6 +272,7 @@ export function createBridgeServer({
     if (timer) clearInterval(timer);
     for (const client of clients) client.end();
     clients.clear();
+    wakingThreads.clear();
   });
-  return { server, refresh, getCachedTasks: () => cachedTasks };
+  return { server, refresh, getCachedTasks: () => cachedTasks, scheduleIdleWake };
 }

@@ -468,9 +468,9 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   document.querySelector('#queue-card').click();
   assert.equal(document.querySelectorAll('.queue-manager-list li').length, 3);
   const steerFailurePath = `/api/tasks/${task().id}/queue/${queue()[0].id}/steer`;
-  failures.set(steerFailurePath, '优先级调整失败；消息仍保留在队列中');
+  failures.set(steerFailurePath, '立即执行失败；消息仍保留在队列中');
   document.querySelector('[data-action="steer"]').click();
-  assert.match(document.querySelector('.queue-notice').textContent, /正在提升优先级/);
+  assert.match(document.querySelector('.queue-notice').textContent, /正在插入当前执行回合/);
   assert.equal(document.querySelector('#modal-content').classList.contains('is-busy'), true);
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(document.querySelectorAll('.queue-manager-list li').length, 3);
@@ -681,7 +681,7 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   failures.set(`/api/tasks/${task().id}/queue/${queue()[0].id}/steer`, 'steer failed');
   await assert.rejects(ui.steerQueueItem(queue()[0].id), /steer failed/);
   failures.set(`/api/tasks/${task().id}/queue/${queue()[0].id}/steer`, '');
-  await assert.rejects(ui.steerQueueItem(queue()[0].id), /调整优先级失败/);
+  await assert.rejects(ui.steerQueueItem(queue()[0].id), /立即执行失败/);
   failures.delete(`/api/tasks/${task().id}/queue/${queue()[0].id}/steer`);
   ui.state.details.delete(task().id);
   failures.set(`/api/tasks/${task().id}/queue/${queue()[0].id}/steer`, 'no detail');
