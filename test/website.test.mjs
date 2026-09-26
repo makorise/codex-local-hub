@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
 
 const html = await readFile(new URL('../website/index.html', import.meta.url), 'utf8');
+const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 
 async function setup({ savedLanguage, browserLanguage = '' } = {}) {
   const dom = new JSDOM(html, { url: 'http://127.0.0.1:8792/', pretendToBeVisual: true });
@@ -67,6 +68,10 @@ test('product website localizes, animates and copies the one-message installer',
   assert.match(document.title, /瞭望台/);
   assert.match(document.querySelector('h1').textContent, /离开电脑/);
   assert.match(document.querySelector('[data-product-image="desktop"]').src, /desktop-dashboard\.zh-CN\.png$/);
+  assert.match(document.querySelector('[data-demo-image="host"]').src, /mac-host\.zh-CN\.png$/);
+  assert.match(document.querySelector('[data-demo-image="dashboard"]').src, /mobile-dashboard\.zh-CN\.png$/);
+  assert.match(document.querySelector('[data-demo-image="conversation"]').src, /mobile-conversation\.zh-CN\.png$/);
+  assert.match(document.querySelector('[data-demo-image="dashboard"]').alt, /手机任务面板/);
   assert.equal(document.querySelectorAll('.reveal:not(.visible)').length, 0);
   assert.equal(observers[0].options.threshold, 0.12);
   assert.ok(observers[0].unobserved.length > 0);
@@ -76,6 +81,8 @@ test('product website localizes, animates and copies the one-message installer',
   assert.equal(dom.window.localStorage.getItem('codex-lookout-language'), 'en');
   assert.match(document.querySelector('h1').textContent, /Step away from your Mac/);
   assert.match(document.querySelector('[data-product-image="mobile"]').src, /mobile-conversation\.en\.png$/);
+  assert.match(document.querySelector('[data-demo-image="host"]').src, /mac-host\.en\.png$/);
+  assert.match(document.querySelector('[data-demo-image="dashboard"]').alt, /mobile task dashboard/);
 
   document.querySelector('[data-copy-prompt]').click();
   await new Promise((resolve) => setImmediate(resolve));
@@ -107,4 +114,28 @@ test('product website localizes, animates and copies the one-message installer',
   assert.match(document.querySelector('[data-install-prompt]').textContent, /使用 \$skill-installer/);
   module.applyLanguage('zh-TW');
   assert.equal(dom.window.document.documentElement.lang, 'zh-CN');
+});
+
+test('product website publishes complete SEO, trust and release metadata', async () => {
+  const [robots, sitemap, workflow] = await Promise.all([
+    readFile(new URL('../website/robots.txt', import.meta.url), 'utf8'),
+    readFile(new URL('../website/sitemap.xml', import.meta.url), 'utf8'),
+    readFile(new URL('../.github/workflows/pages.yml', import.meta.url), 'utf8'),
+  ]);
+  const dom = new JSDOM(html);
+  const { document } = dom.window;
+  assert.equal(document.querySelector('meta[property="og:image"]').content, 'https://makorise.github.io/codex-local-hub/assets/social-preview.png');
+  assert.equal(document.querySelector('meta[name="twitter:card"]').content, 'summary_large_image');
+  const structuredData = JSON.parse(document.querySelector('script[type="application/ld+json"]').textContent);
+  assert.equal(structuredData.softwareVersion, packageJson.version);
+  assert.equal(structuredData.offers.price, '0');
+  assert.equal(document.querySelectorAll('.demo-card').length, 3);
+  assert.equal(document.querySelectorAll('.trust-list > *').length, 3);
+  assert.match(document.querySelector('.manual-download').textContent, /unsigned preview/);
+  assert.match(robots, /Sitemap: https:\/\/makorise\.github\.io\/codex-local-hub\/sitemap\.xml/);
+  assert.match(sitemap, /<loc>https:\/\/makorise\.github\.io\/codex-local-hub\/<\/loc>/);
+  for (const asset of ['mac-host.en.png', 'mac-host.zh-CN.png', 'mobile-dashboard.en.png', 'mobile-dashboard.zh-CN.png']) {
+    assert.match(workflow, new RegExp(asset.replace('.', '\\.')));
+  }
+  dom.window.close();
 });
