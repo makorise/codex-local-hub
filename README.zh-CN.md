@@ -8,6 +8,14 @@
 
 [**访问产品官网 →**](https://makorise.github.io/codex-local-hub/) · [English](README.md)
 
+<p align="center">
+  <strong>加入 Codex 瞭望台用户群</strong><br>
+  <sub>使用微信扫码，交流使用经验、反馈问题和新功能建议。</sub>
+</p>
+<p align="center">
+  <img src="docs/assets/community/codex-lookout-wechat-group-2026-10-04.png" width="320" alt="Codex 瞭望台微信用户群二维码">
+</p>
+
 **不用一直守着电脑，也能从手机查看 ChatGPT/Codex 做到哪、是否需要回复。**
 
 <p align="center">

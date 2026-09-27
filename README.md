@@ -8,6 +8,14 @@ Use $skill-installer to install https://github.com/makorise/codex-local-hub/tree
 
 **[Visit the product website →](https://makorise.github.io/codex-local-hub/)** · [简体中文](README.zh-CN.md)
 
+<p align="center">
+  <strong>Join the Codex Lookout user group · 加入 Codex 瞭望台用户群</strong><br>
+  <sub>Scan with WeChat to share feedback, report issues, and meet other users.</sub>
+</p>
+<p align="center">
+  <img src="docs/assets/community/codex-lookout-wechat-group-2026-10-04.png" width="320" alt="WeChat QR code for the Codex Lookout user group">
+</p>
+
 **Monitor and control long-running ChatGPT Codex tasks from your phone—without staying glued to your Mac.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-2563eb.svg)](LICENSE)
