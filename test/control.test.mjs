@@ -160,6 +160,11 @@ test('Codex app tools channel discovers the desktop pipe and sends the prompt', 
   if (savedPipe === undefined) delete process.env.CODEX_APP_TOOLS_PIPE_PATH;
   else process.env.CODEX_APP_TOOLS_PIPE_PATH = savedPipe;
   assert.equal(appToolsError('', 'fallback').message, 'fallback');
+  const closedPipe = appToolsError('Codex app tools pipe closed');
+  assert.equal(closedPipe.code, 'DESKTOP_CONTROL_UNAVAILABLE');
+  assert.equal(closedPipe.transportCode, 'PIPE_CLOSED');
+  assert.equal(closedPipe.statusCode, 503);
+  assert.doesNotMatch(closedPipe.message, /pipe closed/i);
   assert.equal(deliveryStatusUnknown().code, 'DELIVERY_STATUS_UNKNOWN');
 
   const environmentChild = childProcess((line, process) => {
@@ -436,7 +441,7 @@ test('Codex control resumes idle tasks only through the desktop owner', async ()
   await assert.rejects(unavailable.resume('thread-2', '不要抢占'), (error) => (
     error.statusCode === 503
     && error.code === 'DESKTOP_CONTROL_UNAVAILABLE'
-    && /不会启动另一个执行器/.test(error.message)
+    && /ChatGPT Remote/.test(error.message)
   ));
   assert.equal(spawned, false);
   assert.equal(desktopControlUnavailable().code, 'DESKTOP_CONTROL_UNAVAILABLE');

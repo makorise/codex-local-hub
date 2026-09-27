@@ -88,23 +88,28 @@ export function createBridgeServer({
   pollMs = 1500,
   runtimeInfo = { version: 'unknown', source: 'bundled' },
   defer = setImmediate,
+  now = Date.now,
+  wakeRetryMs = 60_000,
 }) {
   const clients = new Set();
   let cachedTasks = [];
   let cachedSignature = '';
   let timer = null;
   const wakingThreads = new Set();
+  const wakeRetryAt = new Map();
 
   function scheduleIdleWake(threadId) {
-    if (!repository.wakeQueuedTaskIfIdle || wakingThreads.has(threadId)) return false;
+    if (!repository.wakeQueuedTaskIfIdle || wakingThreads.has(threadId) || (wakeRetryAt.get(threadId) || 0) > now()) return false;
     wakingThreads.add(threadId);
     defer(async () => {
       try {
         const result = await repository.wakeQueuedTaskIfIdle(threadId);
+        wakeRetryAt.delete(threadId);
         if (result.started) await refresh();
       } catch {
         // The durable native queue remains the source of truth. Do not retry
-        // in a loop or surface repeated errors while Codex Desktop is busy.
+        // on every poll or surface repeated errors while Codex Desktop is busy.
+        wakeRetryAt.set(threadId, now() + wakeRetryMs);
       } finally {
         wakingThreads.delete(threadId);
       }

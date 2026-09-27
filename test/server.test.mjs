@@ -213,6 +213,7 @@ test('queued prompts wake idle tasks once through the native Codex Desktop owner
   let failRefresh = false;
   let wakeResult = { started: true };
   let wakeFailure = null;
+  let currentTime = 1_000;
   const deferred = [];
   const repository = {
     listTasks: async () => {
@@ -226,7 +227,14 @@ test('queued prompts wake idle tasks once through the native Codex Desktop owner
       return wakeResult;
     },
   };
-  const bridge = createBridgeServer({ repository, publicDir, defer: (callback) => deferred.push(callback), pollMs: 60_000 });
+  const bridge = createBridgeServer({
+    repository,
+    publicDir,
+    defer: (callback) => deferred.push(callback),
+    now: () => currentTime,
+    wakeRetryMs: 60_000,
+    pollMs: 60_000,
+  });
   await new Promise((resolve) => bridge.server.listen(0, '127.0.0.1', resolve));
   t.after(async () => {
     bridge.server.closeAllConnections();
@@ -253,9 +261,13 @@ test('queued prompts wake idle tasks once through the native Codex Desktop owner
   wakeFailure = new Error('desktop busy');
   assert.equal(bridge.scheduleIdleWake('failed-thread'), true);
   await deferred.pop()();
+  assert.equal(bridge.scheduleIdleWake('failed-thread'), false);
+  currentTime += 60_001;
+  assert.equal(bridge.scheduleIdleWake('failed-thread'), true);
+  await deferred.pop()();
   failRefresh = true;
   await deferred.shift()();
-  assert.equal(launchCalls, 3);
+  assert.equal(launchCalls, 4);
 });
 
 test('bridge reports repository and message failures and closes active streams', async (t) => {
