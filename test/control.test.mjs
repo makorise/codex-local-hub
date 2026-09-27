@@ -136,10 +136,11 @@ test('Codex app tools channel discovers the desktop pipe and sends the prompt', 
     [
       '/Applications/ChatGPT.app/Contents/Resources/plugins/openai-bundled/plugins/codex-app-tools/server.mjs',
       '--interaction-client-id',
-      'session-caller',
+      'thread-1',
     ],
   ]);
   assert.equal(spawned[2].env.CODEX_APP_TOOLS_PIPE_PATH, '/tmp/current.sock');
+  assert.equal(spawned[2].env.CODEX_SESSION_ID, undefined);
   assert.equal(writes[1].method, 'notifications/initialized');
   assert.deepEqual(writes[2], {
     jsonrpc: '2.0',
@@ -172,10 +173,13 @@ test('Codex app tools channel discovers the desktop pipe and sends the prompt', 
     existsSync: () => true,
     nodeBin: '/custom/node',
     serverPath: '/custom/server.mjs',
-    spawn: (command, args) => {
+    spawn: (command, args, options) => {
       assert.equal(command, '/custom/node');
       assert.equal(args[0], '/custom/server.mjs');
-      assert.equal(args[2], 'caller-thread');
+      assert.equal(args[2], 'thread-2');
+      assert.equal(options.env.CODEX_THREAD_ID, undefined);
+      assert.equal(options.env.CODEX_SESSION_ID, undefined);
+      assert.equal(options.env.CODEX_APP_TOOLS_PIPE_PATH, '/tmp/from-env.sock');
       return environmentChild;
     },
   });
