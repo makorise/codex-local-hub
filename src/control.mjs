@@ -43,7 +43,7 @@ export class CodexAppToolsClient {
       return await this.sendMessageOnce(threadId, text);
     } catch (error) {
       if (error.code === 'DELIVERY_STATUS_UNKNOWN') throw error;
-      if (!/pipe closed|ENOENT|ECONNREFUSED|socket hang up/i.test(error.message)) throw error;
+      if (error.transportCode !== 'PIPE_CLOSED' && !/pipe closed|ENOENT|ECONNREFUSED|socket hang up/i.test(error.message)) throw error;
       this.pipePath = '';
       return this.sendMessageOnce(threadId, text);
     }
@@ -154,7 +154,7 @@ export function discoverAppToolsPipe({
 }
 
 export function desktopControlUnavailable() {
-  return Object.assign(new Error('Codex 桌面端原生控制通道暂不可用；消息仍在队列中，不会启动另一个执行器'), {
+  return Object.assign(new Error('Codex Desktop 当前不接受外部立即执行；消息仍保留在队列中。需要立即干预时请使用 ChatGPT Remote 的 Steer'), {
     statusCode: 503,
     code: 'DESKTOP_CONTROL_UNAVAILABLE',
   });
@@ -162,6 +162,9 @@ export function desktopControlUnavailable() {
 
 export function appToolsError(detail, fallback = 'Codex 桌面端消息发送失败') {
   const message = String(detail || '').trim();
+  if (/Codex app tools pipe closed/i.test(message)) {
+    return Object.assign(desktopControlUnavailable(), { transportCode: 'PIPE_CLOSED' });
+  }
   return Object.assign(new Error(message || fallback), { statusCode: 502 });
 }
 
