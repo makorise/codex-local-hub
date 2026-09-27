@@ -8,6 +8,8 @@ Use $skill-installer to install https://github.com/makorise/codex-local-hub/tree
 
 **[Visit the product website →](https://makorise.github.io/codex-local-hub/)** · [简体中文](README.zh-CN.md)
 
+**Featured in [awesome-ChatGPT-repositories](https://github.com/taishi-i/awesome-ChatGPT-repositories/pull/242)** · Listed in the CLIs collection.
+
 <p align="center">
   <strong>Join the Codex Lookout user group · 加入 Codex 瞭望台用户群</strong><br>
   <sub>Scan with WeChat to share feedback, report issues, and meet other users.</sub>

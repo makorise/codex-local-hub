@@ -8,6 +8,8 @@
 
 [**访问产品官网 →**](https://makorise.github.io/codex-local-hub/) · [English](README.md)
 
+**已被 [awesome-ChatGPT-repositories](https://github.com/taishi-i/awesome-ChatGPT-repositories/pull/242) 收录** · 位于 CLIs 分类。
+
 <p align="center">
   <strong>加入 Codex 瞭望台用户群</strong><br>
   <sub>使用微信扫码，交流使用经验、反馈问题和新功能建议。</sub>
