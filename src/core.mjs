@@ -1,7 +1,26 @@
+import { existsSync as nodeExistsSync } from 'node:fs';
+
 export const MAX_MESSAGE_LENGTH = 12_000;
 export const CORE_READY_MARKER = 'CODEX_LOOKOUT_READY';
 export const LEGACY_HOST_READY_MARKER = 'Codex 掌上任务台已启动';
 export const LEGACY_READY_DELAYS_MS = [100, 350, 750];
+export const MAC_CODEX_BIN_CANDIDATES = [
+  '/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex',
+  '/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex',
+  '/Applications/Codex.app/Contents/Resources/codex',
+  '/Applications/ChatGPT.app/Contents/Resources/codex',
+];
+
+export function resolveCodexBin({
+  configured = '',
+  platform = process.platform,
+  existsSync = nodeExistsSync,
+} = {}) {
+  const requested = String(configured || '').trim();
+  if (requested && !requested.includes('/')) return requested;
+  const candidates = [requested, ...(platform === 'darwin' ? MAC_CODEX_BIN_CANDIDATES : [])].filter(Boolean);
+  return candidates.find((candidate) => existsSync(candidate)) || requested || 'codex';
+}
 
 export function scheduleCoreReadySignals({ write, schedule }) {
   write(CORE_READY_MARKER);

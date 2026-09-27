@@ -6,12 +6,20 @@ import {
   CodexAppToolsClient,
   CodexControlClient,
   appToolsError,
+  codexResourcesDirectory,
   controlProcessError,
   controlProtocolError,
   deliveryStatusUnknown,
   desktopControlUnavailable,
   discoverAppToolsPipe,
 } from '../src/control.mjs';
+
+test('Codex desktop resource discovery supports legacy and nested CLI layouts', () => {
+  assert.equal(codexResourcesDirectory('/Applications/ChatGPT.app/Contents/Resources/codex'), '/Applications/ChatGPT.app/Contents/Resources');
+  assert.equal(codexResourcesDirectory('/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex'), '/Applications/ChatGPT.app/Contents/Resources');
+  assert.equal(codexResourcesDirectory('/usr/local/bin/codex'), '/usr/local/bin');
+  assert.equal(codexResourcesDirectory(''), '.');
+});
 
 function childProcess(onWrite = () => undefined) {
   const child = new EventEmitter();

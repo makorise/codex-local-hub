@@ -2,6 +2,12 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.27 - 2026-09-27
+
+- Restored phone usage and account data after the ChatGPT desktop app moved its bundled Codex CLI into a nested application directory.
+- Added automatic discovery for current, nested, legacy, and explicitly configured Codex executables.
+- Kept the Codex Desktop control channel anchored to the correct application resources when using the nested CLI.
+
 ## 0.2.26 - 2026-09-25
 
 - Restored the queue lightning action as a real Codex Desktop delivery: it steers a running turn or starts the selected idle task instead of only changing queue order.

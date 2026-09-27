@@ -5,6 +5,7 @@ import {
   CORE_READY_MARKER,
   LEGACY_HOST_READY_MARKER,
   LEGACY_READY_DELAYS_MS,
+  MAC_CODEX_BIN_CANDIDATES,
   activityLabel,
   cleanUserMessage,
   scheduleCoreReadySignals,
@@ -16,10 +17,20 @@ import {
   isAuthorized,
   isInternalMessage,
   presentTask,
+  resolveCodexBin,
   safeJson,
   truncate,
   validateMessageInput,
 } from '../src/core.mjs';
+
+test('Codex executable resolution follows the current desktop bundle and safe fallbacks', () => {
+  const current = MAC_CODEX_BIN_CANDIDATES[0];
+  assert.equal(resolveCodexBin({ configured: '/missing/codex', existsSync: (path) => path === current, platform: 'darwin' }), current);
+  assert.equal(resolveCodexBin({ configured: '/custom/codex', existsSync: (path) => path === '/custom/codex', platform: 'darwin' }), '/custom/codex');
+  assert.equal(resolveCodexBin({ configured: 'codex-preview', existsSync: () => false, platform: 'darwin' }), 'codex-preview');
+  assert.equal(resolveCodexBin({ configured: '', existsSync: () => false, platform: 'linux' }), 'codex');
+  assert.equal(resolveCodexBin({ configured: '/missing/codex', existsSync: () => false, platform: 'linux' }), '/missing/codex');
+});
 
 test('core readiness signal isolates ASCII and retries v0.2.8 host detection', () => {
   const writes = [];

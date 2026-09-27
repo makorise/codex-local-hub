@@ -4,6 +4,13 @@ import { dirname, join } from 'node:path';
 
 const APP_TOOLS_SERVER = join('plugins', 'openai-bundled', 'plugins', 'codex-app-tools', 'server.mjs');
 
+export function codexResourcesDirectory(codexBin) {
+  const normalized = String(codexBin || '');
+  const marker = '/Contents/Resources/';
+  const boundary = normalized.indexOf(marker);
+  return boundary >= 0 ? normalized.slice(0, boundary + marker.length - 1) : dirname(normalized);
+}
+
 export class CodexAppToolsClient {
   constructor({
     codexBin = '/Applications/ChatGPT.app/Contents/Resources/codex',
@@ -18,7 +25,7 @@ export class CodexAppToolsClient {
     setTimer = setTimeout,
     clearTimer = clearTimeout,
   } = {}) {
-    const resources = dirname(codexBin);
+    const resources = codexResourcesDirectory(codexBin);
     this.pipePath = pipePath;
     this.nodeBin = nodeBin || join(resources, 'cua_node', 'bin', 'node');
     this.serverPath = serverPath || join(resources, APP_TOOLS_SERVER);
@@ -123,7 +130,7 @@ export class CodexAppToolsClient {
         params: {
           protocolVersion: '2025-11-25',
           capabilities: {},
-          clientInfo: { name: 'codex-local-hub', version: '0.2.26' },
+          clientInfo: { name: 'codex-local-hub', version: '0.2.27' },
         },
       });
     });
@@ -281,7 +288,7 @@ export class CodexControlClient {
         id: 1,
         method: 'initialize',
         params: {
-          clientInfo: { name: 'codex-pocket-dashboard', title: 'Codex Lookout', version: '0.2.26' },
+          clientInfo: { name: 'codex-pocket-dashboard', title: 'Codex Lookout', version: '0.2.27' },
           capabilities: { experimentalApi: true },
         },
       });

@@ -9,14 +9,14 @@ import { CodexAppToolsClient, CodexControlClient } from './control.mjs';
 import { DeliveryInbox } from './deliveries.mjs';
 import { createBridgeServer, resolveRuntimeInfo } from './server.mjs';
 import { createTodayTokenReader, createUsageReader, requestRateLimits } from './usage.mjs';
-import { scheduleCoreReadySignals } from './core.mjs';
+import { resolveCodexBin, scheduleCoreReadySignals } from './core.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const home = process.env.HOME;
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || '0.0.0.0';
 const requirePairing = process.env.BRIDGE_REQUIRE_PAIRING === '1';
-const codexBin = process.env.CODEX_BIN || '/Applications/ChatGPT.app/Contents/Resources/codex';
+const codexBin = resolveCodexBin({ configured: process.env.CODEX_BIN });
 const appTools = new CodexAppToolsClient({ codexBin });
 const control = new CodexControlClient({
   codexBin,
