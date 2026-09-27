@@ -2,6 +2,12 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.28 - 2026-09-27
+
+- Fixed long-running conversations staying on an old message when Codex updated the text of an existing assistant record without changing its timestamp.
+- Refreshes selected-task details when the latest visible result or activity changes while preserving the reader's scroll position.
+- Rotated the phone web-app cache so installed home-screen shortcuts receive the fix immediately after updating.
+
 ## 0.2.27 - 2026-09-27
 
 - Restored phone usage and account data after the ChatGPT desktop app moved its bundled Codex CLI into a nested application directory.

@@ -130,7 +130,7 @@ export class CodexAppToolsClient {
         params: {
           protocolVersion: '2025-11-25',
           capabilities: {},
-          clientInfo: { name: 'codex-local-hub', version: '0.2.27' },
+          clientInfo: { name: 'codex-local-hub', version: '0.2.28' },
         },
       });
     });
@@ -288,7 +288,7 @@ export class CodexControlClient {
         id: 1,
         method: 'initialize',
         params: {
-          clientInfo: { name: 'codex-pocket-dashboard', title: 'Codex Lookout', version: '0.2.27' },
+          clientInfo: { name: 'codex-pocket-dashboard', title: 'Codex Lookout', version: '0.2.28' },
           capabilities: { experimentalApi: true },
         },
       });

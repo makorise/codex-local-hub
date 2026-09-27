@@ -426,8 +426,10 @@ function taskViewChanged(previous, current) {
   if (!previous || !current) return previous !== current;
   return previous.updatedAt !== current.updatedAt
     || previous.progress.state !== current.progress.state
+    || previous.activity !== current.activity
     || previous.queuedCount !== current.queuedCount
     || previous.latestTask !== current.latestTask
+    || previous.latestResult !== current.latestResult
     || previous.title !== current.title
     || previous.project !== current.project
     || previous.projectId !== current.projectId

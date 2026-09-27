@@ -560,13 +560,22 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   ui.switchLanguage();
   assert.equal(ui.taskViewChanged(baseTask, { ...baseTask, updatedAt: baseTask.updatedAt + 1 }), true);
   assert.equal(ui.taskViewChanged(baseTask, { ...baseTask, progress: { ...baseTask.progress, state: 'idle' } }), true);
+  assert.equal(ui.taskViewChanged(baseTask, { ...baseTask, activity: 'new activity' }), true);
   assert.equal(ui.taskViewChanged(baseTask, { ...baseTask, queuedCount: 2 }), true);
   assert.equal(ui.taskViewChanged(baseTask, { ...baseTask, latestTask: 'changed' }), true);
+  assert.equal(ui.taskViewChanged(baseTask, { ...baseTask, latestResult: 'changed' }), true);
   assert.equal(ui.taskViewChanged(baseTask, { ...baseTask, title: 'changed' }), true);
   assert.equal(ui.taskViewChanged(baseTask, { ...baseTask, project: 'changed' }), true);
   assert.equal(ui.taskViewChanged(baseTask, { ...baseTask, projectId: 'changed' }), true);
   assert.equal(ui.taskViewChanged(baseTask, { ...baseTask, goal: { ...baseTask.goal, elapsedSeconds: 181 } }), true);
   assert.equal(ui.taskViewChanged(baseTask, { ...baseTask, goal: { ...baseTask.goal, status: { state: 'done', label: '完成' } } }), true);
+
+  ui.state.tasks = [baseTask];
+  ui.state.selectedId = baseTask.id;
+  const detailLoadsBeforeStreamUpdate = calls.filter(([path]) => path === `/api/tasks/${baseTask.id}`).length;
+  ui.updateTasks({ tasks: [{ ...baseTask, latestResult: '正在持续输出的新结果' }], syncedAt: Date.now() });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(calls.filter(([path]) => path === `/api/tasks/${baseTask.id}`).length > detailLoadsBeforeStreamUpdate);
 
   ui.state.filter = 'queued';
   ui.state.tasks = [task({ queuedCount: 0 }), task({ id: '22222222-2222-2222-2222-222222222222', queuedCount: 1 })];
