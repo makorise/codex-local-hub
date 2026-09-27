@@ -61,11 +61,18 @@ export class CodexAppToolsClient {
         return;
       }
       this.pipePath = pipePath;
-      const interactionThreadId = this.environment.CODEX_THREAD_ID || this.environment.CODEX_SESSION_ID || threadId;
+      // The hub can inherit the thread/session that happened to launch the Mac app.
+      // That ambient identity is unrelated to the task selected on the phone and
+      // makes cross-thread sends connect as the wrong caller. Always scope the
+      // proxy to the actual destination and keep the inherited IDs out of the
+      // child environment.
+      const childEnvironment = { ...this.environment, CODEX_APP_TOOLS_PIPE_PATH: pipePath };
+      delete childEnvironment.CODEX_THREAD_ID;
+      delete childEnvironment.CODEX_SESSION_ID;
       const child = this.spawn(
         this.nodeBin,
-        [this.serverPath, '--interaction-client-id', interactionThreadId],
-        { stdio: ['pipe', 'pipe', 'pipe'], env: { ...this.environment, CODEX_APP_TOOLS_PIPE_PATH: pipePath } },
+        [this.serverPath, '--interaction-client-id', threadId],
+        { stdio: ['pipe', 'pipe', 'pipe'], env: childEnvironment },
       );
       let buffer = '';
       let stderr = '';
