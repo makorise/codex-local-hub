@@ -28,6 +28,11 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
             store.restore(directoryName: nil)
             print(hostVersion)
             return true
+        case "--print-sanitized-environment":
+            let environment = ServerEnvironment.sanitized(ProcessInfo.processInfo.environment)
+            let data = try! JSONSerialization.data(withJSONObject: environment, options: [.sortedKeys])
+            print(String(decoding: data, as: UTF8.self))
+            return true
         case "--install-core-update":
             guard arguments.count == 5 else {
                 fputs("Usage: CodexLocalHub --install-core-update <archive.zip> <version> <sha256>\n", stderr)
@@ -62,6 +67,7 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var updateChecker: GitHubUpdateChecker!
     private var pendingCoreActivation: CoreActivation?
     private var isSwitchingCore = false
+    private var mobileUpdateInFlight = false
     private var coreStartupWorkItem: DispatchWorkItem?
     private let updatePromptKey = "CodexLocalHubLastPromptedUpdateVersion"
     private lazy var hostVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
@@ -284,13 +290,14 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         process.currentDirectoryURL = resourceRoot
         process.standardOutput = pipe
         process.standardError = pipe
-        var environment = ProcessInfo.processInfo.environment
+        var environment = ServerEnvironment.sanitized(ProcessInfo.processInfo.environment)
         environment["PORT"] = "8787"
         environment["HOST"] = "0.0.0.0"
         environment["BRIDGE_REQUIRE_PAIRING"] = "0"
         environment["CODEX_BIN"] = "/Applications/ChatGPT.app/Contents/Resources/codex"
         environment["CODEX_LOCAL_HUB_VERSION"] = coreStore.effectiveVersion()
         environment["CODEX_LOCAL_HUB_CORE_SOURCE"] = resourceRoot == bundledRoot ? "bundled" : "hot-update"
+        environment["CODEX_LOCAL_HUB_HOST_UPDATE"] = "1"
         process.environment = environment
 
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
@@ -347,7 +354,11 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let lines = outputBuffer.components(separatedBy: .newlines)
         outputBuffer = lines.last ?? ""
         for line in lines.dropLast() {
-            if line.contains("CODEX_LOOKOUT_READY") || line.contains("Codex 瞭望台已启动") {
+            if ServerEnvironment.signal(in: line) == .updateRequested {
+                requestUpdateFromDashboard()
+                continue
+            }
+            if ServerEnvironment.signal(in: line) == .ready {
                 restartAttempts = 0
                 statusLabel.stringValue = text("服务运行中 · 任务正在实时同步", "Service online · tasks are syncing live")
                 statusDot.layer?.backgroundColor = NSColor.systemGreen.cgColor
@@ -355,6 +366,7 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     coreStartupWorkItem?.cancel()
                     coreStartupWorkItem = nil
                     pendingCoreActivation = nil
+                    mobileUpdateInFlight = false
                     availableUpdate = nil
                     updateChecker = GitHubUpdateChecker(currentVersion: coreStore.effectiveVersion())
                     updateButton.isEnabled = true
@@ -472,6 +484,49 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
+    private func requestUpdateFromDashboard() {
+        guard !mobileUpdateInFlight else { return }
+        mobileUpdateInFlight = true
+        updateButton.isEnabled = false
+        updateButton.title = text("手机正在请求更新…", "Update requested from phone…")
+        updateChecker.invalidateCache()
+        updateChecker = GitHubUpdateChecker(currentVersion: coreStore.effectiveVersion())
+        updateChecker.check(force: true) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                switch result {
+                case .available(let update):
+                    self.availableUpdate = update
+                    if let coreAsset = update.coreAsset {
+                        self.downloadCoreUpdate(update: update, asset: coreAsset)
+                    } else {
+                        self.mobileUpdateInFlight = false
+                        self.showAvailableUpdate(update, prompt: false)
+                    }
+                case .skipped(let cached):
+                    if let cached, let coreAsset = cached.coreAsset {
+                        self.availableUpdate = cached
+                        self.downloadCoreUpdate(update: cached, asset: coreAsset)
+                    } else {
+                        self.mobileUpdateInFlight = false
+                        self.showUpToDateState()
+                    }
+                case .upToDate:
+                    self.mobileUpdateInFlight = false
+                    self.availableUpdate = nil
+                    self.showUpToDateState()
+                case .noRelease:
+                    self.mobileUpdateInFlight = false
+                    self.availableUpdate = nil
+                    self.showNoReleaseState()
+                case .failed:
+                    self.mobileUpdateInFlight = false
+                    self.showUpdateCheckFailed()
+                }
+            }
+        }
+    }
+
     private func showAvailableUpdate(_ update: UpdateRelease, prompt: Bool) {
         availableUpdate = update
         let canHotUpdate = update.coreAsset != nil
@@ -544,6 +599,7 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
             guard let self else { return }
             guard error == nil, let temporaryURL else {
                 DispatchQueue.main.async {
+                    self.mobileUpdateInFlight = false
                     self.updateButton.isEnabled = true
                     self.showTemporaryUpdateStatus(self.text("热升级下载失败", "Core update download failed"))
                 }
@@ -554,11 +610,15 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 DispatchQueue.main.async { self.activateCoreUpdate(activation) }
             } catch CoreUpdateError.incompatibleHost {
                 DispatchQueue.main.async {
+                    let requestedFromPhone = self.mobileUpdateInFlight
+                    self.mobileUpdateInFlight = false
                     self.updateButton.isEnabled = true
-                    self.downloadInstaller(update: update)
+                    if requestedFromPhone { self.showAvailableUpdate(update, prompt: false) }
+                    else { self.downloadInstaller(update: update) }
                 }
             } catch {
                 DispatchQueue.main.async {
+                    self.mobileUpdateInFlight = false
                     self.updateButton.isEnabled = true
                     self.showTemporaryUpdateStatus(self.text("核心校验失败，已取消升级", "Core verification failed. Update cancelled"))
                 }
@@ -585,6 +645,7 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard let activation = pendingCoreActivation else { return }
         coreStore.restore(directoryName: activation.previousDirectoryName)
         pendingCoreActivation = nil
+        mobileUpdateInFlight = false
         availableUpdate = nil
         updateChecker.invalidateCache()
         UserDefaults.standard.removeObject(forKey: updatePromptKey)

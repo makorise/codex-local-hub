@@ -10,6 +10,7 @@ import { DeliveryInbox } from './deliveries.mjs';
 import { createBridgeServer, resolveRuntimeInfo } from './server.mjs';
 import { createTodayTokenReader, createUsageReader, requestRateLimits } from './usage.mjs';
 import { resolveCodexBin, scheduleCoreReadySignals } from './core.mjs';
+import { createUpdateReader } from './updates.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const home = process.env.HOME;
@@ -42,7 +43,6 @@ const repository = new CodexRepository({
   historyDb: process.env.CODEX_HISTORY_DB || join(home, '.codex', 'thread_history_1.sqlite'),
   goalsDb: process.env.CODEX_GOALS_DB || join(home, '.codex', 'goals_1.sqlite'),
   codexBin,
-  steerMessage: (threadId, turnId, message) => control.steer(threadId, turnId, message),
   archiveTask: (threadId) => control.archiveThread(threadId),
   interruptTurn: (threadId, turnId) => control.interruptTurn(threadId, turnId),
   deleteProject: (projectId) => control.deleteProject(projectId),
@@ -51,7 +51,10 @@ const todayTokenReader = createTodayTokenReader({ sessionsDir: join(home, '.code
 const usageReader = createUsageReader({ request: () => requestRateLimits({ codexBin }), todayTokenReader });
 const accountReader = createAccountReader({ request: () => requestAccount({ codexBin }) });
 const runtimeInfo = await resolveRuntimeInfo({ root });
-const { server } = createBridgeServer({ repository, token, requirePairing, publicDir: join(root, 'public'), usageReader, accountReader, deliveryInbox, runtimeInfo });
+const hostUpdateEnabled = process.env.CODEX_LOCAL_HUB_HOST_UPDATE === '1';
+const updateReader = createUpdateReader({ currentVersion: runtimeInfo.version, hostUpdateEnabled });
+const requestHostUpdate = hostUpdateEnabled ? async () => { console.log('CODEX_LOOKOUT_UPDATE_REQUEST'); } : null;
+const { server } = createBridgeServer({ repository, token, requirePairing, publicDir: join(root, 'public'), usageReader, accountReader, deliveryInbox, runtimeInfo, updateReader, requestHostUpdate });
 
 server.listen(port, host, () => {
   const addresses = lanAddresses().map((address) => `http://${address}:${port}/`);

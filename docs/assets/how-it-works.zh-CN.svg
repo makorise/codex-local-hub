@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1400" height="640" viewBox="0 0 1400 640" role="img" aria-labelledby="title desc">
   <title id="title">Codex 瞭望台工作原理</title>
-  <desc id="desc">四阶段流程图：安装到 Mac、读取本地 Codex 状态、通过本地 Node.js 中继同步，以及从手机双向操作。</desc>
+  <desc id="desc">四阶段流程图：安装到 Mac、读取本地 Codex 状态、通过本地 Node.js 中继同步，以及在手机查看和继续已有任务。</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0a0e18"/><stop offset="1" stop-color="#11182a"/></linearGradient>
     <linearGradient id="card" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#171f31"/><stop offset="1" stop-color="#101625"/></linearGradient>
@@ -82,7 +82,7 @@
       <text x="0" y="158" fill="#f2f5fb" font-size="19" font-weight="700">在手机上监控和控制</text>
       <text x="0" y="192" fill="#9aa6ba" font-size="14.5">查看进度、目标、用量、</text>
       <text x="0" y="216" fill="#9aa6ba" font-size="14.5">最近消息和图片；发送、</text>
-      <text x="0" y="240" fill="#9aa6ba" font-size="14.5">排队、插队或恢复任务。</text>
+      <text x="0" y="240" fill="#9aa6ba" font-size="14.5">排队、排序、删除或恢复。</text>
       <rect x="0" y="266" width="183" height="28" rx="14" fill="#78a8ff" fill-opacity=".09" stroke="#78a8ff" stroke-opacity=".18"/>
       <text x="14" y="285" fill="#a9c7ff" font-size="12" font-weight="650">浏览器或桌面快捷方式</text>
     </g>

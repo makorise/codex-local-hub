@@ -102,10 +102,10 @@ Continue with $setup-codex-local-hub from the last verified setup stage. Reuse t
 
 ## How it works
 
-![Architecture diagram showing how Codex Lookout is installed on a Mac, reads local Codex state, synchronizes over local Wi-Fi, and supports two-way control from a phone](docs/assets/how-it-works.svg)
+![Architecture diagram showing how Codex Lookout is installed on a Mac, reads local Codex state, and synchronizes a focused phone dashboard over local Wi-Fi](docs/assets/how-it-works.svg)
 
 1. **Install the host app.** The native macOS wrapper starts its bundled Node.js service on the Mac and shows a QR code containing the plain phone address.
-2. **Read local Codex data.** The service reads task, project, queue, goal, usage, and recent visible-message state from the local `~/.codex` databases. It uses the Codex CLI and app-server control channel for resume, queue, and steer actions; it does not scrape the ChatGPT web interface.
+2. **Read local Codex data.** The service reads task, project, queue, goal, usage, and recent visible-message state from the local `~/.codex` databases. It uses supported Codex command paths for follow-up prompts and queue management; it does not scrape the ChatGPT web interface.
 3. **Synchronize on the LAN.** Scanning the QR code opens the dashboard directly. JSON endpoints provide current state, while server-sent events refresh it when work changes.
 4. **Control work from the phone.** Prompts, queue actions, task stop/archive commands, and project-management actions travel back to the Mac through Codex's native control protocol. The service keeps only a small recent view for monitoring instead of building a second full chat archive.
 
@@ -114,7 +114,7 @@ The current release is local-network only. The data path stays between the Mac a
 ## Why Codex Lookout?
 
 - **Phone-first monitoring** — see running, queued, paused, failed, and completed tasks.
-- **Two-way control** — send prompts, reorder or remove queued prompts, and steer an active task.
+- **Focused task control** — continue existing tasks and reorder or remove queued prompts using only stable controls.
 - **Interrupted-task recovery** — resume a paused task with one tap.
 - **Bedside task management** — stop or archive a task and remove a project from Codex without returning to the Mac; project files are always preserved.
 - **Visual delivery inbox** — review the latest screenshots and image results on your phone.
@@ -129,7 +129,7 @@ The current release is local-network only. The data path stays between the Mac a
 
 - Monitor long-running Codex coding tasks from the couch, another room, or a mobile device.
 - Send the next prompt without returning to the Mac.
-- Reorder queued prompts and steer urgent work into the active turn.
+- Reorder queued prompts or remove work that is no longer needed.
 - Review screenshots and visual results before accepting a UI implementation.
 - Keep Codex task history local instead of copying full conversations into a hosted dashboard.
 

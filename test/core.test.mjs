@@ -21,6 +21,7 @@ import {
   safeJson,
   truncate,
   validateMessageInput,
+  validateProjectTaskInput,
 } from '../src/core.mjs';
 
 test('Codex executable resolution follows the current desktop bundle and safe fallbacks', () => {
@@ -136,6 +137,17 @@ test('message validation and authorization reject unsafe requests', () => {
   assert.equal(validateMessageInput({ threadId: '1234567890abcdef1234', message: ' ' }).error, '请输入消息');
   assert.match(validateMessageInput({ threadId: '1234567890abcdef1234', message: 'x'.repeat(MAX_MESSAGE_LENGTH + 1) }).error, /不能超过/);
   assert.deepEqual(validateMessageInput({ threadId: ' 1234567890abcdef1234 ', message: ' hi ' }), { ok: true, threadId: '1234567890abcdef1234', message: 'hi' });
+  assert.equal(validateProjectTaskInput('bad', { message: 'x' }).error, '项目 ID 无效');
+  assert.equal(validateProjectTaskInput(undefined, undefined).error, '项目 ID 无效');
+  assert.equal(validateProjectTaskInput('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {}).error, '请输入临时任务内容');
+  assert.match(validateProjectTaskInput('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', { message: 'x'.repeat(MAX_MESSAGE_LENGTH + 1) }).error, /不能超过/);
+  assert.equal(validateProjectTaskInput('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', { message: 'x', requestId: 'short' }).error, '创建请求标识无效');
+  assert.deepEqual(validateProjectTaskInput(' aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa ', { message: ' fix it ' }), {
+    ok: true, projectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', message: 'fix it', requestId: '',
+  });
+  assert.deepEqual(validateProjectTaskInput('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', { message: 'fix it', requestId: ' 12345678-1234-4123-8123-123456789012 ' }), {
+    ok: true, projectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', message: 'fix it', requestId: '12345678-1234-4123-8123-123456789012',
+  });
   const url = new URL('http://x/?token=secret');
   assert.equal(isAuthorized(url, {}, ''), true);
   assert.equal(isAuthorized(url, {}, 'secret'), true);

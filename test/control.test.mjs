@@ -10,6 +10,7 @@ import {
   controlProcessError,
   controlProtocolError,
   deliveryStatusUnknown,
+  desktopArchiveUnavailable,
   desktopControlUnavailable,
   discoverAppToolsPipe,
 } from '../src/control.mjs';
@@ -32,36 +33,12 @@ function childProcess(onWrite = () => undefined) {
   return child;
 }
 
-test('Codex control initializes the desktop proxy and steers the active turn', async () => {
-  const writes = [];
-  let spawned;
-  const child = childProcess((line, process) => {
-    const message = JSON.parse(line);
-    writes.push(message);
-    if (message.id === 1) process.stdout.write('\nnot-json\n{"id":1,"result":{}}\n');
-    if (message.id === 2) process.stdout.write('{"id":2,"result":{"turnId":"turn-2"}}\n');
-  });
-  const client = new CodexControlClient({
-    codexBin: '/codex',
-    socketPath: '/tmp/codex.sock',
-    spawn: (...args) => { spawned = args; return child; },
-  });
-  assert.deepEqual(await client.steer('thread-1', 'turn-1', '现在处理这个'), { turnId: 'turn-2' });
-  assert.deepEqual(spawned, ['/codex', ['app-server', 'proxy', '--sock', '/tmp/codex.sock'], { stdio: ['pipe', 'pipe', 'pipe'] }]);
-  assert.equal(writes[1].method, 'initialized');
-  assert.deepEqual(writes[0].params.capabilities, { experimentalApi: true });
-  assert.deepEqual(writes.slice(2), [{
-    id: 2,
-    method: 'turn/steer',
-    params: { threadId: 'thread-1', input: [{ type: 'text', text: '现在处理这个' }], expectedTurnId: 'turn-1' },
-  }]);
-  assert.equal(child.killed, true);
-
+test('Codex control initializes the desktop proxy and manages supported tasks', async () => {
   const startWrites = [];
   const startChild = childProcess((line, process) => {
     const message = JSON.parse(line);
     startWrites.push(message);
-    if (message.id === 1) process.stdout.write('{"method":"notice"}\n{"id":1,"result":{}}\n');
+    if (message.id === 1) process.stdout.write('\nnot-json\n{"method":"notice"}\n{"id":1,"result":{}}\n');
     if (message.id === 2) process.stdout.write('{"id":2,"result":{"thread":{"id":"thread-1"}}}\n');
     if (message.id === 3) process.stdout.write('{"id":3,"result":{"turn":{"id":"turn-new"}}}\n');
   });
@@ -75,6 +52,28 @@ test('Codex control initializes the desktop proxy and steers the active turn', a
   startChild.stdout.write('{"method":"turn/completed","params":{"threadId":"thread-1"}}\n');
   assert.equal(startChild.killed, true);
   assert.deepEqual(await starter.callSequence([]), []);
+
+  const functionalWrites = [];
+  const functionalChild = childProcess((line, process) => {
+    const message = JSON.parse(line);
+    functionalWrites.push(message);
+    if (message.id === 1) process.stdout.write('{"id":1,"result":{}}\n');
+    if (message.id === 2) process.stdout.write('{"id":2,"result":{"thread":{"id":"thread-functional"}}}\n');
+    if (message.id === 3) process.stdout.write('{"id":3,"result":{"ok":true}}\n');
+  });
+  assert.deepEqual(await new CodexControlClient({ socketPath: '/tmp/control.sock', spawn: () => functionalChild }).callSequence([
+    { method: 'thread/resume', params: { threadId: 'thread-functional' } },
+    (completed) => ({ method: 'status/read', params: { threadId: completed[0].thread.id } }),
+  ]), [{ thread: { id: 'thread-functional' } }, { ok: true }]);
+  assert.equal(functionalWrites[3].params.threadId, 'thread-functional');
+
+  const invalidRequestChild = childProcess((line, process) => {
+    if (JSON.parse(line).id === 1) process.stdout.write('{"id":1,"result":{}}\n');
+  });
+  await assert.rejects(
+    new CodexControlClient({ spawn: () => invalidRequestChild }).callSequence([() => { throw new Error('request build failed'); }]),
+    /request build failed/,
+  );
 
   const callChild = childProcess((line, process) => {
     const message = JSON.parse(line);
@@ -101,11 +100,33 @@ test('Codex control initializes the desktop proxy and steers the active turn', a
     { method: 'project/delete', params: { projectId: 'project-1' } },
   ]);
 
-  const appTools = { sendMessage: async (...args) => ({ args }) };
-  assert.deepEqual(
-    await new CodexControlClient({ appTools }).steer('thread-2', 'ignored-turn', '桌面通道'),
-    { args: ['thread-2', '桌面通道'] },
-  );
+  const appTools = {
+    sendMessage: async (...args) => ({ args }),
+    archiveThread: async (...args) => ({ archivedArgs: args }),
+  };
+  assert.deepEqual(await new CodexControlClient({ appTools }).archiveThread('thread-2'), {
+    archivedArgs: ['thread-2'],
+  });
+
+  const fallbackArchiveRequests = [];
+  const fallbackArchiveClient = new CodexControlClient({
+    appTools: { archiveThread: async () => { throw desktopArchiveUnavailable(); } },
+    spawn: () => childProcess((line, process) => {
+      const message = JSON.parse(line);
+      if (message.id === 1) process.stdout.write('{"id":1,"result":{}}\n');
+      if (message.id === 2) {
+        fallbackArchiveRequests.push(message);
+        process.stdout.write('{"id":2,"result":{}}\n');
+      }
+    }),
+  });
+  assert.deepEqual(await fallbackArchiveClient.archiveThread('thread-fallback'), {});
+  assert.equal(fallbackArchiveRequests[0].method, 'thread/archive');
+
+  const fatalArchiveError = new Error('archive denied');
+  await assert.rejects(new CodexControlClient({
+    appTools: { archiveThread: async () => { throw fatalArchiveError; } },
+  }).archiveThread('thread-denied'), fatalArchiveError);
 });
 
 test('Codex app tools channel discovers the desktop pipe and sends the prompt', async () => {
@@ -126,7 +147,7 @@ test('Codex app tools channel discovers the desktop pipe and sends the prompt', 
   });
   assert.deepEqual(await client.sendMessage('thread-1', '立即处理'), {
     accepted: true,
-    mode: 'steered',
+    mode: 'continued',
     via: 'codex-app',
     result: { content: [{ type: 'text', text: 'ok' }], isError: false },
   });
@@ -150,8 +171,36 @@ test('Codex app tools channel discovers the desktop pipe and sends the prompt', 
   assert.equal(child.killed, true);
   child.emit('error', new Error('late desktop error'));
 
+  const archiveWrites = [];
+  const archiveChild = childProcess((line, process) => {
+    const message = JSON.parse(line);
+    archiveWrites.push(message);
+    if (message.id === 1) process.stdout.write('{"jsonrpc":"2.0","id":1,"result":{}}\n');
+    if (message.id === 2) process.stdout.write('{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"archived"}],"isError":false}}\n');
+  });
+  const archiveClient = new CodexAppToolsClient({
+    pipePath: '/tmp/current.sock',
+    existsSync: () => true,
+    environment: { CODEX_SESSION_ID: 'session-caller' },
+    spawn: () => archiveChild,
+  });
+  assert.deepEqual(await archiveClient.archiveThread('thread-archive'), {
+    archived: true,
+    threadId: 'thread-archive',
+    via: 'codex-app',
+    result: { content: [{ type: 'text', text: 'archived' }], isError: false },
+  });
+  assert.deepEqual(archiveWrites[2], {
+    jsonrpc: '2.0',
+    id: 2,
+    method: 'tools/call',
+    params: { name: 'set_thread_archived', arguments: { threadId: 'thread-archive', archived: true } },
+  });
+
   assert.equal(discoverAppToolsPipe({ configured: ' /tmp/configured.sock ', existsSync: () => true }), '/tmp/configured.sock');
   assert.equal(discoverAppToolsPipe({ configured: '/tmp/stale.sock', existsSync: (path) => path === '/tmp/live.sock', execFileSync: () => 'CODEX_APP_TOOLS_PIPE_PATH=/tmp/dead.sock CODEX_APP_TOOLS_PIPE_PATH=/tmp/live.sock' }), '/tmp/live.sock');
+  assert.equal(discoverAppToolsPipe({ configured: '/tmp/stale.sock', excludedPaths: new Set(['/tmp/stale.sock', '/tmp/dead.sock']), existsSync: () => true, execFileSync: () => 'CODEX_APP_TOOLS_PIPE_PATH=/tmp/dead.sock CODEX_APP_TOOLS_PIPE_PATH=/tmp/live.sock' }), '/tmp/live.sock');
+  assert.equal(discoverAppToolsPipe({ configured: '/tmp/codex-browser-use/browser.sock', existsSync: () => true, execFileSync: () => 'CODEX_APP_TOOLS_PIPE_PATH=/tmp/codex-browser-use/browser.sock CODEX_APP_TOOLS_PIPE_PATH=/tmp/app-tools.sock' }), '/tmp/app-tools.sock');
   assert.equal(discoverAppToolsPipe({ configured: '', execFileSync: () => 'no pipe here' }), '');
   assert.equal(discoverAppToolsPipe({ configured: '', execFileSync: () => { throw new Error('ps failed'); } }), '');
   const savedPipe = process.env.CODEX_APP_TOOLS_PIPE_PATH;
@@ -186,7 +235,7 @@ test('Codex app tools channel discovers the desktop pipe and sends the prompt', 
   });
   assert.deepEqual(await environmentClient.sendMessage('thread-2', 'message'), {
     accepted: true,
-    mode: 'steered',
+    mode: 'continued',
     via: 'codex-app',
     result: undefined,
   });
@@ -230,11 +279,14 @@ test('Codex app tools channel discovers the desktop pipe and sends the prompt', 
   await retryClient.sendMessage('thread-retry', 'message');
   assert.equal(retryCount, 2);
   assert.equal(retryClient.pipePath, '/tmp/live.sock');
+  assert.equal(retryClient.failedPipes.has('/tmp/stale.sock'), true);
 });
 
 test('Codex app tools channel preserves the queue on desktop failures', async () => {
   const missing = new CodexAppToolsClient({ pipePath: '', execFileSync: () => '', environment: {} });
   await assert.rejects(missing.sendMessage('thread', 'text'), (error) => error.statusCode === 503);
+  await assert.rejects(missing.archiveThread('thread'), (error) => error.code === 'DESKTOP_ARCHIVE_UNAVAILABLE');
+  assert.equal(desktopArchiveUnavailable().statusCode, 503);
 
   const scenarios = [
     {
@@ -332,6 +384,34 @@ test('Codex app tools channel preserves the queue on desktop failures', async ()
   uncertainTimeoutCallback();
   await assert.rejects(uncertainPending, (error) => error.code === 'DELIVERY_STATUS_UNKNOWN');
   assert.equal(uncertainSpawns, 1);
+
+  let archiveTimeoutCallback;
+  const archiveTimeoutChild = childProcess((line, child) => {
+    if (JSON.parse(line).id === 1) child.stdout.write('{"id":1,"result":{}}\n');
+  });
+  const archiveTimeout = new CodexAppToolsClient({
+    pipePath: '/tmp/codex.sock',
+    existsSync: () => true,
+    spawn: () => archiveTimeoutChild,
+    setTimer: (callback) => { archiveTimeoutCallback = callback; return 13; },
+    clearTimer: () => undefined,
+  });
+  const archivePending = archiveTimeout.archiveThread('thread');
+  await new Promise((resolve) => setImmediate(resolve));
+  archiveTimeoutCallback();
+  await assert.rejects(archivePending, /归档超时/);
+
+  const rejectedArchive = new CodexAppToolsClient({
+    pipePath: '/tmp/codex.sock',
+    existsSync: () => true,
+    spawn: () => childProcess((line, child) => {
+      const message = JSON.parse(line);
+      if (message.id === 1) child.stdout.write('{"id":1,"result":{}}\n');
+      if (message.id === 2) child.stdout.write('{"id":2,"result":{"isError":true}}\n');
+    }),
+  });
+  await assert.rejects(rejectedArchive.archiveThread('thread'), /拒绝归档/);
+
 });
 
 test('Codex control reports protocol, process and timeout failures', async () => {
@@ -345,11 +425,11 @@ test('Codex control reports protocol, process and timeout failures', async () =>
       make: () => childProcess((line, child) => { if (JSON.parse(line).id === 1) child.stdout.write('{"id":1,"error":{}}\n'); }),
     },
     {
-      expected: /steer denied/,
+      expected: /control denied/,
       make: () => childProcess((line, child) => {
         const message = JSON.parse(line);
         if (message.id === 1) child.stdout.write('{"id":1,"result":{}}\n');
-        if (message.id === 2) child.stdout.write('{"id":2,"error":{"message":"steer denied"}}\n');
+        if (message.id === 2) child.stdout.write('{"id":2,"error":{"message":"control denied"}}\n');
       }),
     },
     {
@@ -382,13 +462,6 @@ test('Codex control reports protocol, process and timeout failures', async () =>
     await assert.rejects(client.call('test', {}), scenario.expected);
   }
 
-  const deniedSteer = new CodexControlClient({ spawn: () => childProcess((line, child) => {
-    const message = JSON.parse(line);
-    if (message.id === 1) child.stdout.write('{"id":1,"result":{}}\n');
-    if (message.id === 2) child.stdout.write('{"id":2,"error":{"message":"turn active-1 not found"}}\n');
-  }) });
-  await assert.rejects(deniedSteer.steer('thread-1', 'active-1', 'message'), /执行回合已经变化/);
-
   let timeoutCallback;
   let cleared = false;
   const timeoutClient = new CodexControlClient({
@@ -410,6 +483,10 @@ test('Codex control reports protocol, process and timeout failures', async () =>
   assert.match(controlProtocolError('thread 123 not found', 'fallback').message, /找不到该任务/);
   assert.match(controlProtocolError('turn 456 not found', 'fallback').message, /执行回合已经变化/);
   assert.match(controlProtocolError('expected active turn abc', 'fallback').message, /执行回合已经变化/);
+  const activeWriter = controlProtocolError('thread already has an active writer', 'fallback');
+  assert.equal(activeWriter.code, 'ACTIVE_WRITER');
+  assert.match(activeWriter.message, /操作通道暂时冲突/);
+  assert.doesNotMatch(activeWriter.message, /无法从手机归档|请使用电脑/);
   assert.equal(controlProtocolError('', 'fallback', 502).statusCode, 502);
   assert.equal(controlProtocolError('', 'fallback', 502).message, 'fallback');
 });
@@ -419,7 +496,7 @@ test('Codex control resumes idle tasks only through the desktop owner', async ()
   const appTools = {
     sendMessage: async (...args) => {
       calls.push(args);
-      return { accepted: true, mode: 'steered', via: 'codex-app' };
+      return { accepted: true, mode: 'continued', via: 'codex-app' };
     },
   };
   let spawned = false;
@@ -429,7 +506,7 @@ test('Codex control resumes idle tasks only through the desktop owner', async ()
   });
   assert.deepEqual(await client.resume('thread-1', '继续执行', '/work'), {
     accepted: true,
-    mode: 'steered',
+    mode: 'continued',
     via: 'codex-app',
   });
   assert.deepEqual(calls, [['thread-1', '继续执行']]);
@@ -441,7 +518,7 @@ test('Codex control resumes idle tasks only through the desktop owner', async ()
   await assert.rejects(unavailable.resume('thread-2', '不要抢占'), (error) => (
     error.statusCode === 503
     && error.code === 'DESKTOP_CONTROL_UNAVAILABLE'
-    && /ChatGPT Remote/.test(error.message)
+    && /消息仍保留/.test(error.message)
   ));
   assert.equal(spawned, false);
   assert.equal(desktopControlUnavailable().code, 'DESKTOP_CONTROL_UNAVAILABLE');

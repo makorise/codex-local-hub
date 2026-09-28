@@ -31,6 +31,9 @@ test('repository lists, caches details and escapes database paths', async () => 
   assert.match(calls[0][1][2], /queue''s\.db/);
   assert.match(calls[0][1][2], /history''s\.db/);
   assert.match(calls[0][1][2], /goals''s\.db/);
+  assert.doesNotMatch(calls[0][1][2], /json_extract\(hi\.item_json/);
+  assert.match(calls[0][1][2], /NULL AS latest_assistant/);
+  assert.match(calls[0][1][2], /t\.thread_source IS NULL AND t\.originator = 'Codex Desktop' AND t\.project_id IS NOT NULL/);
   assert.equal(escapeSqlite("a'b"), "a''b");
 });
 
@@ -47,6 +50,7 @@ test('repository falls back when optional Codex databases are not initialized', 
   });
   assert.equal((await repository.listTasks())[0].title, 'Task');
   assert.match(calls[1][2], /NULL AS latest_user/);
+  assert.match(calls[1][2], /t\.thread_source IS NULL AND t\.originator = 'Codex Desktop' AND t\.project_id IS NOT NULL/);
 
   repository.execFile = async (command) => {
     if (command === 'sqlite3') throw Object.assign(new Error('unable to open database file'), { stderr: '' });
@@ -166,6 +170,92 @@ test('task and project management uses Codex controls without deleting workspace
   await assert.rejects(unsupported.stopTask(row.id), (error) => error.statusCode === 503);
   await assert.rejects(unsupported.archiveThread(row.id), (error) => error.statusCode === 503);
   await assert.rejects(unsupported.removeProject('project', 'name'), (error) => error.statusCode === 503);
+
+  const fallbackWrites = [];
+  const desktopOwned = new CodexRepository({
+    stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals',
+    execFile: async (...args) => { fallbackWrites.push(args); return { stdout: '' }; },
+    archiveTask: async () => { throw Object.assign(new Error('active writer'), { code: 'ACTIVE_WRITER' }); },
+  });
+  desktopOwned.details.set("desktop'owned", { id: "desktop'owned" });
+  assert.deepEqual(await desktopOwned.archiveThread("desktop'owned"), {
+    archived: true,
+    threadId: "desktop'owned",
+  });
+  assert.equal(fallbackWrites.length, 1);
+  assert.equal(fallbackWrites[0][0], 'sqlite3');
+  assert.equal(fallbackWrites[0][1][0], '/state');
+  assert.match(fallbackWrites[0][1][1], /SET archived = 1, archived_at = CAST/);
+  assert.match(fallbackWrites[0][1][1], /desktop''owned/);
+  assert.equal(desktopOwned.details.has("desktop'owned"), false);
+});
+
+test('repository lists projects without exposing task creation', async () => {
+  let projectRows = [{ id: 'project-1', name: 'sync' }];
+  const repository = new CodexRepository({
+    stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals',
+    execFile: async (_command, args) => {
+      const sql = args[2];
+      if (sql.includes('WHERE EXISTS')) return { stdout: JSON.stringify(projectRows) };
+      return { stdout: '' };
+    },
+  });
+  assert.deepEqual(await repository.listProjects(), [{ id: 'project-1', name: 'sync' }]);
+  assert.equal(repository.createTemporaryTask, undefined);
+  assert.equal(repository.steerQueuedTask, undefined);
+  projectRows = [];
+  assert.deepEqual(await repository.listProjects(), []);
+  repository.execFile = async () => ({ stdout: '' });
+  assert.deepEqual(await repository.listProjects(), []);
+});
+
+test('activity summary reports a truthful 30-day work rhythm and safe empty fallbacks', async () => {
+  const timestamp = new Date(2026, 8, 28, 10, 0, 0).getTime();
+  let calls = 0;
+  const repository = new CodexRepository({
+    stateDb: '/state', queueDb: '/queue', historyDb: '/history', goalsDb: '/goals', now: () => timestamp,
+    execFile: async (_command, args) => {
+      calls += 1;
+      if (calls === 1) {
+        assert.match(args[2], /FROM thread_turns/);
+        return { stdout: JSON.stringify([{ date: '2026-09-28', turns: 5, completed_turns: 4, duration_ms: 90_000 }]) };
+      }
+      assert.match(args[2], /AS project_count/);
+      return { stdout: JSON.stringify([{ project_count: 3, task_count: 12, recent_task_count: 7, archived_task_count: 2 }]) };
+    },
+  });
+  const summary = await repository.activitySummary();
+  assert.equal(summary.days.length, 30);
+  assert.deepEqual(summary.days.at(-1), { date: '2026-09-28', turns: 5, completedTurns: 4, durationMs: 90_000 });
+  assert.equal(summary.activeDays, 1);
+  assert.equal(summary.totalTurns, 5);
+  assert.equal(summary.completedTurns, 4);
+  assert.equal(summary.totalDurationMs, 90_000);
+  assert.equal(summary.projectCount, 3);
+  assert.equal(summary.taskCount, 12);
+  assert.equal(summary.recentTaskCount, 7);
+  assert.equal(summary.archivedTaskCount, 2);
+  assert.equal(summary.updatedAt, timestamp);
+
+  calls = 0;
+  repository.execFile = async () => {
+    calls += 1;
+    if (calls === 1) throw Object.assign(new Error('optional'), { stderr: 'no such table: thread_turns' });
+    return { stdout: '' };
+  };
+  const empty = await repository.activitySummary();
+  assert.equal(empty.totalTurns, 0);
+  assert.equal(empty.projectCount, 0);
+
+  calls = 0;
+  repository.execFile = async () => {
+    calls += 1;
+    return { stdout: calls === 1 ? '' : '[null]' };
+  };
+  assert.equal((await repository.activitySummary()).taskCount, 0);
+
+  repository.execFile = async () => { throw new Error('database locked'); };
+  await assert.rejects(repository.activitySummary(), /database locked/);
 });
 
 test('history messages parse user, assistant, queued and invalid records', () => {
@@ -225,8 +315,8 @@ test('queue mutations reorder and delete atomically with revision conflict prote
   await assert.rejects(repository.deleteQueuedTask('1234567890abcdef1234', 'dddddddddddddddddddd', afterDelete[0].queueRevision), (error) => error.statusCode === 409);
 });
 
-test('queued task steering delivers through Codex Desktop and removes only accepted work', async (t) => {
-  const directory = await mkdtemp(join(tmpdir(), 'bridge-steer-'));
+test('queued task waking keeps Codex Desktop as the task owner', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'bridge-wake-'));
   const queueDb = join(directory, 'queue.sqlite');
   const historyDb = join(directory, 'history.sqlite');
   const threadId = '1234567890abcdef1234';
@@ -238,59 +328,39 @@ test('queued task steering delivers through Codex Desktop and removes only accep
     CREATE TRIGGER queued_items_revision_after_delete AFTER DELETE ON queued_items BEGIN INSERT INTO queued_thread_revisions (thread_id) VALUES (OLD.thread_id) ON CONFLICT(thread_id) DO UPDATE SET revision = (SELECT COALESCE(MAX(revision), 0) + 1 FROM queued_thread_revisions); END;
     CREATE TRIGGER queued_items_revision_after_update AFTER UPDATE ON queued_items BEGIN INSERT INTO queued_thread_revisions (thread_id) VALUES (NEW.thread_id) ON CONFLICT(thread_id) DO UPDATE SET revision = (SELECT COALESCE(MAX(revision), 0) + 1 FROM queued_thread_revisions); END;
     INSERT INTO queued_items VALUES
-      ('aaaaaaaaaaaaaaaaaaaa', '${threadId}', '{"UserInput":{"content":[{"type":"text","text":"steer me"}]}}', 1, 1, 1),
-      ('bbbbbbbbbbbbbbbbbbbb', '${threadId}', '{"UserInput":{"content":[{"type":"text","text":"keep me"}]}}', 2, 2, 2);
+      ('aaaaaaaaaaaaaaaaaaaa', '${threadId}', '{"UserInput":{"content":[{"type":"text","text":"wake me"}]}}', 1, 1, 1);
   `]);
   await execFile('sqlite3', [historyDb, `
     CREATE TABLE thread_turns (thread_id TEXT, turn_id TEXT, status TEXT, rollout_ordinal INTEGER);
-    INSERT INTO thread_turns VALUES ('${threadId}', 'turn-active', 'inProgress', 1);
+    INSERT INTO thread_turns VALUES ('${threadId}', 'turn-complete', 'completed', 1);
   `]);
-  const calls = [];
-  const repository = new CodexRepository({
-    stateDb: '/state', queueDb, historyDb, goalsDb: '/goals',
-    steerMessage: async (...args) => { calls.push(args); return { accepted: true, mode: 'steered' }; },
-  });
-  const initial = await repository.loadQueuedTasks(threadId);
-  await assert.rejects(repository.steerQueuedTask(threadId, initial[0].id, initial[0].queueRevision + 1), (error) => error.statusCode === 409);
-  const steered = await repository.steerQueuedTask(threadId, initial[1].id, initial[0].queueRevision);
-  assert.deepEqual(calls, [[threadId, 'turn-active', 'keep me']]);
-  assert.deepEqual(steered.result, { accepted: true, mode: 'steered' });
-  assert.deepEqual(steered.queuedTasks.map((item) => item.text), ['steer me']);
-
-  repository.steerMessage = async () => { throw Object.assign(new Error('desktop rejected steer'), { statusCode: 502 }); };
-  const preserved = await repository.loadQueuedTasks(threadId);
-  await assert.rejects(repository.steerQueuedTask(threadId, preserved[0].id, preserved[0].queueRevision), /desktop rejected steer/);
-  assert.deepEqual((await repository.loadQueuedTasks(threadId)).map((item) => item.text), ['steer me']);
-
-  await execFile('sqlite3', [historyDb, `UPDATE thread_turns SET status = 'completed';`]);
-  repository.steerMessage = async (...args) => { calls.push(args); return { accepted: true, mode: 'started' }; };
-  const idle = await repository.loadQueuedTasks(threadId);
-  const started = await repository.steerQueuedTask(threadId, idle[0].id, idle[0].queueRevision);
-  assert.deepEqual(calls.at(-1), [threadId, null, 'steer me']);
-  assert.deepEqual(started.result, { accepted: true, mode: 'started' });
-  assert.deepEqual(started.queuedTasks, []);
-
-  await execFile('sqlite3', [queueDb, `INSERT INTO queued_items VALUES ('cccccccccccccccccccc', '${threadId}', '{"UserInput":{"content":[{"type":"text","text":"preserve unsupported"}]}}', 1, 3, 3);`]);
-  const unsupported = new CodexRepository({ stateDb: '/state', queueDb, historyDb, goalsDb: '/goals' });
-  const unsupportedItem = (await unsupported.loadQueuedTasks(threadId))[0];
-  await assert.rejects(unsupported.steerQueuedTask(threadId, unsupportedItem.id, unsupportedItem.queueRevision), (error) => error.statusCode === 503);
-  assert.deepEqual((await unsupported.loadQueuedTasks(threadId)).map((item) => item.text), ['preserve unsupported']);
-
   const wakeCalls = [];
   const waker = new CodexRepository({
     stateDb: '/state', queueDb, historyDb, goalsDb: '/goals',
-    steerMessage: async (...args) => { wakeCalls.push(args); return { accepted: true, mode: 'started' }; },
+    platform: 'darwin',
+    execFile: async (command, args) => {
+      if (command === '/usr/bin/open') {
+        wakeCalls.push([command, ...args]);
+        return { stdout: '' };
+      }
+      return execFile(command, args);
+    },
   });
   const awakened = await waker.wakeQueuedTaskIfIdle(threadId);
   assert.equal(awakened.started, true);
-  assert.equal(awakened.itemId, unsupportedItem.id);
-  assert.deepEqual(wakeCalls, [[threadId, null, 'preserve unsupported']]);
+  assert.equal(awakened.itemId, 'aaaaaaaaaaaaaaaaaaaa');
+  assert.deepEqual(wakeCalls, [['/usr/bin/open', '-g', `codex://threads/${threadId}`]]);
+  assert.deepEqual((await waker.loadQueuedTasks(threadId)).map((message) => message.text), ['wake me']);
+  await execFile('sqlite3', [queueDb, `DELETE FROM queued_items WHERE thread_id = '${threadId}';`]);
   assert.deepEqual(await waker.wakeQueuedTaskIfIdle(threadId), { started: false, reason: 'empty' });
 
   await execFile('sqlite3', [queueDb, `INSERT INTO queued_items VALUES ('dddddddddddddddddddd', '${threadId}', '{"UserInput":{"content":[{"type":"text","text":"wait for active"}]}}', 1, 4, 4);`]);
   await execFile('sqlite3', [historyDb, `UPDATE thread_turns SET status = 'inProgress', turn_id = 'turn-new';`]);
   assert.deepEqual(await waker.wakeQueuedTaskIfIdle(threadId), { started: false, reason: 'active' });
   assert.deepEqual((await waker.loadQueuedTasks(threadId)).map((item) => item.text), ['wait for active']);
+
+  const unsupportedWake = new CodexRepository({ stateDb: '/state', queueDb, historyDb, goalsDb: '/goals', platform: 'linux' });
+  await assert.rejects(unsupportedWake.wakeDesktopThread(threadId), (error) => error.code === 'DESKTOP_WAKE_UNAVAILABLE');
 });
 
 test('thread working directory uses cached, stored and process fallbacks', async () => {

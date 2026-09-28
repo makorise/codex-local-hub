@@ -4,6 +4,18 @@ import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
 
 const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
+
+test('unsupported task creation and steer controls are absent from the phone UI', () => {
+  const dom = new JSDOM(html);
+  assert.equal(dom.window.document.querySelector('#new-task-button'), null);
+  assert.equal(dom.window.document.querySelector('.task-toolbar .filters')?.firstElementChild?.dataset.filter, 'all');
+  assert.doesNotMatch(html, /new-task|data-action="steer"/);
+  assert.doesNotMatch(css, /new-task|queue-steer|project-picker/);
+  assert.match(css, /\.connection-dot\s*\{[^}]*flex:\s*0 0 7px;/s);
+  const mobileCss = css.slice(css.indexOf('@media (max-width: 760px)'));
+  assert.match(mobileCss, /\.modal-sheet\s*\{[^}]*max-height:\s*calc\(100dvh - max\(8px, env\(safe-area-inset-top\)\)\);/s);
+});
 
 function response(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -41,6 +53,25 @@ function todayTokens(overrides = {}) {
   };
 }
 
+function activitySummary(overrides = {}) {
+  const anchor = new Date('2026-09-28T12:00:00');
+  const days = Array.from({ length: 30 }, (_, index) => {
+    const date = new Date(anchor);
+    date.setDate(anchor.getDate() - (29 - index));
+    return {
+      date: date.toISOString().slice(0, 10),
+      turns: index % 4,
+      completedTurns: index % 5,
+      durationMs: (index % 5) * 60_000,
+    };
+  });
+  return {
+    days, activeDays: 24, totalTurns: 43, completedTurns: 60,
+    totalDurationMs: 7_260_000, projectCount: 3, taskCount: 18,
+    recentTaskCount: 6, archivedTaskCount: 2, updatedAt: Date.now(), ...overrides,
+  };
+}
+
 class FakeEventSource {
   static instances = [];
   constructor(url) {
@@ -74,6 +105,9 @@ async function setup({ failing = new Map(), empty = false, taskCount = 1 } = {})
   FakeEventSource.instances = [];
   let queued = queue();
   let messageMode = 'started';
+  let versionInfo = { currentVersion: '0.2.38', latestVersion: '0.2.38', state: 'latest', updateAvailable: false, canUpdate: false, requiresDesktop: false, checkedAt: Date.now() };
+  let runtimeVersion = '0.2.38';
+  let updateResponse = { accepted: true, version: { currentVersion: '0.2.38', latestVersion: '0.2.39', state: 'available', updateAvailable: true, canUpdate: true, requiresDesktop: false } };
   const deliveryTimestamp = Date.now();
   const sampleDeliveries = [
     { id: 'one.png', title: '首页截图', createdAt: deliveryTimestamp, size: 200, mime: 'image/png', url: '/api/deliveries/files/one.png' },
@@ -87,12 +121,22 @@ async function setup({ failing = new Map(), empty = false, taskCount = 1 } = {})
     project: `project-${(index % 4) + 1}`,
     updatedAt: Date.now() - index * 60_000,
   }));
+  const projects = [{ id: task().projectId, name: 'sync' }, { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', name: 'growth' }];
   globalThis.fetch = async (input, options = {}) => {
     const url = new URL(String(input));
-    calls.push([url.pathname, options.method || 'GET']);
+    calls.push([url.pathname, options.method || 'GET', options.body]);
     if (failing.has(url.pathname)) return response({ error: failing.get(url.pathname) }, 500);
     if (url.pathname === '/api/tasks') return response({ tasks: empty ? [] : availableTasks, syncedAt: Date.now() });
+    if (url.pathname === '/api/version') return response({ version: versionInfo });
+    if (url.pathname === '/api/health') return response({ ok: true, version: runtimeVersion });
+    if (url.pathname === '/api/update' && options.method === 'POST') return response(updateResponse, updateResponse.error ? 409 : 202);
+    if (url.pathname === '/api/projects') return response({ projects: empty ? [] : projects });
+    if (url.pathname === `/api/projects/${task().projectId}/tasks` && options.method === 'POST') {
+      const createdMessage = JSON.parse(options.body).message;
+      return response({ created: true, threadId: createdMessage === '未出现在列表' ? 'new-thread' : task().id, projectId: task().projectId, project: 'sync' }, 201);
+    }
     if (url.pathname === '/api/usage') return response({ usage: empty ? { available: false, limits: [], todayTokens: { available: false } } : { planType: 'pro', limits: [{ label: '周', usedPercent: 20, remainingPercent: 80, resetsAt: Date.now() + 60_000 }], todayTokens: todayTokens() } });
+    if (url.pathname === '/api/activity') return response({ activity: activitySummary(empty ? { days: [], activeDays: 0, totalTurns: 0, completedTurns: 0, totalDurationMs: 0, projectCount: 0, taskCount: 0, recentTaskCount: 0 } : {}) });
     if (url.pathname === '/api/account') return response({ account: empty ? { available: false, name: null, initial: null } : { available: true, name: 'alice', initial: 'A' } });
     if (url.pathname === '/api/deliveries' && options.method === 'DELETE') {
       const deleted = deliveries.length;
@@ -130,18 +174,103 @@ async function setup({ failing = new Map(), empty = false, taskCount = 1 } = {})
       else globalThis[name] = value;
     }
   };
-  return { dom, module, calls, failing, setMessageMode: (mode) => { messageMode = mode; }, cleanup };
+  return {
+    dom, module, calls, failing,
+    setMessageMode: (mode) => { messageMode = mode; },
+    setVersionInfo: (value) => { versionInfo = value; },
+    setRuntimeVersion: (value) => { runtimeVersion = value; },
+    setUpdateResponse: (value) => { updateResponse = value; },
+    cleanup,
+  };
 }
 
 test('frontend renders tasks, details, usage and every queue interaction', async (t) => {
   const failures = new Map();
-  const { dom, module: ui, calls, failing: activeFailures, setMessageMode, cleanup } = await setup({ failing: failures, taskCount: 24 });
+  const { dom, module: ui, calls, failing: activeFailures, setMessageMode, setVersionInfo, setRuntimeVersion, setUpdateResponse, cleanup } = await setup({ failing: failures, taskCount: 24 });
   t.after(cleanup);
   const document = dom.window.document;
   assert.equal(dom.window.location.search, '');
   ui.stripTokenFromUrl();
+  assert.equal(ui.ignoreFailure(), undefined);
+  assert.equal(document.querySelector('#version-current').textContent, 'v0.2.38');
+  assert.equal(document.querySelector('#version-state').textContent, '最新');
+  document.querySelector('#version-button').click();
+  assert.equal(document.querySelector('#modal-title').textContent, 'Codex 瞭望台版本');
+  assert.match(document.querySelector('.version-card').textContent, /最新正式版/);
+  document.querySelector('[data-action="version-refresh"]').click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(calls.some(([path]) => path === '/api/version'));
+  ui.closeContent();
+  const latestVersion = { currentVersion: '0.2.39', latestVersion: '0.2.39', state: 'latest', updateAvailable: false, canUpdate: false, requiresDesktop: false };
+  const availableVersion = { currentVersion: '0.2.38', latestVersion: '0.2.39', state: 'available', updateAvailable: true, canUpdate: true, requiresDesktop: false };
+  ui.state.version = { ...availableVersion, canUpdate: false, requiresDesktop: true };
+  ui.renderVersion();
+  ui.renderVersionDetails();
+  assert.match(document.querySelector('.version-note').textContent, /Mac 宿主程序/);
+  ui.state.version = { ...availableVersion };
+  ui.renderVersion();
+  ui.renderVersionDetails();
+  assert.equal(document.querySelector('#version-button').classList.contains('is-update'), true);
+  setVersionInfo(latestVersion);
+  setRuntimeVersion('0.2.39');
+  assert.equal(await ui.requestPhoneUpdate(), true);
+  assert.equal(ui.state.version.state, 'latest');
+  ui.state.version = { ...availableVersion };
+  setUpdateResponse({ accepted: false, version: latestVersion });
+  ui.renderVersionDetails();
+  document.querySelector('[data-action="version-update"]').click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(ui.state.version.state, 'latest');
+  setUpdateResponse({ error: '需要电脑更新', version: { ...availableVersion, canUpdate: false, requiresDesktop: true } });
+  setVersionInfo({ ...availableVersion, canUpdate: false, requiresDesktop: true });
+  ui.state.version = { ...availableVersion };
+  assert.equal(await ui.requestPhoneUpdate(), false);
+  ui.state.version = { ...availableVersion, state: 'ahead' };
+  ui.renderVersion();
+  assert.equal(document.querySelector('#version-state').textContent, '开发版');
+  ui.state.version = { ...availableVersion, state: 'unavailable', latestVersion: null };
+  ui.renderVersionDetails();
+  assert.match(document.querySelector('.version-card').textContent, /暂时无法读取/);
+  ui.state.version = {};
+  ui.renderVersion();
+  ui.renderVersionDetails();
+  assert.equal(ui.versionStateLabel(null), '待检查');
+  assert.match(document.querySelector('.version-card').textContent, /未知/);
+  ui.state.version = null;
+  ui.renderVersion();
+  assert.equal(document.querySelector('#version-button').hidden, true);
+  assert.equal(ui.renderVersionDetails(), false);
+  setVersionInfo(latestVersion);
+  assert.equal((await ui.loadVersion()).state, 'latest');
+  activeFailures.set('/api/version', 'version unavailable');
+  ui.state.version = { ...availableVersion };
+  ui.renderVersionDetails();
+  document.querySelector('[data-action="version-refresh"]').click();
+  await new Promise((resolve) => setImmediate(resolve));
+  await assert.rejects(ui.loadVersion({ force: true }), /version unavailable/);
+  activeFailures.delete('/api/version');
+  assert.equal(await ui.waitForRuntimeVersion('0.2.38', { attempts: 1, pause: async () => {}, fetchImpl: async () => response({}, 500) }), null);
+  assert.equal(await ui.waitForRuntimeVersion('0.2.38', { attempts: 1, pause: async () => {}, fetchImpl: async () => { throw new Error('restart'); } }), null);
+  assert.equal(await ui.waitForRuntimeVersion('0.2.38', { attempts: 1, pause: async () => {}, fetchImpl: async () => response({ version: '0.2.38' }) }), null);
+  assert.equal(await ui.waitForRuntimeVersion('0.2.38', { attempts: 1, pause: async () => {}, fetchImpl: async () => response({ version: '0.2.39' }) }), '0.2.39');
+  ui.state.version = { ...availableVersion };
+  setUpdateResponse({ accepted: true, version: availableVersion });
+  setRuntimeVersion('0.2.38');
+  activeFailures.set('/api/version', 'version unavailable');
+  assert.equal(await ui.requestPhoneUpdate(), false);
+  activeFailures.delete('/api/version');
+  setVersionInfo(latestVersion);
+  setRuntimeVersion('0.2.39');
   assert.equal(document.querySelectorAll('.task-card').length, 24);
+  const firstCardHead = document.querySelector('.task-card-head');
+  assert.equal(firstCardHead.querySelector('h3').textContent, '同步任务');
+  assert.equal(firstCardHead.querySelector('.status-pill') !== null, true);
+  assert.equal(firstCardHead.querySelector('time') !== null, true);
   assert.equal(document.querySelectorAll('.project-group').length, 5);
+  assert.equal(document.querySelector('#task-count').textContent, '24');
+  assert.equal(document.querySelector('#active-count').textContent, '24');
+  assert.equal(document.querySelector('#queued-count').textContent, '72');
+  assert.equal(document.querySelector('#done-count').textContent, '0');
   assert.equal(document.querySelector('.project-heading strong').textContent, 'sync');
   const firstProjectToggle = document.querySelector('.project-group-toggle');
   firstProjectToggle.click();
@@ -240,9 +369,22 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.equal(document.querySelector('#account-badge').getAttribute('aria-label'), '当前 Codex 账号：alice');
   assert.equal(document.querySelectorAll('.delivery-thumb').length, 2);
   assert.equal(document.querySelector('#delivery-inbox').hidden, false);
+  assert.equal(document.querySelector('#new-task-button'), null);
+  assert.equal(document.querySelector('[data-action="steer"]'), null);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, options = {}) => {
+    const url = new URL(String(input));
+    if (url.pathname === '/api/projects') return response({ projects: null });
+    return originalFetch(input, options);
+  };
+  assert.deepEqual(await ui.loadProjects(), []);
+  globalThis.fetch = originalFetch;
+  activeFailures.set('/api/projects', 'projects unavailable');
+  await assert.rejects(ui.loadProjects(), /projects unavailable/);
+  activeFailures.delete('/api/projects');
   document.querySelector('#language-button').click();
   assert.equal(document.documentElement.lang, 'en');
-  assert.equal(document.querySelector('[data-filter="all"]').textContent, 'All');
+  assert.equal(document.querySelector('[data-filter="all"] span').textContent, 'All');
   assert.equal(document.querySelector('#connection-text').textContent.includes('Synced'), true);
   assert.equal(document.querySelector('#account-badge').getAttribute('aria-label'), 'Current Codex account: alice');
   assert.equal(document.querySelector('#usage-summary').textContent, 'Weekly window: 80% remaining');
@@ -320,7 +462,15 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   dom.window.matchMedia = () => ({ matches: false });
   assert.equal(ui.shouldShowInstallTip(), true);
 
-  Object.defineProperty(dom.window.navigator, 'serviceWorker', { configurable: true, value: { register: async () => ({}) } });
+  let serviceWorkerUpdates = 0;
+  Object.defineProperty(dom.window.navigator, 'serviceWorker', { configurable: true, value: { register: async (path, options) => {
+    assert.equal(path, '/service-worker.js');
+    assert.deepEqual(options, { updateViaCache: 'none' });
+    return { update: async () => { serviceWorkerUpdates += 1; } };
+  } } });
+  assert.equal(await ui.registerServiceWorker(), true);
+  assert.equal(serviceWorkerUpdates, 1);
+  Object.defineProperty(dom.window.navigator, 'serviceWorker', { configurable: true, value: { register: async () => ({ update: async () => { throw new Error('offline'); } }) } });
   assert.equal(await ui.registerServiceWorker(), true);
   Object.defineProperty(dom.window.navigator, 'serviceWorker', { configurable: true, value: { register: async () => { throw new Error('no'); } } });
   assert.equal(await ui.registerServiceWorker(), false);
@@ -467,19 +617,6 @@ test('frontend renders tasks, details, usage and every queue interaction', async
 
   document.querySelector('#queue-card').click();
   assert.equal(document.querySelectorAll('.queue-manager-list li').length, 3);
-  const steerFailurePath = `/api/tasks/${task().id}/queue/${queue()[0].id}/steer`;
-  failures.set(steerFailurePath, '立即执行失败；消息仍保留在队列中');
-  document.querySelector('[data-action="steer"]').click();
-  assert.match(document.querySelector('.queue-notice').textContent, /正在插入当前执行回合/);
-  assert.equal(document.querySelector('#modal-content').classList.contains('is-busy'), true);
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(document.querySelectorAll('.queue-manager-list li').length, 3);
-  assert.match(document.querySelector('.queue-notice').textContent, /消息仍保留在队列中/);
-  assert.equal(document.querySelectorAll('.queue-notice').length, 1);
-  assert.equal(document.querySelector('#toast').textContent.includes('消息仍保留在队列中'), false);
-  assert.equal(document.querySelector('#modal-content').classList.contains('is-busy'), false);
-  assert.ok(calls.some(([path, method]) => path === steerFailurePath && method === 'POST'));
-  failures.delete(steerFailurePath);
   document.querySelector('[data-action="expand"]').click();
   assert.equal(document.querySelector('.queue-manager-list li').classList.contains('is-expanded'), true);
   await ui.reorderQueue(queue()[1].id, -1);
@@ -487,8 +624,6 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   document.querySelector('[data-action="delete"]').click();
   assert.equal(document.querySelector('[data-action="delete"]').textContent.trim(), '确认');
   await ui.deleteQueueItem(document.querySelector('[data-queue-id]').dataset.queueId);
-  assert.equal(document.querySelectorAll('.queue-manager-list li').length, 2);
-  await ui.steerQueueItem(document.querySelector('[data-queue-id]').dataset.queueId);
   assert.equal(document.querySelectorAll('.queue-manager-list li').length, 2);
 
   document.querySelector('#modal-close').click();
@@ -500,9 +635,18 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.match(document.querySelector('#modal-content').textContent, /完成移动端/);
   document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape' }));
   document.querySelector('#usage-card').click();
-  assert.match(document.querySelector('#modal-content').textContent, /已使用 20%/);
-  assert.match(document.querySelector('#modal-content').textContent, /总计 12,345/);
-  assert.match(document.querySelector('#modal-content').textContent, /不包含网页端/);
+  assert.equal(document.querySelector('#modal-title').textContent, '活动数据');
+  assert.equal(document.querySelector('.modal-sheet').classList.contains('activity-sheet'), true);
+  assert.equal(document.querySelectorAll('.activity-metrics article').length, 4);
+  assert.match(document.querySelector('.activity-dashboard').textContent, /近 30 天完成了 60 个工作回合/);
+  assert.match(document.querySelector('.activity-dashboard').textContent, /今日 Token/);
+  assert.match(document.querySelector('.activity-dashboard').textContent, /本周余量 80%/);
+  assert.equal(document.querySelector('[data-range="7"]').classList.contains('is-active'), true);
+  document.querySelector('[data-range="30"]').click();
+  assert.equal(document.querySelector('[data-range="30"]').classList.contains('is-active'), true);
+  assert.match(document.querySelector('.activity-chart-line').getAttribute('d'), /^M /);
+  document.querySelector('#modal-close').click();
+  assert.equal(document.querySelector('.modal-sheet').classList.contains('activity-sheet'), false);
 
   const textarea = document.querySelector('#message-input');
   textarea.value = '继续处理';
@@ -540,7 +684,21 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   document.querySelector('[data-filter="done"]').click();
   assert.match(document.querySelector('#task-list').textContent, /没有符合条件/);
   document.querySelector('[data-filter="all"]').click();
-  document.querySelector('#refresh-button').click();
+  const refreshButton = document.querySelector('#refresh-button');
+  refreshButton.click();
+  assert.equal(refreshButton.disabled, true);
+  assert.equal(refreshButton.classList.contains('is-refreshing'), true);
+  assert.equal(refreshButton.getAttribute('aria-busy'), 'true');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(refreshButton.disabled, false);
+  assert.equal(refreshButton.classList.contains('is-refreshing'), false);
+  assert.equal(refreshButton.hasAttribute('aria-busy'), false);
+  assert.equal(refreshButton.getAttribute('aria-label'), '刷新任务');
+  assert.equal(document.querySelector('#toast').textContent, '已刷新');
+  failures.set(`/api/tasks/${task().id}`, 'refresh detail failed');
+  assert.equal(await ui.refreshTasks(), false);
+  assert.match(document.querySelector('#toast').textContent, /refresh detail failed/);
+  failures.delete(`/api/tasks/${task().id}`);
   document.querySelector('#back-button').click();
   assert.equal(document.querySelector('#detail-pane').classList.contains('is-open'), false);
 
@@ -613,6 +771,28 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   ui.state.usage = null;
   ui.renderUsage();
   document.querySelector('#usage-card').click();
+  assert.equal(document.querySelector('.activity-allowance'), null);
+  assert.deepEqual(ui.activityChartGeometry(), {
+    max: 1,
+    points: [{ x: 8, y: 108 }],
+    line: 'M 8.00 108.00',
+    area: 'M 8.00 108.00 L 8.00 112 L 8.00 112 Z',
+  });
+  const mixedChart = ui.activityChartGeometry([{ turns: -2 }, { turns: 'bad' }, { turns: 4 }]);
+  assert.equal(mixedChart.max, 4);
+  assert.equal(mixedChart.points.length, 3);
+  assert.match(ui.activityDayLabel('2026-09-28'), /9.*28/);
+  ui.state.activity = null;
+  assert.equal(ui.renderActivityDashboard(), false);
+  ui.state.account = null;
+  ui.state.activity = activitySummary({ days: [], activeDays: 0, totalTurns: 0, completedTurns: 0, totalDurationMs: 0 });
+  assert.equal(ui.renderActivityDashboard(9), true);
+  assert.match(document.querySelector('.activity-dashboard').textContent, /本机账号/);
+  assert.match(document.querySelector('.activity-chart-card').textContent, /还没有完成的工作回合/);
+  delete ui.state.activity.days;
+  assert.equal(ui.renderActivityDashboard(), true);
+  ui.closeContent();
+  ui.state.activity = activitySummary();
 
   dom.window.history.replaceState(null, '', '/');
   ui.state.selectedId = null;
@@ -657,8 +837,6 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   ui.state.details.set(task().id, { ...baseTask, messages: [], queuedTasks: queue() });
   ui.renderDetail();
   ui.renderQueueManager();
-  document.querySelector('[data-action="steer"]').click();
-  await new Promise((resolve) => setImmediate(resolve));
   ui.state.details.set(task().id, { ...baseTask, messages: [], queuedTasks: queue() });
   ui.renderQueueManager();
   document.querySelectorAll('[data-action="down"]')[0].click();
@@ -687,16 +865,6 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   failures.set(`/api/tasks/${task().id}/queue/${queue()[0].id}`, '');
   await assert.rejects(ui.deleteQueueItem(queue()[0].id), /删除失败/);
   failures.delete(`/api/tasks/${task().id}/queue/${queue()[0].id}`);
-  failures.set(`/api/tasks/${task().id}/queue/${queue()[0].id}/steer`, 'steer failed');
-  await assert.rejects(ui.steerQueueItem(queue()[0].id), /steer failed/);
-  failures.set(`/api/tasks/${task().id}/queue/${queue()[0].id}/steer`, '');
-  await assert.rejects(ui.steerQueueItem(queue()[0].id), /立即执行失败/);
-  failures.delete(`/api/tasks/${task().id}/queue/${queue()[0].id}/steer`);
-  ui.state.details.delete(task().id);
-  failures.set(`/api/tasks/${task().id}/queue/${queue()[0].id}/steer`, 'no detail');
-  await assert.rejects(ui.steerQueueItem(queue()[0].id), /no detail/);
-  failures.delete(`/api/tasks/${task().id}/queue/${queue()[0].id}/steer`);
-
   ui.state.details.delete(task().id);
   ui.state.tasks = [baseTask, task({ id: '22222222-2222-2222-2222-222222222222' })];
   ui.applyQueuedTasks([]);
@@ -734,6 +902,7 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter' }));
 
   failures.set('/api/usage', 'usage failed');
+  failures.set('/api/activity', 'activity failed');
   failures.set('/api/account', 'account failed');
   failures.set('/api/deliveries', 'delivery failed');
   failures.set('/api/messages', 'send failed');
@@ -741,6 +910,13 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   const currentThumbnail = document.querySelector('.delivery-thumb');
   await ui.loadUsage();
   assert.equal(document.querySelector('#usage-card').hidden, true);
+  ui.state.activity = null;
+  document.querySelector('#usage-card').click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(document.querySelector('#toast').textContent, /活动数据读取失败/);
+  assert.equal(await ui.loadActivity(), null);
+  failures.delete('/api/activity');
+  assert.equal((await ui.loadActivity()).completedTurns, 60);
   await ui.loadAccount();
   assert.equal(document.querySelector('#account-badge').hidden, true);
   await ui.loadDeliveries();
@@ -815,7 +991,7 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   const optimisticId = ui.addOptimisticQueueItem(task().id, '立即出现');
   ui.renderQueueManager();
   assert.match(document.querySelector('.queue-copy small').textContent, /安全写入/);
-  assert.equal(document.querySelector('[data-action="steer"]').disabled, true);
+  assert.equal(document.querySelector('[data-action="steer"]'), null);
   assert.equal(ui.removeOptimisticQueueItem(task().id, optimisticId), true);
   const regular = queue();
   ui.applyQueuedTasks([regular[0], { ...regular[1], id: 'optimistic-middle', optimistic: true }, regular[2]]);
@@ -889,6 +1065,7 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(ui.state.selectedId, null);
   assert.equal(document.querySelector('#detail-pane').classList.contains('is-open'), false);
+  assert.equal(await ui.refreshTasks(), true);
 
   failures.set('/api/tasks', 'tasks failed');
   await ui.startDashboard();

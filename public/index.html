@@ -10,12 +10,13 @@
     <meta property="og:description" content="Monitor and control Codex tasks from your phone on the local network." />
     <meta property="og:type" content="website" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Codex Hub" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/app-icon-192.png" />
-    <link rel="stylesheet" href="/styles.css?v=31" />
+    <link rel="stylesheet" href="/styles.css?v=42" />
     <title>Codex Lookout</title>
   </head>
   <body>
@@ -24,7 +25,10 @@
         <div class="brand">
           <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
           <div>
-            <h1 data-i18n="brand.name">Codex 瞭望台</h1>
+            <div class="brand-title-row">
+              <h1 data-i18n="brand.name">Codex 瞭望台</h1>
+              <button id="version-button" class="version-button" type="button" hidden><span id="version-current"></span><em id="version-state"></em></button>
+            </div>
             <p>
               <span class="connection-state"><span id="connection-dot" class="connection-dot"></span><span id="connection-text" data-i18n="connection.connecting">正在连接 Mac</span></span>
               <span id="account-badge" class="account-badge" hidden><i id="account-initial" aria-hidden="true"></i><span id="account-name"></span></span>
@@ -78,17 +82,13 @@
             <div id="delivery-list" class="delivery-list"></div>
           </section>
 
-          <div class="summary-row">
-            <div><span id="active-count">0</span><small data-i18n="summary.running">正在进行</small></div>
-            <div><span id="queued-count">0</span><small data-i18n="summary.queued">等待处理</small></div>
-            <div><span id="task-count">0</span><small data-i18n="summary.all">全部任务</small></div>
-          </div>
-
-          <div class="filters" role="tablist" aria-label="任务筛选" data-i18n-aria="nav.taskFilter">
-            <button class="filter is-active" type="button" data-filter="all" data-i18n="filter.all">全部</button>
-            <button class="filter" type="button" data-filter="running" data-i18n="filter.running">进行中</button>
-            <button class="filter" type="button" data-filter="queued" data-i18n="filter.queued">已排队</button>
-            <button class="filter" type="button" data-filter="done" data-i18n="filter.done">已完成</button>
+          <div class="task-toolbar">
+            <div class="filters" role="tablist" aria-label="任务筛选" data-i18n-aria="nav.taskFilter">
+              <button class="filter is-active" type="button" data-filter="all"><span data-i18n="filter.all">全部</span><em id="task-count" class="filter-count">0</em></button>
+              <button class="filter" type="button" data-filter="running"><span data-i18n="filter.running">进行中</span><em id="active-count" class="filter-count">0</em></button>
+              <button class="filter" type="button" data-filter="queued"><span data-i18n="filter.queued">已排队</span><em id="queued-count" class="filter-count">0</em></button>
+              <button class="filter" type="button" data-filter="done"><span data-i18n="filter.done">已完成</span><em id="done-count" class="filter-count">0</em></button>
+            </div>
           </div>
 
           <div id="task-list" class="task-list" aria-live="polite">
@@ -183,6 +183,6 @@
         <div id="modal-content" class="modal-content"></div>
       </section>
     </div>
-    <script type="module" src="/app.js?v=36"></script>
+    <script type="module" src="/app.js?v=46"></script>
   </body>
 </html>

@@ -87,16 +87,29 @@ export function createBridgeServer({
   createServer = nodeCreateServer,
   pollMs = 1500,
   runtimeInfo = { version: 'unknown', source: 'bundled' },
+  updateReader = async () => ({
+    currentVersion: runtimeInfo.version,
+    latestVersion: null,
+    state: 'unavailable',
+    updateAvailable: false,
+    canUpdate: false,
+    requiresDesktop: false,
+    releaseUrl: null,
+    checkedAt: Date.now(),
+  }),
+  requestHostUpdate = null,
   defer = setImmediate,
   now = Date.now,
-  wakeRetryMs = 60_000,
+  wakeRetryMs = 15_000,
 }) {
   const clients = new Set();
   let cachedTasks = [];
   let cachedSignature = '';
   let timer = null;
+  let refreshInFlight = null;
   const wakingThreads = new Set();
   const wakeRetryAt = new Map();
+  let updatePending = false;
 
   function scheduleIdleWake(threadId) {
     if (!repository.wakeQueuedTaskIfIdle || wakingThreads.has(threadId) || (wakeRetryAt.get(threadId) || 0) > now()) return false;
@@ -104,7 +117,7 @@ export function createBridgeServer({
     defer(async () => {
       try {
         const result = await repository.wakeQueuedTaskIfIdle(threadId);
-        wakeRetryAt.delete(threadId);
+        wakeRetryAt.set(threadId, now() + wakeRetryMs);
         if (result.started) await refresh();
       } catch {
         // The durable native queue remains the source of truth. Do not retry
@@ -117,9 +130,12 @@ export function createBridgeServer({
     return true;
   }
 
-  async function refresh() {
+  async function performRefresh() {
     try {
       cachedTasks = await repository.listTasks();
+      for (const task of cachedTasks) {
+        if (task.queuedCount > 0 && task.progress?.state !== 'running') scheduleIdleWake(task.id);
+      }
       const signature = safeJson(cachedTasks);
       if (signature !== cachedSignature) {
         cachedSignature = signature;
@@ -132,6 +148,12 @@ export function createBridgeServer({
       for (const client of clients) client.write(frame);
       throw error;
     }
+  }
+
+  function refresh() {
+    if (refreshInFlight) return refreshInFlight;
+    refreshInFlight = performRefresh().finally(() => { refreshInFlight = null; });
+    return refreshInFlight;
   }
 
   const server = createServer(async (request, response) => {
@@ -156,9 +178,34 @@ export function createBridgeServer({
       if (request.method === 'GET' && url.pathname === '/api/health') {
         return json(response, 200, { ok: true, clients: clients.size, ...runtimeInfo });
       }
+      if (request.method === 'GET' && url.pathname === '/api/version') {
+        const version = await updateReader({ force: url.searchParams.get('refresh') === '1' });
+        return json(response, 200, { version });
+      }
+      if (request.method === 'POST' && url.pathname === '/api/update') {
+        const version = await updateReader({ force: true });
+        if (!version.updateAvailable) return json(response, 200, { accepted: false, version });
+        if (!version.canUpdate || typeof requestHostUpdate !== 'function') {
+          return json(response, 409, { error: '此更新需要在 Mac 上完成', version });
+        }
+        if (!updatePending) {
+          updatePending = true;
+          try { await requestHostUpdate(version); } catch (error) {
+            updatePending = false;
+            throw error;
+          }
+        }
+        return json(response, 202, { accepted: true, version });
+      }
       if (request.method === 'GET' && url.pathname === '/api/tasks') {
         const tasks = await refresh();
         return json(response, 200, { tasks, syncedAt: Date.now() });
+      }
+      if (request.method === 'GET' && url.pathname === '/api/projects') {
+        return json(response, 200, { projects: await repository.listProjects() });
+      }
+      if (request.method === 'GET' && url.pathname === '/api/activity') {
+        return json(response, 200, { activity: await repository.activitySummary() });
       }
       if (request.method === 'GET' && url.pathname === '/api/usage') {
         return json(response, 200, { usage: await usageReader() });
@@ -252,14 +299,6 @@ export function createBridgeServer({
         const queuedTasks = await repository.deleteQueuedTask(queueItemMatch[1], queueItemMatch[2], body.revision);
         await refresh();
         return json(response, 200, { queuedTasks });
-      }
-      const steerItemMatch = url.pathname.match(/^\/api\/tasks\/([0-9a-f-]+)\/queue\/([0-9a-f-]+)\/steer$/i);
-      if (request.method === 'POST' && steerItemMatch) {
-        const body = await readJsonBody(request);
-        if (!Number.isSafeInteger(body.revision) || body.revision < 0) return json(response, 400, { error: '队列修订号无效' });
-        const result = await repository.steerQueuedTask(steerItemMatch[1], steerItemMatch[2], body.revision);
-        await refresh();
-        return json(response, 200, result);
       }
       if (url.pathname.startsWith('/api/')) return json(response, 404, { error: '接口不存在' });
       return serveStatic(response, publicDir, url.pathname);

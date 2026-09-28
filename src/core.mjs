@@ -150,6 +150,17 @@ export function validateMessageInput(body) {
   return { ok: true, threadId, message };
 }
 
+export function validateProjectTaskInput(projectId, body) {
+  const normalizedProjectId = String(projectId ?? '').trim();
+  const message = String(body?.message ?? '').trim();
+  const requestId = String(body?.requestId ?? '').trim();
+  if (!/^[0-9a-f-]{20,}$/i.test(normalizedProjectId)) return { ok: false, error: '项目 ID 无效' };
+  if (!message) return { ok: false, error: '请输入临时任务内容' };
+  if (message.length > MAX_MESSAGE_LENGTH) return { ok: false, error: `任务内容不能超过 ${MAX_MESSAGE_LENGTH} 个字符` };
+  if (requestId && !/^[a-z0-9_-]{16,128}$/i.test(requestId)) return { ok: false, error: '创建请求标识无效' };
+  return { ok: true, projectId: normalizedProjectId, message, requestId };
+}
+
 export function isAuthorized(url, headers, token) {
   if (!token) return true;
   const bearer = String(headers.authorization ?? '').replace(/^Bearer\s+/i, '');

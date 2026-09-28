@@ -2,11 +2,14 @@ import { applyTranslations, getLanguage, initializeLanguage, setLanguage, t } fr
 
 const state = {
   tasks: [],
+  projects: [],
   selectedId: null,
   filter: 'all',
   details: new Map(),
   usage: null,
+  activity: null,
   account: null,
+  version: null,
   deliveries: [],
   syncedAt: null,
   unreadTaskIds: new Set(),
@@ -42,10 +45,13 @@ let toastTimer;
 let source;
 let queueNotice = null;
 let optimisticSequence = 0;
+let activityRange = 7;
 
 function api(path) {
   return new URL(path, location.origin);
 }
+
+function ignoreFailure() { return undefined; }
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
@@ -190,16 +196,17 @@ function renderTaskCard(task, showProject = false) {
   const unread = state.unreadTaskIds.has(task.id);
   return `
     <button class="task-card ${showProject ? 'shows-project' : ''} ${task.id === state.selectedId ? 'is-selected' : ''} ${unread ? 'is-unread' : ''}" type="button" data-id="${escapeHtml(task.id)}">
-      <div class="task-card-top">
-        ${showProject ? `<span class="task-project">${escapeHtml(project)}</span>` : ''}
-        <span class="task-card-badges">
+      ${showProject ? `<span class="task-project">${escapeHtml(project)}</span>` : ''}
+      <div class="task-card-head">
+        <h3 title="${escapeHtml(task.title)}">${escapeHtml(task.title)}</h3>
+        <span class="task-card-meta">
           ${unread ? `<span class="unread-dot" role="status" aria-label="${escapeHtml(t('task.unread'))}" title="${escapeHtml(t('task.unread'))}"></span>` : ''}
           <span class="status-pill" data-tone="${escapeHtml(task.progress.tone)}">${escapeHtml(localizedProgress(task))}</span>
+          <time>${relativeTime(task.updatedAt)}</time>
         </span>
       </div>
-      <h3>${escapeHtml(task.title)}</h3>
       <p>${escapeHtml(task.latestTask || t('empty.task'))}</p>
-      <div class="task-card-foot"><span>${escapeHtml(localizedActivity(task))}</span><time>${relativeTime(task.updatedAt)}</time></div>
+      <div class="task-card-foot"><span>${escapeHtml(localizedActivity(task))}</span></div>
     </button>`;
 }
 
@@ -208,6 +215,7 @@ function renderList() {
   updateUnreadPresentation();
   $('#active-count').textContent = state.tasks.filter((task) => task.progress.state === 'running').length;
   $('#queued-count').textContent = state.tasks.reduce((total, task) => total + task.queuedCount, 0);
+  $('#done-count').textContent = state.tasks.filter((task) => task.progress.state === 'done').length;
   $('#task-count').textContent = state.tasks.length;
   if (!tasks.length) {
     list.innerHTML = `<div class="list-empty">${escapeHtml(t('empty.filtered'))}</div>`;
@@ -375,6 +383,7 @@ function switchLanguage() {
   renderDetail();
   renderUsage();
   renderAccount();
+  renderVersion();
   renderDeliveries();
   resetDeliveryClearButton();
   if (state.syncedAt) {
@@ -398,7 +407,10 @@ function renderInstallTip() {
 function registerServiceWorker() {
   const localSecureContext = location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname);
   if (!localSecureContext || !window.navigator.serviceWorker) return Promise.resolve(false);
-  return window.navigator.serviceWorker.register('/service-worker.js').then(() => true).catch(() => false);
+  return window.navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' }).then(async (registration) => {
+    try { await registration.update?.(); } catch { /* The active worker can keep serving this visit. */ }
+    return true;
+  }).catch(() => false);
 }
 
 function updateTasks(payload) {
@@ -447,11 +459,126 @@ async function loadDetail(id, { followLatest = false } = {}) {
   }
 }
 
+async function loadProjects() {
+  const response = await fetch(api('/api/projects'));
+  const payload = await response.json();
+  if (!response.ok) throw new Error(localizedError(payload.error, 'create.failure'));
+  state.projects = payload.projects || [];
+  return state.projects;
+}
+
 function setConnection(online, text) {
   const dot = $('#connection-dot');
   dot.classList.toggle('is-online', online);
   dot.classList.toggle('is-offline', !online);
   $('#connection-text').textContent = text;
+}
+
+function versionStateLabel(version = state.version) {
+  return t(`version.state.${version?.state || 'unavailable'}`);
+}
+
+function renderVersion() {
+  const button = $('#version-button');
+  const version = state.version;
+  button.hidden = !version;
+  if (!version) return;
+  const current = version.currentVersion || t('version.unknown');
+  const latest = version.latestVersion || t('version.unknown');
+  $('#version-current').textContent = `v${current}`;
+  $('#version-state').textContent = versionStateLabel(version);
+  button.classList.toggle('is-update', version.state === 'available');
+  button.setAttribute('aria-label', t('version.aria', { current, status: versionStateLabel(version), latest }));
+}
+
+function renderVersionDetails() {
+  const version = state.version;
+  if (!version) return false;
+  $('#modal-kicker').textContent = t('version.kicker');
+  $('#modal-title').textContent = t('version.title');
+  const current = version.currentVersion || t('version.unknown');
+  const latest = version.latestVersion || t('version.unknown');
+  const canUpdate = version.state === 'available' && version.canUpdate;
+  const requiresDesktop = version.state === 'available' && !version.canUpdate;
+  const modalContent = $('#modal-content');
+  modalContent.className = 'modal-content version-dashboard';
+  modalContent.innerHTML = `<section class="version-card">
+    <span>${escapeHtml(versionStateLabel(version))}</span>
+    <strong>${escapeHtml(t(`version.summary.${version.state || 'unavailable'}`))}</strong>
+    <div class="version-compare">
+      <div class="version-number"><small>${escapeHtml(t('version.current'))}</small><strong>v${escapeHtml(current)}</strong></div>
+      <span class="version-arrow" aria-hidden="true">→</span>
+      <div class="version-number"><small>${escapeHtml(t('version.latest'))}</small><strong>v${escapeHtml(latest)}</strong></div>
+    </div>
+  </section>
+  <div class="version-actions">
+    ${canUpdate ? `<button class="version-action" type="button" data-action="version-update">${escapeHtml(t('version.update', { version: latest }))}</button>` : ''}
+    <button class="version-action secondary" type="button" data-action="version-refresh">${escapeHtml(t('version.check'))}</button>
+  </div>
+  ${requiresDesktop ? `<p class="version-note">${escapeHtml(t('version.requiresDesktop'))}</p>` : ''}
+  <p class="version-note">${escapeHtml(t('version.note'))}</p>`;
+  $('#content-modal').hidden = false;
+  document.body.classList.add('modal-open');
+  return true;
+}
+
+async function loadVersion({ force = false } = {}) {
+  const response = await fetch(api(`/api/version${force ? '?refresh=1' : ''}`));
+  const payload = await response.json();
+  if (!response.ok) throw new Error(localizedError(payload.error, 'version.updateFailure'));
+  state.version = payload.version;
+  renderVersion();
+  return state.version;
+}
+
+async function waitForRuntimeVersion(previousVersion, { attempts = 40, pause = (delay) => new Promise((resolve) => setTimeout(resolve, delay)), fetchImpl = fetch } = {}) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    await pause(1_500);
+    try {
+      const response = await fetchImpl(api('/api/health'), { cache: 'no-store' });
+      if (!response.ok) continue;
+      const health = await response.json();
+      if (health.version && health.version !== previousVersion) return health.version;
+    } catch {
+      // A brief disconnect is expected while the Mac restarts the local service.
+    }
+  }
+  return null;
+}
+
+async function requestPhoneUpdate() {
+  const previousVersion = state.version?.currentVersion;
+  const action = $('#modal-content').querySelector('[data-action="version-update"]');
+  if (action) {
+    action.disabled = true;
+    action.textContent = t('version.updating');
+  }
+  try {
+    const response = await fetch(api('/api/update'), { method: 'POST' });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(localizedError(payload.error, 'version.updateFailure'));
+    if (!payload.accepted) {
+      state.version = payload.version;
+      renderVersion();
+      renderVersionDetails();
+      return false;
+    }
+    state.version = { ...payload.version, state: 'installing' };
+    renderVersion();
+    renderVersionDetails();
+    showToast(t('version.updateAccepted'));
+    const installedVersion = await waitForRuntimeVersion(previousVersion);
+    if (!installedVersion) throw new Error(t('version.updateFailure'));
+    await loadVersion({ force: true });
+    showToast(t('version.updateComplete', { version: installedVersion }));
+    renderVersionDetails();
+    return true;
+  } catch (error) {
+    await loadVersion({ force: true }).catch(() => undefined);
+    renderVersionDetails();
+    showToast(localizedError(error.message, 'version.updateFailure'));
+    return false;
+  }
 }
 
 function formatReset(timestamp) {
@@ -512,6 +639,104 @@ async function loadUsage() {
     state.usage = null;
     renderUsage();
   }
+}
+
+async function loadActivity() {
+  try {
+    const response = await fetch(api('/api/activity'));
+    if (!response.ok) throw new Error(t('activity.loadFailure'));
+    state.activity = (await response.json()).activity;
+  } catch {
+    state.activity = null;
+  }
+  return state.activity;
+}
+
+function activityChartGeometry(days = []) {
+  const series = days.length ? days : [{ turns: 0 }];
+  const max = Math.max(1, ...series.map((day) => Math.max(0, Number(day.turns) || 0)));
+  const points = series.map((day, index) => ({
+    x: 8 + (304 * index) / Math.max(1, series.length - 1),
+    y: 108 - (96 * Math.max(0, Number(day.turns) || 0)) / max,
+  }));
+  const line = points.map((point, index) => `${index ? 'L' : 'M'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
+  const area = `${line} L ${points.at(-1).x.toFixed(2)} 112 L ${points[0].x.toFixed(2)} 112 Z`;
+  return { max, points, line, area };
+}
+
+function activityDayLabel(date) {
+  return new Intl.DateTimeFormat(getLanguage(), { month: 'numeric', day: 'numeric' }).format(new Date(`${date}T12:00:00`));
+}
+
+function renderActivityDashboard(range = activityRange) {
+  const activity = state.activity;
+  if (!activity) return false;
+  activityRange = range === 30 ? 30 : 7;
+  const allDays = activity.days || [];
+  const days = allDays.slice(-activityRange);
+  const chartDays = days.map((day) => ({ ...day, turns: Number(day.completedTurns || 0) }));
+  const chart = activityChartGeometry(chartDays);
+  const peak = chartDays.reduce((best, day) => day.turns > best.turns ? day : best, chartDays[0] || { date: '', turns: 0 });
+  const rangeTurns = chartDays.reduce((sum, day) => sum + day.turns, 0);
+  const rangeActiveDays = chartDays.filter((day) => day.turns > 0).length;
+  const limits = state.usage?.limits || [];
+  const primary = limits[0];
+  const today = state.usage?.todayTokens;
+  const todayTokens = today?.recorded ? formatTokenCount(today.totalTokens) : '—';
+  const duration = formatDuration(Math.round(Number(activity.totalDurationMs || 0) / 1000));
+  const firstDay = days[0]?.date;
+  const middleDay = days[Math.floor(days.length / 2)]?.date || firstDay;
+  const lastDay = days.at(-1)?.date || firstDay;
+  const accountName = state.account?.name || t('activity.localAccount');
+  $('#modal-kicker').textContent = t('activity.kicker');
+  $('#modal-title').textContent = t('activity.title');
+  $('#content-modal .modal-sheet').classList.add('activity-sheet');
+  const modalContent = $('#modal-content');
+  modalContent.className = 'modal-content activity-dashboard';
+  modalContent.innerHTML = `
+    <section class="activity-hero">
+      <div class="activity-hero-glow" aria-hidden="true"></div>
+      <span>${escapeHtml(t('activity.eyebrow', { account: accountName }))}</span>
+      <strong>${escapeHtml(t('activity.hero', { count: activity.completedTurns }))}</strong>
+      <small>${escapeHtml(t('activity.period'))}</small>
+      ${primary ? `<div class="activity-allowance"><i style="--remaining:${primary.remainingPercent}"></i><span>${escapeHtml(t('activity.allowance', { percent: primary.remainingPercent }))}</span></div>` : ''}
+    </section>
+    <section class="activity-metrics" aria-label="${escapeHtml(t('activity.metrics'))}">
+      <article><span>${escapeHtml(t('activity.tokensToday'))}</span><strong>${escapeHtml(todayTokens)}</strong><small>tokens</small></article>
+      <article><span>${escapeHtml(t('activity.completedTurns'))}</span><strong>${activity.completedTurns}</strong><small>${escapeHtml(t('activity.turnsUnit'))}</small></article>
+      <article><span>${escapeHtml(t('activity.runTime'))}</span><strong>${escapeHtml(duration)}</strong><small>${escapeHtml(t('activity.localOnly'))}</small></article>
+      <article><span>${escapeHtml(t('activity.projects'))}</span><strong>${activity.projectCount}</strong><small>${escapeHtml(t('activity.projectsUnit'))}</small></article>
+    </section>
+    <section class="activity-chart-card">
+      <header>
+        <div><span>${escapeHtml(t('activity.rhythm'))}</span><strong>${escapeHtml(t('activity.rhythmSummary', { days: rangeActiveDays, turns: rangeTurns }))}</strong></div>
+        <div class="activity-range" role="group" aria-label="${escapeHtml(t('activity.range'))}">
+          <button type="button" data-action="activity-range" data-range="7" class="${activityRange === 7 ? 'is-active' : ''}">${escapeHtml(t('activity.sevenDays'))}</button>
+          <button type="button" data-action="activity-range" data-range="30" class="${activityRange === 30 ? 'is-active' : ''}">${escapeHtml(t('activity.thirtyDays'))}</button>
+        </div>
+      </header>
+      <div class="activity-chart" aria-label="${escapeHtml(t('activity.chartAria', { count: peak.turns }))}">
+        <svg viewBox="0 0 320 120" preserveAspectRatio="none" role="img">
+          <defs><linearGradient id="activity-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#79aaff" stop-opacity=".34"/><stop offset="1" stop-color="#7964ff" stop-opacity="0"/></linearGradient></defs>
+          <path class="activity-chart-grid" d="M8 12H312 M8 44H312 M8 76H312 M8 108H312" />
+          <path class="activity-chart-area" d="${chart.area}" />
+          <path class="activity-chart-line" d="${chart.line}" />
+          ${chart.points.map((point, index) => index === chart.points.length - 1 ? `<circle cx="${point.x}" cy="${point.y}" r="4" />` : '').join('')}
+        </svg>
+      </div>
+      <div class="activity-chart-labels"><span>${firstDay ? activityDayLabel(firstDay) : ''}</span><span>${middleDay ? activityDayLabel(middleDay) : ''}</span><span>${lastDay ? activityDayLabel(lastDay) : ''}</span></div>
+      <p>${peak.date ? escapeHtml(t('activity.peak', { date: activityDayLabel(peak.date), count: peak.turns })) : escapeHtml(t('activity.noActivity'))}</p>
+    </section>
+    <section class="activity-facts">
+      <article><span>${escapeHtml(t('activity.newTasks'))}</span><strong>${activity.recentTaskCount}</strong></article>
+      <article><span>${escapeHtml(t('activity.activeDays'))}</span><strong>${activity.activeDays}</strong></article>
+      <article><span>${escapeHtml(t('activity.allTasks'))}</span><strong>${activity.taskCount}</strong></article>
+    </section>
+    <p class="activity-note">${escapeHtml(t('activity.note'))}</p>`;
+  $('#content-modal').hidden = false;
+  document.body.classList.add('modal-open');
+  $('#modal-close').focus();
+  return true;
 }
 
 function renderAccount() {
@@ -601,6 +826,30 @@ async function loadTasks() {
   updateTasks(await response.json());
 }
 
+async function refreshTasks() {
+  const button = $('#refresh-button');
+  const selectedId = state.selectedId;
+  button.disabled = true;
+  button.classList.add('is-refreshing');
+  button.setAttribute('aria-busy', 'true');
+  button.setAttribute('aria-label', t('action.refreshing'));
+  let succeeded = false;
+  try {
+    await loadTasks();
+    if (selectedId) await loadDetail(selectedId);
+    showToast(t('action.refreshed'));
+    succeeded = true;
+  } catch (error) {
+    showToast(localizedError(error.message, 'error.sync'));
+  } finally {
+    button.disabled = false;
+    button.classList.remove('is-refreshing');
+    button.removeAttribute('aria-busy');
+    button.setAttribute('aria-label', t('action.refresh'));
+  }
+  return succeeded;
+}
+
 async function sendTaskMessage(message, threadId = state.selectedId) {
   if (!message || !threadId) return null;
   const response = await fetch(api('/api/messages'), {
@@ -682,7 +931,7 @@ function renderQueueManager() {
   $('#modal-kicker').textContent = t('queue.waiting', { count: queuedTasks.length });
   $('#modal-title').textContent = t('queue.title');
   const modalContent = $('#modal-content');
-  modalContent.className = `modal-content queue-manager${queueNotice?.tone === 'progress' ? ' is-busy' : ''}`;
+  modalContent.className = 'modal-content queue-manager';
   modalContent.innerHTML = queuedTasks.length ? `
     <p class="queue-help">${escapeHtml(t('queue.help'))}</p>
     ${queueNotice ? `<div class="queue-notice" data-tone="${escapeHtml(queueNotice.tone)}" role="status">${escapeHtml(queueNotice.text)}</div>` : ''}
@@ -700,9 +949,6 @@ function renderQueueManager() {
             </button>
             <button type="button" data-action="down" aria-label="${escapeHtml(t('queue.lower'))}" ${index === queuedTasks.length - 1 || message.optimistic ? 'disabled' : ''}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
-            </button>
-            <button class="queue-steer" type="button" data-action="steer" aria-label="${escapeHtml(t('queue.steer'))}" ${message.optimistic ? 'disabled' : ''}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 2-8 12h7l-1 8 8-12h-7l1-8Z" /></svg>
             </button>
             <button class="queue-delete" type="button" data-action="delete" aria-label="${escapeHtml(t('queue.delete'))}" ${message.optimistic ? 'disabled' : ''}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" /></svg>
@@ -843,25 +1089,9 @@ async function deleteQueueItem(itemId) {
   showToast(t('queue.deleted'));
 }
 
-async function steerQueueItem(itemId) {
-  const queuedTasks = state.details.get(state.selectedId)?.queuedTasks || [];
-  queueNotice = { tone: 'progress', text: t('queue.steering') };
-  renderQueueManager();
-  const response = await fetch(api(`/api/tasks/${state.selectedId}/queue/${itemId}/steer`), {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ revision: queueRevision(queuedTasks) }),
-  });
-  const payload = await response.json();
-  if (!response.ok) throw new Error(localizedError(payload.error, 'queue.steerFailure'));
-  queueNotice = { tone: 'success', text: t('queue.steered') };
-  applyQueuedTasks(payload.queuedTasks);
-  renderQueueManager();
-  showToast(t('queue.steeredToast'));
-}
-
 function closeContent() {
   $('#content-modal').hidden = true;
+  $('#content-modal .modal-sheet').classList.remove('activity-sheet');
   document.body.classList.remove('modal-open');
 }
 
@@ -905,6 +1135,7 @@ $('#message-form').addEventListener('submit', async (event) => {
 input.addEventListener('input', resizeComposer);
 $('#language-button').textContent = languageButtonLabel();
 $('#language-button').addEventListener('click', switchLanguage);
+$('#version-button').addEventListener('click', renderVersionDetails);
 $('#install-help').addEventListener('click', () => showContent(t('install.helpTitle'), t('install.helpBody')));
 $('#install-dismiss').addEventListener('click', () => {
   localStorage.setItem('codex-local-hub-install-dismissed', '1');
@@ -930,7 +1161,7 @@ document.querySelectorAll('.filter').forEach((button) => button.addEventListener
   document.querySelectorAll('.filter').forEach((item) => item.classList.toggle('is-active', item === button));
   renderList();
 }));
-$('#refresh-button').addEventListener('click', () => loadTasks().catch((error) => showToast(error.message)));
+$('#refresh-button').addEventListener('click', refreshTasks);
 $('#delivery-list').addEventListener('click', (event) => {
   const button = event.target.closest('[data-delivery-id]');
   const delivery = state.deliveries.find((item) => item.id === button?.dataset.deliveryId);
@@ -972,6 +1203,19 @@ $('#task-menu-button').addEventListener('click', renderTaskManagement);
 $('#modal-content').addEventListener('click', async (event) => {
   const button = event.target.closest('[data-action]');
   if (!button) return;
+  if (button.dataset.action === 'activity-range') {
+    renderActivityDashboard(Number(button.dataset.range));
+    return;
+  }
+  if (button.dataset.action === 'version-refresh') {
+    button.disabled = true;
+    await loadVersion({ force: true }).then(renderVersionDetails).catch((error) => showToast(localizedError(error.message, 'version.updateFailure')));
+    return;
+  }
+  if (button.dataset.action === 'version-update') {
+    await requestPhoneUpdate();
+    return;
+  }
   if ($('#modal-content').classList.contains('management-menu')) {
     await handleManagementAction(button);
     return;
@@ -994,7 +1238,6 @@ $('#modal-content').addEventListener('click', async (event) => {
   try {
     if (action === 'up') await reorderQueue(row.dataset.queueId, -1);
     if (action === 'down') await reorderQueue(row.dataset.queueId, 1);
-    if (action === 'steer') await steerQueueItem(row.dataset.queueId);
     if (action === 'delete') await deleteQueueItem(row.dataset.queueId);
   } catch (error) {
     await loadDetail(state.selectedId).catch(() => undefined);
@@ -1012,22 +1255,9 @@ $('#goal-card').addEventListener('click', () => {
     elapsed: formatDuration(goal.elapsedSeconds),
   }));
 });
-$('#usage-card').addEventListener('click', () => {
-  const limits = state.usage?.limits || [];
-  if (!limits.length) return;
-  const rows = limits.map((limit) => `${t('usage.used', {
-    window: usageWindowLabel(limit),
-    used: limit.usedPercent,
-    remaining: limit.remainingPercent,
-  })}\n${t('usage.reset', { time: formatReset(limit.resetsAt) })}`);
-  const today = state.usage?.todayTokens;
-  const todayDetail = today?.available ? `\n\n${t('usage.todayTitle')}\n${today.recorded ? t('usage.todayDetail', {
-    total: new Intl.NumberFormat(getLanguage()).format(today.totalTokens),
-    input: new Intl.NumberFormat(getLanguage()).format(today.inputTokens),
-    output: new Intl.NumberFormat(getLanguage()).format(today.outputTokens),
-    cached: new Intl.NumberFormat(getLanguage()).format(today.cachedInputTokens),
-  }) : t('usage.todayEmpty')}\n${t('usage.todayNote')}` : '';
-  showContent(t('usage.title'), `${rows.join('\n\n')}${state.usage.planType ? `\n\n${t('usage.plan', { plan: state.usage.planType })}` : ''}${todayDetail}`);
+$('#usage-card').addEventListener('click', async () => {
+  if (!state.activity) await loadActivity();
+  if (!renderActivityDashboard()) showToast(t('activity.loadFailure'));
 });
 $('#modal-close').addEventListener('click', closeContent);
 $('.modal-backdrop').addEventListener('click', closeContent);
@@ -1048,12 +1278,15 @@ async function startDashboard() {
   renderInstallTip();
   registerServiceWorker();
   try {
-    await loadTasks();
+    await Promise.all([loadTasks(), loadProjects()]);
     connectEvents();
     loadUsage();
+    loadVersion().catch(ignoreFailure);
+    loadActivity();
     loadAccount();
     loadDeliveries();
     setInterval(loadUsage, 60_000);
+    setInterval(loadActivity, 60_000);
     setInterval(loadDeliveries, 5_000);
   } catch (error) {
     setConnection(false, t('connection.offline'));
@@ -1069,6 +1302,7 @@ export {
   preferredLanguage,
   stripTokenFromUrl,
   api,
+  ignoreFailure,
   escapeHtml,
   relativeTime,
   localizedProgress,
@@ -1106,13 +1340,24 @@ export {
   updateTasks,
   taskViewChanged,
   loadDetail,
+  loadProjects,
   setConnection,
+  versionStateLabel,
+  renderVersion,
+  renderVersionDetails,
+  loadVersion,
+  waitForRuntimeVersion,
+  requestPhoneUpdate,
   formatReset,
   usageWindowLabel,
   formatTokenCount,
   renderTodayTokens,
   renderUsage,
   loadUsage,
+  loadActivity,
+  activityChartGeometry,
+  activityDayLabel,
+  renderActivityDashboard,
   renderAccount,
   loadAccount,
   renderDeliveries,
@@ -1122,6 +1367,7 @@ export {
   clearDeliveries,
   showDelivery,
   loadTasks,
+  refreshTasks,
   sendTaskMessage,
   addOptimisticQueueItem,
   removeOptimisticQueueItem,
@@ -1138,7 +1384,6 @@ export {
   handleManagementAction,
   reorderQueue,
   deleteQueueItem,
-  steerQueueItem,
   closeContent,
   resizeComposer,
   startDashboard,

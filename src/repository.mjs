@@ -14,8 +14,8 @@ SELECT t.id, t.name, t.title, t.preview, t.cwd, t.model, t.is_pinned, p.id AS pr
        (SELECT ht.status FROM history_db.thread_turns ht WHERE ht.thread_id = t.id ORDER BY ht.rollout_ordinal DESC LIMIT 1) AS turn_status,
        (SELECT hi.item_type FROM history_db.thread_items hi WHERE hi.thread_id = t.id ORDER BY hi.rollout_ordinal DESC LIMIT 1) AS last_item_type,
        (SELECT hi.created_at_ms FROM history_db.thread_items hi WHERE hi.thread_id = t.id ORDER BY hi.rollout_ordinal DESC LIMIT 1) AS last_activity_at,
-       (SELECT json_extract(hi.item_json, '$.content[0].text') FROM history_db.thread_items hi WHERE hi.thread_id = t.id AND hi.item_type = 'userMessage' ORDER BY hi.rollout_ordinal DESC LIMIT 1) AS latest_user,
-       (SELECT json_extract(hi.item_json, '$.text') FROM history_db.thread_items hi WHERE hi.thread_id = t.id AND hi.item_type = 'agentMessage' ORDER BY hi.rollout_ordinal DESC LIMIT 1) AS latest_assistant,
+       NULL AS latest_user,
+       NULL AS latest_assistant,
        g.goal_id, g.objective AS goal_objective, g.status AS goal_status,
        g.time_used_seconds AS goal_time_used_seconds
 FROM threads t
@@ -26,7 +26,10 @@ LEFT JOIN projects p ON p.id = COALESCE(t.project_id, (
 ))
 LEFT JOIN thread_sections s ON s.id = t.thread_section_id
 LEFT JOIN goal_db.thread_goals g ON g.thread_id = t.id
-WHERE t.archived = 0 AND t.preview <> '' AND t.thread_source = 'user'
+WHERE t.archived = 0 AND t.preview <> '' AND (
+  t.thread_source = 'user'
+  OR (t.thread_source IS NULL AND t.originator = 'Codex Desktop' AND t.project_id IS NOT NULL)
+)
 ORDER BY t.is_pinned DESC, t.recency_at_ms DESC
 LIMIT 80;`;
 
@@ -40,7 +43,10 @@ SELECT t.id, t.name, t.title, t.preview, t.cwd, t.model, t.is_pinned, NULL AS pr
        NULL AS goal_id, NULL AS goal_objective, NULL AS goal_status,
        NULL AS goal_time_used_seconds
 FROM threads t
-WHERE t.archived = 0 AND t.preview <> '' AND t.thread_source = 'user'
+WHERE t.archived = 0 AND t.preview <> '' AND (
+  t.thread_source = 'user'
+  OR (t.thread_source IS NULL AND t.originator = 'Codex Desktop' AND t.project_id IS NOT NULL)
+)
 ORDER BY t.is_pinned DESC, t.recency_at_ms DESC
 LIMIT 80;`;
 
@@ -53,7 +59,7 @@ export class CodexRepository {
     codexBin = 'codex',
     execFile = defaultExec,
     now = () => Date.now(),
-    steerMessage = async () => { throw Object.assign(new Error('当前 Codex 不支持立即执行'), { statusCode: 503 }); },
+    platform = process.platform,
     archiveTask = async () => { throw Object.assign(new Error('当前 Codex 不支持归档任务'), { statusCode: 503 }); },
     interruptTurn = async () => { throw Object.assign(new Error('当前 Codex 不支持停止任务'), { statusCode: 503 }); },
     deleteProject = async () => { throw Object.assign(new Error('当前 Codex 不支持删除项目'), { statusCode: 503 }); },
@@ -65,7 +71,7 @@ export class CodexRepository {
     this.codexBin = codexBin;
     this.execFile = execFile;
     this.now = now;
-    this.steerMessage = steerMessage;
+    this.platform = platform;
     this.archiveTask = archiveTask;
     this.interruptTurn = interruptTurn;
     this.deleteProject = deleteProject;
@@ -96,6 +102,59 @@ export class CodexRepository {
     if (!task) return null;
     const [messages, queuedTasks] = await Promise.all([this.loadMessages(threadId), this.loadQueuedTasks(threadId)]);
     return { ...task, messages, queuedTasks };
+  }
+
+  async listProjects() {
+    const sql = `SELECT p.id, p.name FROM projects p WHERE EXISTS (SELECT 1 FROM project_roots pr WHERE pr.project_id = p.id) ORDER BY p.position ASC, p.id ASC;`;
+    const { stdout = '' } = await this.execFile('sqlite3', ['-json', this.stateDb, sql], { maxBuffer: 1024 * 1024 });
+    return stdout.trim() ? JSON.parse(stdout).map((project) => ({ id: project.id, name: project.name })) : [];
+  }
+
+  async activitySummary() {
+    const anchor = new Date(this.now());
+    anchor.setHours(12, 0, 0, 0);
+    const days = Array.from({ length: 30 }, (_, index) => {
+      const date = new Date(anchor);
+      date.setDate(anchor.getDate() - (29 - index));
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    });
+    const start = new Date(`${days[0]}T00:00:00`).getTime();
+    const historySql = `ATTACH DATABASE '${escapeSqlite(this.stateDb)}' AS state_db; SELECT strftime('%Y-%m-%d', ht.started_at, 'unixepoch', 'localtime') AS date, COUNT(*) AS turns, SUM(CASE WHEN ht.status = 'completed' THEN 1 ELSE 0 END) AS completed_turns, SUM(COALESCE(ht.duration_ms, 0)) AS duration_ms FROM thread_turns ht JOIN state_db.threads t ON t.id = ht.thread_id WHERE ht.started_at >= ${Math.floor(start / 1000)} AND t.preview <> '' AND (t.thread_source = 'user' OR (t.thread_source IS NULL AND t.originator = 'Codex Desktop')) GROUP BY date ORDER BY date ASC;`;
+    let historyRows = [];
+    try {
+      const { stdout = '' } = await this.execFile('sqlite3', ['-json', this.historyDb, historySql], { maxBuffer: 1024 * 1024 });
+      historyRows = stdout.trim() ? JSON.parse(stdout) : [];
+    } catch (error) {
+      if (!isOptionalDataUnavailable(error)) throw error;
+    }
+    const stateSql = `SELECT (SELECT COUNT(*) FROM projects p WHERE EXISTS (SELECT 1 FROM project_roots pr WHERE pr.project_id = p.id)) AS project_count, COUNT(*) AS task_count, SUM(CASE WHEN created_at >= ${Math.floor(start / 1000)} THEN 1 ELSE 0 END) AS recent_task_count, SUM(CASE WHEN archived = 1 THEN 1 ELSE 0 END) AS archived_task_count FROM threads WHERE preview <> '' AND (thread_source = 'user' OR (thread_source IS NULL AND originator = 'Codex Desktop'));`;
+    const { stdout: stateStdout = '' } = await this.execFile('sqlite3', ['-json', this.stateDb, stateSql], { maxBuffer: 1024 * 1024 });
+    const totals = stateStdout.trim() ? JSON.parse(stateStdout)[0] : {};
+    const indexed = new Map(historyRows.map((row) => [row.date, row]));
+    const daily = days.map((date) => {
+      const row = indexed.get(date) || {};
+      return {
+        date,
+        turns: Math.max(0, Number(row.turns) || 0),
+        completedTurns: Math.max(0, Number(row.completed_turns) || 0),
+        durationMs: Math.max(0, Number(row.duration_ms) || 0),
+      };
+    });
+    return {
+      days: daily,
+      activeDays: daily.filter((day) => day.turns > 0).length,
+      totalTurns: daily.reduce((sum, day) => sum + day.turns, 0),
+      completedTurns: daily.reduce((sum, day) => sum + day.completedTurns, 0),
+      totalDurationMs: daily.reduce((sum, day) => sum + day.durationMs, 0),
+      projectCount: Math.max(0, Number(totals?.project_count) || 0),
+      taskCount: Math.max(0, Number(totals?.task_count) || 0),
+      recentTaskCount: Math.max(0, Number(totals?.recent_task_count) || 0),
+      archivedTaskCount: Math.max(0, Number(totals?.archived_task_count) || 0),
+      updatedAt: this.now(),
+    };
   }
 
   async loadMessages(threadId) {
@@ -172,26 +231,24 @@ SELECT valid FROM mutation_guard;`;
     return this.loadQueuedTasks(threadId);
   }
 
-  async steerQueuedTask(threadId, itemId, revision) {
-    const queuedTasks = await this.loadQueuedTasks(threadId);
-    const item = queuedTasks.find((message) => message.id === itemId);
-    if (!item || item.queueRevision !== revision) throw Object.assign(new Error('任务队列已变化，请刷新后重试'), { statusCode: 409 });
-    const activeTurn = await this.activeTurnId(threadId);
-    const result = await this.steerMessage(threadId, activeTurn, item.text);
-    const deleteSql = `DELETE FROM queued_items WHERE thread_id = '${escapeSqlite(threadId)}' AND id = '${escapeSqlite(itemId)}';`;
-    await this.execFile('sqlite3', [this.queueDb, deleteSql], { maxBuffer: 1024 * 1024 });
-    return { result, queuedTasks: await this.loadQueuedTasks(threadId) };
-  }
-
   async wakeQueuedTaskIfIdle(threadId) {
     if (await this.activeTurnId(threadId)) return { started: false, reason: 'active' };
     const queuedTasks = await this.loadQueuedTasks(threadId);
     const item = queuedTasks[0];
     if (!item) return { started: false, reason: 'empty' };
-    const result = await this.steerMessage(threadId, null, item.text);
-    const deleteSql = `DELETE FROM queued_items WHERE thread_id = '${escapeSqlite(threadId)}' AND id = '${escapeSqlite(item.id)}';`;
-    await this.execFile('sqlite3', [this.queueDb, deleteSql], { maxBuffer: 1024 * 1024 });
+    const result = await this.wakeDesktopThread(threadId);
     return { started: true, itemId: item.id, result };
+  }
+
+  async wakeDesktopThread(threadId) {
+    if (this.platform !== 'darwin') {
+      throw Object.assign(new Error('当前系统无法唤醒 Codex Desktop 任务，消息已保留在队列中'), {
+        statusCode: 503,
+        code: 'DESKTOP_WAKE_UNAVAILABLE',
+      });
+    }
+    await this.execFile('/usr/bin/open', ['-g', `codex://threads/${encodeURIComponent(threadId)}`], { maxBuffer: 1024 * 1024 });
+    return { accepted: true, mode: 'wake-requested', via: 'codex-deep-link' };
   }
 
   async sendMessage(threadId, message) {
@@ -210,7 +267,19 @@ SELECT valid FROM mutation_guard;`;
   async archiveThread(threadId) {
     if (!this.details.has(threadId)) await this.listTasks();
     if (!this.details.has(threadId)) throw Object.assign(new Error('任务不存在或已经归档'), { statusCode: 404 });
-    await this.archiveTask(threadId);
+    try {
+      await this.archiveTask(threadId);
+    } catch (error) {
+      // A Desktop-owned thread can reject the legacy app-server archive call
+      // because that secondary process is not its active writer. The official
+      // Desktop archive action ultimately persists these same two fields, so
+      // use a narrow local-state fallback instead of sending the user back to
+      // the Mac. The visible-task check above keeps this scoped to a known
+      // Codex thread, and SQLite still serializes the concurrent write safely.
+      if (error?.code !== 'ACTIVE_WRITER') throw error;
+      const sql = `UPDATE threads SET archived = 1, archived_at = CAST(strftime('%s', 'now') AS INTEGER) WHERE id = '${escapeSqlite(threadId)}' AND archived = 0;`;
+      await this.execFile('sqlite3', [this.stateDb, sql], { maxBuffer: 1024 * 1024 });
+    }
     this.details.delete(threadId);
     return { archived: true, threadId };
   }

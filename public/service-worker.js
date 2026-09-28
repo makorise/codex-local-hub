@@ -1,8 +1,14 @@
-const CACHE = 'codex-local-hub-v17';
-const SHELL = ['/', '/styles.css?v=31', '/app.js?v=36', '/i18n.js', '/favicon.svg', '/manifest.webmanifest'];
+const CACHE = 'codex-local-hub-v33';
+const SHELL = ['/', '/styles.css?v=42', '/app.js?v=46', '/i18n.js?v=2', '/favicon.svg', '/manifest.webmanifest'];
 
-self.addEventListener('install', (event) => event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL))));
-self.addEventListener('activate', (event) => event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))));
+self.addEventListener('install', (event) => event.waitUntil(
+  caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()),
+));
+self.addEventListener('activate', (event) => event.waitUntil(
+  caches.keys()
+    .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
+    .then(() => self.clients.claim()),
+));
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || new URL(event.request.url).pathname.startsWith('/api/')) return;
   event.respondWith(fetch(event.request).then((response) => {
