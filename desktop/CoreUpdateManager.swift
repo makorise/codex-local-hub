@@ -35,6 +35,7 @@ enum CoreUpdateError: LocalizedError {
 
 final class CoreUpdateStore {
     private static let activeDirectoryKey = "CodexLocalHubActiveCoreDirectory"
+    private static let previousDirectoryKey = "CodexLocalHubPreviousCoreDirectory"
 
     private let hostVersion: SemanticVersion
     private let defaults: UserDefaults
@@ -69,6 +70,20 @@ final class CoreUpdateStore {
         return directory
     }
 
+    @discardableResult
+    func pruneStoredVersions() -> Int {
+        let activeName = validStoredDirectoryName(defaults.string(forKey: Self.activeDirectoryKey))
+        let previousName = validStoredDirectoryName(defaults.string(forKey: Self.previousDirectoryKey))
+        let keep = Set([activeName, previousName].compactMap { $0 })
+        if activeName == nil { defaults.removeObject(forKey: Self.activeDirectoryKey) }
+        if previousName == nil { defaults.removeObject(forKey: Self.previousDirectoryKey) }
+        return pruneVersions(keeping: keep)
+    }
+
+    func storedVersionCount() -> Int {
+        storedDirectoryNames().count
+    }
+
     func install(archive: URL, expectedVersion: String, expectedSHA256: String) throws -> CoreActivation {
         guard verify(file: archive, expectedSHA256: expectedSHA256) else { throw CoreUpdateError.checksumMismatch }
         try validateArchivePaths(archive)
@@ -94,14 +109,34 @@ final class CoreUpdateStore {
             destination = versions.appendingPathComponent(directoryName, isDirectory: true)
         }
         try FileManager.default.moveItem(at: staging, to: destination)
-        let previous = defaults.string(forKey: Self.activeDirectoryKey)
+        let previous = validStoredDirectoryName(defaults.string(forKey: Self.activeDirectoryKey))
         defaults.set(directoryName, forKey: Self.activeDirectoryKey)
+        if let previous { defaults.set(previous, forKey: Self.previousDirectoryKey) }
+        else { defaults.removeObject(forKey: Self.previousDirectoryKey) }
+        _ = pruneVersions(keeping: Set([directoryName, previous].compactMap { $0 }))
         return CoreActivation(version: manifest.version, directoryName: directoryName, previousDirectoryName: previous)
     }
 
     func restore(directoryName: String?) {
         if let directoryName { defaults.set(directoryName, forKey: Self.activeDirectoryKey) }
         else { defaults.removeObject(forKey: Self.activeDirectoryKey) }
+        defaults.removeObject(forKey: Self.previousDirectoryKey)
+        _ = pruneStoredVersions()
+    }
+
+    func complete(_ activation: CoreActivation) {
+        let keep = Set([activation.directoryName, activation.previousDirectoryName].compactMap { $0 })
+        _ = pruneVersions(keeping: keep)
+    }
+
+    func rollback(_ activation: CoreActivation) {
+        if let previous = activation.previousDirectoryName {
+            defaults.set(previous, forKey: Self.activeDirectoryKey)
+        } else {
+            defaults.removeObject(forKey: Self.activeDirectoryKey)
+        }
+        defaults.removeObject(forKey: Self.previousDirectoryKey)
+        _ = pruneVersions(keeping: Set([activation.previousDirectoryName].compactMap { $0 }))
     }
 
     func verify(file: URL, expectedSHA256: String) -> Bool {
@@ -117,6 +152,31 @@ final class CoreUpdateStore {
     private func activeManifest() -> CoreManifest? {
         guard let directory = activeDirectory() else { return nil }
         return validatedManifest(at: directory)
+    }
+
+    private func validStoredDirectoryName(_ name: String?) -> String? {
+        guard let name, !name.contains("/"), !name.contains("..") else { return nil }
+        let directory = root.appendingPathComponent("versions/\(name)", isDirectory: true)
+        guard let manifest = validatedManifest(at: directory),
+              let version = SemanticVersion(manifest.version), version > hostVersion else { return nil }
+        return name
+    }
+
+    private func storedDirectoryNames() -> [String] {
+        let versions = root.appendingPathComponent("versions", isDirectory: true)
+        return (try? FileManager.default.contentsOfDirectory(atPath: versions.path)) ?? []
+    }
+
+    private func pruneVersions(keeping names: Set<String>) -> Int {
+        let versions = root.appendingPathComponent("versions", isDirectory: true)
+        var removed = 0
+        for name in storedDirectoryNames() where !names.contains(name) {
+            guard !name.contains("/"), !name.contains("..") else { continue }
+            if (try? FileManager.default.removeItem(at: versions.appendingPathComponent(name, isDirectory: true))) != nil {
+                removed += 1
+            }
+        }
+        return removed
     }
 
     private func validatedManifest(at directory: URL) -> CoreManifest? {

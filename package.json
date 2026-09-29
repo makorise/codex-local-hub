@@ -1,6 +1,6 @@
 {
   "name": "codex-local-hub",
-  "version": "0.2.44",
+  "version": "0.2.45",
   "private": true,
   "type": "module",
   "description": "Local-first macOS dashboard for monitoring and controlling ChatGPT Codex tasks from your phone.",
@@ -46,7 +46,7 @@
     "node": ">=22.22.2"
   },
   "codexLocalHub": {
-    "minimumCoreHostVersion": "0.2.2"
+    "minimumCoreHostVersion": "0.2.45"
   },
   "devDependencies": {
     "jsdom": "^30.1.0"

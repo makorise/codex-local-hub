@@ -11,11 +11,13 @@ private func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
 @main
 struct CoreUpdateTests {
     static func main() throws {
-        guard CommandLine.arguments.count == 5 else { exit(2) }
+        guard CommandLine.arguments.count == 7 else { exit(2) }
         let archive = URL(fileURLWithPath: CommandLine.arguments[1])
         let checksum = CommandLine.arguments[2]
         let nextArchive = URL(fileURLWithPath: CommandLine.arguments[3])
         let nextChecksum = CommandLine.arguments[4]
+        let thirdArchive = URL(fileURLWithPath: CommandLine.arguments[5])
+        let thirdChecksum = CommandLine.arguments[6]
         let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("CodexCoreTests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: temporary) }
@@ -34,12 +36,20 @@ struct CoreUpdateTests {
         expect(nextActivation.version == "0.2.4", "installs a forward core update")
         expect(nextActivation.previousDirectoryName == activation.directoryName, "remembers the previous core for rollback")
         expect(store.effectiveVersion() == "0.2.4", "reports the forward-updated core version")
-        store.restore(directoryName: nextActivation.previousDirectoryName)
-        expect(store.effectiveVersion() == "0.2.3", "rolls back atomically to the previous compatible core")
+        expect(store.storedVersionCount() == 2, "retains only the active and rollback cores")
 
-        let upgradedHost = CoreUpdateStore(hostVersion: "0.2.3", defaults: defaults, applicationSupport: temporary)
+        let thirdActivation = try store.install(archive: thirdArchive, expectedVersion: "0.2.5", expectedSHA256: thirdChecksum)
+        expect(thirdActivation.previousDirectoryName == nextActivation.directoryName, "advances the rollback pointer")
+        expect(store.storedVersionCount() == 2, "evicts an older third core automatically")
+        store.rollback(thirdActivation)
+        expect(store.effectiveVersion() == "0.2.4", "rolls back atomically to the previous compatible core")
+        expect(store.storedVersionCount() == 1, "removes a failed core after rollback")
+
+        let upgradedHost = CoreUpdateStore(hostVersion: "0.2.4", defaults: defaults, applicationSupport: temporary)
         expect(upgradedHost.activeServerRoot() == nil, "ignores and clears a hot-update core that is not newer than the host")
-        expect(upgradedHost.effectiveVersion() == "0.2.3", "uses the upgraded bundled host version after clearing a stale core")
+        expect(upgradedHost.effectiveVersion() == "0.2.4", "uses the upgraded bundled host version after clearing a stale core")
+        expect(upgradedHost.pruneStoredVersions() == 1, "removes stale cores after a full host upgrade")
+        expect(upgradedHost.storedVersionCount() == 0, "leaves no obsolete hot-update core behind")
 
         store.restore(directoryName: nil)
         expect(store.activeServerRoot() == nil, "can atomically restore the bundled core")

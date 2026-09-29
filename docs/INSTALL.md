@@ -22,9 +22,11 @@ The Mac app checks the repository's latest stable GitHub Release at most once ev
 
 The host window always shows the active version. After a check it displays either `Current vX · latest stable`, `Current vX → New vY`, or a retryable availability error. The update button explicitly says whether the offered action is a core hot update or a full host update.
 
-The preferred asset is `Codex-Local-Hub-core-<version>.zip`, which contains only `src`, `public`, and a compatibility manifest. The app requires GitHub's SHA-256 asset digest, rejects unsafe archive paths, extracts into `~/Library/Application Support/Codex Local Hub/CoreUpdates`, atomically selects the new core, and restarts the local service. If startup fails before the normal ready signal, it restores the previous core and starts it again. The signed `.app` bundle is never modified.
+The preferred asset for a compatible service or web release is `Codex-Local-Hub-core-<version>.zip`, which contains only `src`, `public`, and a compatibility manifest. The app requires GitHub's SHA-256 asset digest, rejects unsafe archive paths, extracts into `~/Library/Application Support/Codex Local Hub/CoreUpdates`, atomically selects the new core, and restarts the local service. If startup fails before the normal ready signal, it restores the previous core and starts it again. Only the active core and one rollback core are retained. The signed `.app` bundle is never modified.
 
-When the core manifest requires a newer native host—or a release has no compatible core asset—the app falls back to downloading and opening the universal DMG. Equal or older versions are ignored, network failures do not interrupt the local service, and no separate update server is required.
+When the native host changes, the release intentionally omits the hot-update core so an older app cannot report success without installing the new host behavior. The app then offers a full upgrade; until the DMG is notarized, the README's one-message Codex setup performs that data-preserving replacement. Equal or older versions are ignored, network failures do not interrupt the local service, and no separate update server is required.
+
+The host enforces one running app instance, waits for its bundled service to exit, and recovers only a confirmed orphaned Codex Lookout listener on port `8787`. It never terminates an unrelated listener. **Check & Repair** revalidates the service and prunes obsolete hot-update cores. **Copy Diagnostics** produces a compact support report without task content, absolute paths, LAN addresses, or command arguments.
 
 Use **Check for updates** in the host window to bypass the daily throttle. Prereleases and draft releases are intentionally ignored by automatic updates.
 
@@ -79,7 +81,7 @@ npm run package:mac
 
 The release script enables hardened runtime, signs the embedded Node runtimes with JIT entitlements, signs the app and DMG, submits the DMG to Apple, staples the ticket, and verifies the result.
 
-GitHub Releases themselves do not require an Apple account. A tag matching `package.json` triggers the release workflow. Without Developer ID secrets the workflow publishes a stable, checksum-verified core update plus an explicitly named unsigned DMG preview; with signing and notarization secrets it publishes a stable notarized DMG alongside the core update.
+GitHub Releases themselves do not require an Apple account. A tag matching `package.json` triggers the release workflow. Compatible service/web releases include a checksum-verified core update. Native-host releases intentionally omit that core and publish a full app package instead. Without Developer ID secrets the app package is explicitly named as an unsigned DMG preview; with signing and notarization secrets it is published as a stable notarized DMG.
 
 For a notarized automated release, configure these GitHub Actions secrets: `MACOS_CERTIFICATE_BASE64`, `MACOS_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_TEAM_ID`, and `APPLE_APP_SPECIFIC_PASSWORD`. The first value is a base64-encoded Developer ID Application `.p12`; the password is an app-specific Apple password, not the normal Apple Account password. Publishing the core update and unsigned preview requires none of these Apple credentials.
 

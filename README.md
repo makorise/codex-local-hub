@@ -212,7 +212,8 @@ See [SECURITY.md](SECURITY.md) before deploying or modifying the network boundar
 ## Reliability
 
 - Server-side state is read incrementally and cached only in memory.
-- The macOS wrapper automatically restarts the local service after unexpected exits with bounded backoff.
+- The macOS wrapper enforces one running instance, automatically restarts the local service with bounded backoff, and recovers a confirmed orphaned Lookout listener without terminating unrelated software.
+- Hot updates retain only the active core and one rollback core. The Mac app also provides **Check & Repair** and a privacy-safe diagnostic report.
 - The UI keeps existing thumbnails during network jitter to prevent flashing.
 - Idle and interrupted tasks are started through Codex resume rather than silently remaining queued.
 - Queue mutations use revision checks to prevent conflicting edits.

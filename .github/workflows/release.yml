@@ -45,7 +45,9 @@ jobs:
           echo "DEVELOPER_ID_APPLICATION=$identity" >> "$GITHUB_ENV"
       - name: Build installer
         run: |
-          npm run package:core
+          if [[ "$(node -p "require('./package.json').codexLocalHub.minimumCoreHostVersion")" != "$(node -p "require('./package.json').version")" ]]; then
+            npm run package:core
+          fi
           npm run package:mac
       - name: Verify installer and checksum
         run: |
@@ -58,7 +60,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="$(node -p "require('./package.json').version")"
-          gh release create "$GITHUB_REF_NAME" "dist/Codex-Local-Hub-core-$version.zip" "dist/Codex-Local-Hub-core-$version.zip.sha256" "dist/Codex-Local-Hub-$version-universal.dmg" "dist/Codex-Local-Hub-$version-universal.dmg.sha256" --verify-tag --generate-notes --title "Codex Lookout v$version"
+          assets=("dist/Codex-Local-Hub-$version-universal.dmg" "dist/Codex-Local-Hub-$version-universal.dmg.sha256")
+          if [[ -f "dist/Codex-Local-Hub-core-$version.zip" ]]; then
+            assets+=("dist/Codex-Local-Hub-core-$version.zip" "dist/Codex-Local-Hub-core-$version.zip.sha256")
+          fi
+          gh release create "$GITHUB_REF_NAME" "${assets[@]}" --verify-tag --generate-notes --title "Codex Lookout v$version"
       - name: Publish stable core release with unsigned DMG preview
         if: ${{ !(env.DEVELOPER_ID_APPLICATION != '' && env.APPLE_ID != '' && env.APPLE_TEAM_ID != '' && env.APPLE_APP_SPECIFIC_PASSWORD != '') }}
         env:
@@ -68,10 +74,10 @@ jobs:
           preview="dist/Codex-Local-Hub-$version-universal-unsigned-preview.dmg"
           mv "dist/Codex-Local-Hub-$version-universal.dmg" "$preview"
           shasum -a 256 "$preview" > "$preview.sha256"
-          gh release create "$GITHUB_REF_NAME" \
-            "dist/Codex-Local-Hub-core-$version.zip#Core hot update" \
-            "dist/Codex-Local-Hub-core-$version.zip.sha256#Core SHA-256" \
-            "$preview#Unsigned universal DMG preview" \
-            "$preview.sha256#DMG preview SHA-256" \
+          assets=("$preview#Unsigned universal DMG preview" "$preview.sha256#DMG preview SHA-256")
+          if [[ -f "dist/Codex-Local-Hub-core-$version.zip" ]]; then
+            assets+=("dist/Codex-Local-Hub-core-$version.zip#Core hot update" "dist/Codex-Local-Hub-core-$version.zip.sha256#Core SHA-256")
+          fi
+          gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
             --verify-tag --generate-notes --latest --title "Codex Lookout v$version" \
-            --notes "Installations whose Mac host already uses the Makorise release channel can update safely through the app's checksum-verified core updater. Hosts installed before the repository move need one data-preserving full migration with the README's one-message Codex setup; later compatible releases can hot-update normally. The attached DMG preview is universal but is not Apple-notarized."
+            --notes "This release upgrades the native Mac host for safer single-instance startup, automatic port recovery, bounded core retention, and privacy-safe diagnostics. Use the README's one-message Codex setup for a data-preserving full upgrade. The attached DMG preview is universal but is not Apple-notarized. Later compatible core releases can hot-update when the Mac host already uses the Makorise release channel; hosts installed before the repository move need one data-preserving full migration."

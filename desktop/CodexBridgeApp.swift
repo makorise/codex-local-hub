@@ -1,13 +1,27 @@
 import AppKit
 import CoreImage
 import CoreImage.CIFilterBuiltins
+import Darwin
 
 @main
 final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private static var retainedDelegate: CodexBridgeApp?
+    private static var instanceLock: SingleInstanceLock?
 
     static func main() {
         if runCommandLineMode() { return }
+        let legacySupportName = ["Codex", "Local", "Hub"].joined(separator: " ")
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            .appendingPathComponent(legacySupportName, isDirectory: true)
+        guard let lock = SingleInstanceLock.acquire(in: support) else {
+            if let identifier = Bundle.main.bundleIdentifier {
+                NSRunningApplication.runningApplications(withBundleIdentifier: identifier)
+                    .first(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier })?
+                    .activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+            }
+            return
+        }
+        instanceLock = lock
         let delegate = CodexBridgeApp()
         retainedDelegate = delegate
         let application = NSApplication.shared
@@ -72,6 +86,7 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let updatePromptKey = "CodexLocalHubLastPromptedUpdateVersion"
     private lazy var hostVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
     private lazy var coreStore = CoreUpdateStore(hostVersion: hostVersion)
+    private lazy var runtimeHealth = RuntimeHealth(bundlePath: Bundle.main.bundlePath)
 
     private var isChinese: Bool { Locale.preferredLanguages.first?.lowercased().hasPrefix("zh") == true }
     private func text(_ zh: String, _ en: String) -> String { isChinese ? zh : en }
@@ -85,10 +100,13 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let copyButton = NSButton(title: "", target: nil, action: nil)
     private let toggleButton = NSButton(title: "", target: nil, action: nil)
     private let updateButton = NSButton(title: "", target: nil, action: nil)
+    private let repairButton = NSButton(title: "", target: nil, action: nil)
+    private let diagnosticsButton = NSButton(title: "", target: nil, action: nil)
     private let versionLabel = NSTextField(labelWithString: "")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
+        _ = coreStore.pruneStoredVersions()
         buildWindow()
         startServer()
         configureUpdateChecks()
@@ -103,12 +121,12 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         restartWorkItem?.cancel()
         coreStartupWorkItem?.cancel()
         updateTimer?.invalidate()
-        stopServer()
+        stopServer(waitForExit: true)
     }
 
     private func buildWindow() {
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 620, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: 620, height: 642),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -150,6 +168,8 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         copyButton.title = text("复制手机地址", "Copy phone address")
         toggleButton.title = text("停止服务", "Stop service")
         updateButton.title = text("检查是否有新版本", "Check for a new version")
+        repairButton.title = text("检查并修复", "Check & Repair")
+        diagnosticsButton.title = text("复制诊断信息", "Copy Diagnostics")
         versionLabel.stringValue = text("当前版本 v\(coreStore.effectiveVersion())", "Current version v\(coreStore.effectiveVersion())")
         versionLabel.font = .systemFont(ofSize: 12, weight: .medium)
         versionLabel.textColor = NSColor(calibratedWhite: 0.62, alpha: 1)
@@ -204,6 +224,8 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         configureSecondaryButton(openButton, action: #selector(openDashboard))
         configureSecondaryButton(toggleButton, action: #selector(toggleServer))
         configureSecondaryButton(updateButton, action: #selector(checkForUpdatesManually))
+        configureSecondaryButton(repairButton, action: #selector(checkAndRepair))
+        configureSecondaryButton(diagnosticsButton, action: #selector(copyDiagnostics))
         openButton.isEnabled = false
         copyButton.isEnabled = false
 
@@ -212,15 +234,20 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         mainActions.spacing = 10
         mainActions.distribution = .fillEqually
 
+        let healthActions = NSStackView(views: [repairButton, diagnosticsButton])
+        healthActions.orientation = .horizontal
+        healthActions.spacing = 10
+        healthActions.distribution = .fillEqually
+
         let footer = NSTextField(wrappingLabelWithString: text("当前为局域网模式。锁屏不会影响同步；Mac 休眠、关机或离开当前网络后将暂时不可访问。", "Local network mode is active. Locking the screen is fine; sleep, shutdown, or leaving this network pauses access."))
         footer.font = .systemFont(ofSize: 11)
         footer.textColor = NSColor(calibratedWhite: 0.42, alpha: 1)
         footer.alignment = .center
         footer.maximumNumberOfLines = 2
 
-        let stack = NSStackView(views: [badge, title, subtitle, statusRow, addressCard, mainActions, toggleButton, versionLabel, updateButton, footer])
+        let stack = NSStackView(views: [badge, title, subtitle, statusRow, addressCard, mainActions, toggleButton, healthActions, versionLabel, updateButton, footer])
         stack.orientation = .vertical
-        stack.spacing = 15
+        stack.spacing = 11
         stack.alignment = .centerX
         stack.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(stack)
@@ -228,16 +255,16 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 42),
             stack.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -42),
-            stack.topAnchor.constraint(equalTo: root.topAnchor, constant: 36),
-            stack.bottomAnchor.constraint(lessThanOrEqualTo: root.bottomAnchor, constant: -28),
+            stack.topAnchor.constraint(equalTo: root.topAnchor, constant: 28),
+            stack.bottomAnchor.constraint(lessThanOrEqualTo: root.bottomAnchor, constant: -22),
             statusDot.widthAnchor.constraint(equalToConstant: 10),
             statusDot.heightAnchor.constraint(equalToConstant: 10),
             addressCard.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            addressCard.heightAnchor.constraint(equalToConstant: 176),
+            addressCard.heightAnchor.constraint(equalToConstant: 164),
             qrImageView.leadingAnchor.constraint(equalTo: addressCard.leadingAnchor, constant: 18),
             qrImageView.centerYAnchor.constraint(equalTo: addressCard.centerYAnchor),
-            qrImageView.widthAnchor.constraint(equalToConstant: 136),
-            qrImageView.heightAnchor.constraint(equalToConstant: 136),
+            qrImageView.widthAnchor.constraint(equalToConstant: 126),
+            qrImageView.heightAnchor.constraint(equalToConstant: 126),
             addressStack.leadingAnchor.constraint(equalTo: qrImageView.trailingAnchor, constant: 20),
             addressStack.trailingAnchor.constraint(equalTo: addressCard.trailingAnchor, constant: -20),
             addressStack.centerYAnchor.constraint(equalTo: addressCard.centerYAnchor),
@@ -245,6 +272,8 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
             mainActions.heightAnchor.constraint(equalToConstant: 42),
             toggleButton.widthAnchor.constraint(equalTo: stack.widthAnchor),
             toggleButton.heightAnchor.constraint(equalToConstant: 38),
+            healthActions.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            healthActions.heightAnchor.constraint(equalToConstant: 34),
             updateButton.widthAnchor.constraint(equalTo: stack.widthAnchor),
             updateButton.heightAnchor.constraint(equalToConstant: 32),
         ])
@@ -273,6 +302,18 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
         let resourceRoot = coreStore.activeServerRoot() ?? bundledRoot
+
+        switch runtimeHealth.preparePort() {
+        case .ready:
+            break
+        case .recovered:
+            statusLabel.stringValue = text("已清理旧服务，正在重新启动…", "Recovered a stale service. Restarting…")
+        case .blocked(let processName):
+            shouldRestart = false
+            let message = text("端口 8787 正被 \(processName) 使用", "Port 8787 is being used by \(processName)")
+            updateStopped(message)
+            return
+        }
 
         shouldRestart = true
         restartWorkItem?.cancel()
@@ -366,6 +407,7 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     coreStartupWorkItem?.cancel()
                     coreStartupWorkItem = nil
                     pendingCoreActivation = nil
+                    coreStore.complete(activation)
                     mobileUpdateInFlight = false
                     availableUpdate = nil
                     updateChecker = GitHubUpdateChecker(currentVersion: coreStore.effectiveVersion())
@@ -409,9 +451,16 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
-    private func stopServer() {
+    private func stopServer(waitForExit: Bool = false) {
         guard let process = serverProcess, process.isRunning else { return }
         process.terminate()
+        guard waitForExit else { return }
+        let deadline = Date().addingTimeInterval(2)
+        while process.isRunning && Date() < deadline { Darwin.usleep(50_000) }
+        if process.isRunning {
+            Darwin.kill(process.processIdentifier, SIGKILL)
+            process.waitUntilExit()
+        }
     }
 
     private func scheduleRestart() {
@@ -643,7 +692,7 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func rollbackCoreUpdate() {
         guard let activation = pendingCoreActivation else { return }
-        coreStore.restore(directoryName: activation.previousDirectoryName)
+        coreStore.rollback(activation)
         pendingCoreActivation = nil
         mobileUpdateInFlight = false
         availableUpdate = nil
@@ -738,5 +787,39 @@ final class CodexBridgeApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
         updateChecker.invalidateCache()
         UserDefaults.standard.removeObject(forKey: updatePromptKey)
         checkForUpdates(force: true)
+    }
+
+    @objc private func checkAndRepair() {
+        repairButton.isEnabled = false
+        _ = coreStore.pruneStoredVersions()
+        if serverProcess?.isRunning == true, case .managedCurrent = runtimeHealth.inspectPort() {
+            statusLabel.stringValue = text("检查完成 · 服务运行正常", "Check complete · service is healthy")
+            statusDot.layer?.backgroundColor = NSColor.systemGreen.cgColor
+            repairButton.isEnabled = true
+            return
+        }
+        shouldRestart = false
+        stopServer(waitForExit: true)
+        serverProcess = nil
+        shouldRestart = true
+        restartAttempts = 0
+        startServer()
+        repairButton.isEnabled = true
+    }
+
+    @objc private func copyDiagnostics() {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let diagnostics = RuntimeDiagnostics(
+            appVersion: hostVersion,
+            coreVersion: coreStore.effectiveVersion(),
+            serviceOnline: serverProcess?.isRunning == true,
+            portState: runtimeHealth.inspectPort(),
+            storedCoreCount: coreStore.storedVersionCount(),
+            codexDataAvailable: FileManager.default.fileExists(atPath: home.appendingPathComponent(".codex/state_5.sqlite").path),
+            lanAddressAvailable: addressLabel.stringValue.hasPrefix("http://") && !addressLabel.stringValue.contains("127.0.0.1")
+        ).report(chinese: isChinese)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(diagnostics, forType: .string)
+        statusLabel.stringValue = text("诊断信息已复制（不含路径、IP 和任务内容）", "Diagnostics copied without paths, IPs, or task content")
     }
 }
