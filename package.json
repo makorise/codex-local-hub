@@ -49,6 +49,6 @@
     "minimumCoreHostVersion": "0.2.45"
   },
   "devDependencies": {
-    "jsdom": "^30.1.0"
+    "jsdom": "^30.1.1"
   }
 }
