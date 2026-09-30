@@ -613,6 +613,21 @@ function formatReset(timestamp) {
   return new Intl.DateTimeFormat(getLanguage(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(timestamp);
 }
 
+function formatResetCountdown(timestamp, now = Date.now()) {
+  const resetAt = Number(timestamp);
+  const currentTime = Number(now);
+  if (!timestamp || !Number.isFinite(resetAt) || !Number.isFinite(currentTime)) return t('usage.unknownReset');
+  const remainingMs = resetAt - currentTime;
+  if (remainingMs <= 0) return t('usage.resetPending');
+  const totalMinutes = Math.max(1, Math.ceil(remainingMs / 60_000));
+  const days = Math.floor(totalMinutes / 1_440);
+  const hours = Math.floor((totalMinutes % 1_440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days) return t('usage.countdown.daysHours', { days, hours });
+  if (hours) return t('usage.countdown.hoursMinutes', { hours, minutes });
+  return t('usage.countdown.minutes', { minutes });
+}
+
 function usageWindowLabel(limit) {
   const minutes = Number(limit.windowDurationMins || 0);
   if (minutes === 10_080 || (!minutes && limit.label === '周')) return t('usage.window.week');
@@ -647,7 +662,10 @@ function renderUsage() {
   $('#usage-plan').textContent = plan ? plan[0].toUpperCase() + plan.slice(1) : '';
   const summaries = limits.map((limit) => t('usage.remaining', { window: usageWindowLabel(limit), percent: limit.remainingPercent }));
   $('#usage-summary').textContent = summaries.join(' · ');
-  $('#usage-reset').textContent = t('usage.reset', { time: formatReset(primary.resetsAt) });
+  $('#usage-reset').textContent = limits.map((limit) => t('usage.resetCompact', {
+    window: usageWindowLabel(limit),
+    time: formatReset(limit.resetsAt),
+  })).join(' · ');
   $('#usage-ring-value').textContent = lowest;
   $('#usage-ring').style.setProperty('--remaining', lowest);
   card.dataset.tone = lowest <= 10 ? 'red' : lowest <= 30 ? 'amber' : 'green';
@@ -715,6 +733,15 @@ function renderActivityDashboard(range = activityRange) {
   const middleDay = days[Math.floor(days.length / 2)]?.date || firstDay;
   const lastDay = days.at(-1)?.date || firstDay;
   const accountName = state.account?.name || t('activity.localAccount');
+  const resetWindows = limits.map((limit) => `
+    <article class="activity-limit">
+      <header><span>${escapeHtml(usageWindowLabel(limit))}</span><strong>${limit.remainingPercent}%</strong></header>
+      <div class="activity-limit-track" aria-hidden="true"><i style="--remaining:${limit.remainingPercent}"></i></div>
+      <footer>
+        <span>${escapeHtml(t('usage.resetsIn', { countdown: formatResetCountdown(limit.resetsAt) }))}</span>
+        <time datetime="${limit.resetsAt ? new Date(limit.resetsAt).toISOString() : ''}">${escapeHtml(formatReset(limit.resetsAt))}</time>
+      </footer>
+    </article>`).join('');
   $('#modal-kicker').textContent = t('activity.kicker');
   $('#modal-title').textContent = t('activity.title');
   $('#content-modal .modal-sheet').classList.add('activity-sheet');
@@ -726,7 +753,7 @@ function renderActivityDashboard(range = activityRange) {
       <span>${escapeHtml(t('activity.eyebrow', { account: accountName }))}</span>
       <strong>${escapeHtml(t('activity.hero', { count: activity.completedTurns }))}</strong>
       <small>${escapeHtml(t('activity.period'))}</small>
-      ${primary ? `<div class="activity-allowance"><i style="--remaining:${primary.remainingPercent}"></i><span>${escapeHtml(t('activity.allowance', { percent: primary.remainingPercent }))}</span></div>` : ''}
+      ${primary ? `<div class="activity-allowance"><i style="--remaining:${primary.remainingPercent}"></i><span>${escapeHtml(t('activity.allowance', { window: usageWindowLabel(primary), percent: primary.remainingPercent }))}</span></div>` : ''}
     </section>
     <section class="activity-metrics" aria-label="${escapeHtml(t('activity.metrics'))}">
       <article><span>${escapeHtml(t('activity.tokensToday'))}</span><strong>${escapeHtml(todayTokens)}</strong><small>tokens</small></article>
@@ -734,6 +761,10 @@ function renderActivityDashboard(range = activityRange) {
       <article><span>${escapeHtml(t('activity.runTime'))}</span><strong>${escapeHtml(duration)}</strong><small>${escapeHtml(t('activity.localOnly'))}</small></article>
       <article><span>${escapeHtml(t('activity.projects'))}</span><strong>${activity.projectCount}</strong><small>${escapeHtml(t('activity.projectsUnit'))}</small></article>
     </section>
+    ${limits.length ? `<section class="activity-limits">
+      <header><div><span>${escapeHtml(t('activity.limits'))}</span><strong>${escapeHtml(t(limits.length === 1 ? 'activity.limitCycleOne' : 'activity.limitCycleOther', { count: limits.length }))}</strong></div><small>${escapeHtml(t('activity.limitHint'))}</small></header>
+      <div class="activity-limit-grid">${resetWindows}</div>
+    </section>` : ''}
     <section class="activity-chart-card">
       <header>
         <div><span>${escapeHtml(t('activity.rhythm'))}</span><strong>${escapeHtml(t('activity.rhythmSummary', { days: rangeActiveDays, turns: rangeTurns }))}</strong></div>
@@ -1383,6 +1414,7 @@ export {
   waitForRuntimeVersion,
   requestPhoneUpdate,
   formatReset,
+  formatResetCountdown,
   usageWindowLabel,
   formatTokenCount,
   renderTodayTokens,

@@ -16,10 +16,10 @@ test('unsupported task creation and steer controls are absent from the phone UI'
   assert.match(css, /\.connection-dot\s*\{[^}]*flex:\s*0 0 7px;/s);
   const mobileCss = css.slice(css.indexOf('@media (max-width: 760px)'));
   assert.match(mobileCss, /\.modal-sheet\s*\{[^}]*max-height:\s*calc\(100dvh - max\(8px, env\(safe-area-inset-top\)\)\);/s);
-  assert.match(html, /styles\.css\?v=46/);
-  assert.match(html, /app\.js\?v=48/);
-  assert.match(serviceWorker, /styles\.css\?v=46/);
-  assert.match(serviceWorker, /app\.js\?v=48/);
+  assert.match(html, /styles\.css\?v=47/);
+  assert.match(html, /app\.js\?v=49/);
+  assert.match(serviceWorker, /styles\.css\?v=47/);
+  assert.match(serviceWorker, /app\.js\?v=49/);
   assert.match(serviceWorker, /['"]\/i18n\.js['"]/);
 });
 
@@ -144,7 +144,10 @@ async function setup({ failing = new Map(), empty = false, taskCount = 1 } = {})
       const createdMessage = JSON.parse(options.body).message;
       return response({ created: true, threadId: createdMessage === '未出现在列表' ? 'new-thread' : task().id, projectId: task().projectId, project: 'sync' }, 201);
     }
-    if (url.pathname === '/api/usage') return response({ usage: empty ? { available: false, limits: [], todayTokens: { available: false } } : { planType: 'pro', limits: [{ label: '周', usedPercent: 20, remainingPercent: 80, resetsAt: Date.now() + 60_000 }], todayTokens: todayTokens() } });
+    if (url.pathname === '/api/usage') return response({ usage: empty ? { available: false, limits: [], todayTokens: { available: false } } : { planType: 'pro', limits: [
+      { label: '5 小时', windowDurationMins: 300, usedPercent: 20, remainingPercent: 80, resetsAt: Date.now() + 60_000 },
+      { label: '周', windowDurationMins: 10_080, usedPercent: 35, remainingPercent: 65, resetsAt: Date.now() + 172_800_000 },
+    ], todayTokens: todayTokens() } });
     if (url.pathname === '/api/activity') return response({ activity: activitySummary(empty ? { days: [], activeDays: 0, totalTurns: 0, completedTurns: 0, totalDurationMs: 0, projectCount: 0, taskCount: 0, recentTaskCount: 0 } : {}) });
     if (url.pathname === '/api/account') return response({ account: empty ? { available: false, name: null, initial: null } : { available: true, name: 'alice', initial: 'A' } });
     if (url.pathname === '/api/deliveries' && options.method === 'DELETE') {
@@ -388,7 +391,9 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   ui.state.tasks = originalTasks;
   ui.renderList();
   assert.equal(document.querySelector('#detail-pane').classList.contains('is-open'), true);
-  assert.equal(document.querySelector('#usage-summary').textContent, '周窗口剩余 80%');
+  assert.equal(document.querySelector('#usage-summary').textContent, '5 小时窗口剩余 80% · 周窗口剩余 65%');
+  assert.match(document.querySelector('#usage-reset').textContent, /5 小时/);
+  assert.match(document.querySelector('#usage-reset').textContent, /周/);
   assert.match(document.querySelector('#usage-today-value').textContent, /1\.2万 tokens/);
   assert.match(document.querySelector('#usage-card').getAttribute('aria-label'), /今日 Token/);
   assert.equal(document.querySelector('#account-badge').hidden, false);
@@ -415,7 +420,7 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.equal(document.querySelector('[data-filter="all"] span').textContent, 'All');
   assert.equal(document.querySelector('#connection-text').textContent.includes('Synced'), true);
   assert.equal(document.querySelector('#account-badge').getAttribute('aria-label'), 'Current Codex account: alice');
-  assert.equal(document.querySelector('#usage-summary').textContent, 'Weekly window: 80% remaining');
+  assert.equal(document.querySelector('#usage-summary').textContent, '5 hr window: 80% remaining · Weekly window: 65% remaining');
   assert.match(document.querySelector('#usage-card').getAttribute('aria-label'), /Tokens today/);
   assert.equal(document.querySelector('#delivery-count').textContent, '2 images');
   assert.equal(document.querySelector('.task-card-foot span').textContent, 'Making progress');
@@ -424,6 +429,13 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.match(ui.relativeTime(Date.now() - 120_000), /min ago/);
   assert.match(ui.relativeTime(Date.now() - 7_200_000), /hr ago/);
   assert.equal(ui.formatReset(0), 'Reset time unavailable');
+  assert.equal(ui.formatResetCountdown(0), 'Reset time unavailable');
+  assert.equal(ui.formatResetCountdown('invalid', 0), 'Reset time unavailable');
+  assert.equal(ui.formatResetCountdown(1_000, Number.NaN), 'Reset time unavailable');
+  assert.equal(ui.formatResetCountdown(1_000, 2_000), 'Reset pending');
+  assert.equal(ui.formatResetCountdown(62_000, 2_000), '1m');
+  assert.equal(ui.formatResetCountdown(3_722_000, 2_000), '1h 2m');
+  assert.equal(ui.formatResetCountdown(93_602_000, 2_000), '1d 2h');
   assert.equal(ui.formatDuration(0), '0 sec');
   assert.equal(ui.formatDuration(60), '1 min');
   assert.equal(ui.formatDuration(3_661), '1 hr 1 min');
@@ -668,7 +680,10 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.equal(document.querySelectorAll('.activity-metrics article').length, 4);
   assert.match(document.querySelector('.activity-dashboard').textContent, /近 30 天完成了 60 个工作回合/);
   assert.match(document.querySelector('.activity-dashboard').textContent, /今日 Token/);
-  assert.match(document.querySelector('.activity-dashboard').textContent, /本周余量 80%/);
+  assert.match(document.querySelector('.activity-dashboard').textContent, /5 小时余量 80%/);
+  assert.equal(document.querySelectorAll('.activity-limit').length, 2);
+  assert.match(document.querySelector('.activity-limits').textContent, /2 个独立周期/);
+  assert.match(document.querySelector('.activity-limits').textContent, /后重置/);
   assert.equal(document.querySelector('[data-range="7"]').classList.contains('is-active'), true);
   document.querySelector('[data-range="30"]').click();
   assert.equal(document.querySelector('[data-range="30"]').classList.contains('is-active'), true);
@@ -792,6 +807,7 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   ui.renderUsage();
   assert.equal(document.querySelector('#usage-card').dataset.tone, 'red');
   document.querySelector('#usage-card').click();
+  assert.match(document.querySelector('.activity-limits').textContent, /1 个独立周期/);
   ui.state.usage = { limits: [{ label: '周', usedPercent: 80, remainingPercent: 20, resetsAt: Date.now() }], todayTokens: todayTokens({ recorded: false }) };
   ui.renderUsage();
   assert.equal(document.querySelector('#usage-card').dataset.tone, 'amber');
