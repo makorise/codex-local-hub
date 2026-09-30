@@ -186,7 +186,9 @@ button { color: inherit; }
 .unread-dot { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 4px rgba(120,168,255,.08), 0 0 10px rgba(120,168,255,.42); }
 .task-project { min-width: 0; overflow: hidden; color: var(--muted); font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
 .task-card p { margin: 0; color: var(--muted); font-size: .79rem; line-height: 1.45; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.task-card-foot { margin-top: 11px; display: flex; align-items: center; color: #727d91; font-size: .7rem; }
+.task-card-foot { min-width: 0; margin-top: 11px; display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #727d91; font-size: .7rem; }
+.task-card-foot > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-model { max-width: 46%; flex: 0 1 auto; overflow: hidden; padding: 3px 7px; border: 1px solid rgba(120,168,255,.11); border-radius: 999px; color: #8999b3; background: rgba(120,168,255,.045); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .58rem; letter-spacing: .01em; text-overflow: ellipsis; white-space: nowrap; }
 .status-pill { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; padding: 5px 9px; border-radius: 999px; color: #aeb8c9; background: rgba(255,255,255,.06); font-size: .7rem; font-weight: 650; }
 .status-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 9px currentColor; }
 .status-pill[data-tone="blue"] { color: var(--blue); background: rgba(90,145,255,.1); }

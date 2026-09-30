@@ -16,10 +16,10 @@ test('unsupported task creation and steer controls are absent from the phone UI'
   assert.match(css, /\.connection-dot\s*\{[^}]*flex:\s*0 0 7px;/s);
   const mobileCss = css.slice(css.indexOf('@media (max-width: 760px)'));
   assert.match(mobileCss, /\.modal-sheet\s*\{[^}]*max-height:\s*calc\(100dvh - max\(8px, env\(safe-area-inset-top\)\)\);/s);
-  assert.match(html, /styles\.css\?v=43/);
-  assert.match(html, /app\.js\?v=47/);
-  assert.match(serviceWorker, /styles\.css\?v=43/);
-  assert.match(serviceWorker, /app\.js\?v=47/);
+  assert.match(html, /styles\.css\?v=44/);
+  assert.match(html, /app\.js\?v=48/);
+  assert.match(serviceWorker, /styles\.css\?v=44/);
+  assert.match(serviceWorker, /app\.js\?v=48/);
   assert.match(serviceWorker, /['"]\/i18n\.js['"]/);
 });
 
@@ -35,6 +35,7 @@ function task(overrides = {}) {
     projectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     updatedAt: Date.now(),
     activity: '正在推进',
+    model: 'gpt-6-sol',
     latestTask: '处理前端问题',
     queuedCount: 3,
     progress: { state: 'running', label: '进行中', tone: 'blue' },
@@ -291,6 +292,9 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   setVersionInfo(latestVersion);
   setRuntimeVersion('0.2.39');
   assert.equal(document.querySelectorAll('.task-card').length, 24);
+  assert.equal(document.querySelector('.task-model').textContent, 'gpt-6-sol');
+  assert.equal(document.querySelector('.task-model').getAttribute('aria-label'), '任务模型：gpt-6-sol');
+  assert.doesNotMatch(ui.renderTaskCard(task({ model: null })), /task-model/);
   const firstCardHead = document.querySelector('.task-card-head');
   assert.equal(firstCardHead.querySelector('h3').textContent, '同步任务');
   assert.equal(firstCardHead.querySelector('.status-pill') !== null, true);

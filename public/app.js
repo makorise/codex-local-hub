@@ -195,6 +195,7 @@ function syncUnreadTasks(previousTasks, nextTasks, initialSync = false) {
 function renderTaskCard(task, showProject = false) {
   const project = projectLabel(projectName(task));
   const unread = state.unreadTaskIds.has(task.id);
+  const model = String(task.model || '').trim();
   return `
     <button class="task-card ${showProject ? 'shows-project' : ''} ${task.id === state.selectedId ? 'is-selected' : ''} ${unread ? 'is-unread' : ''}" type="button" data-id="${escapeHtml(task.id)}">
       ${showProject ? `<span class="task-project">${escapeHtml(project)}</span>` : ''}
@@ -207,7 +208,7 @@ function renderTaskCard(task, showProject = false) {
         </span>
       </div>
       <p>${escapeHtml(task.latestTask || t('empty.task'))}</p>
-      <div class="task-card-foot"><span>${escapeHtml(localizedActivity(task))}</span></div>
+      <div class="task-card-foot"><span>${escapeHtml(localizedActivity(task))}</span>${model ? `<span class="task-model" title="${escapeHtml(model)}" aria-label="${escapeHtml(t('task.model', { model }))}">${escapeHtml(model)}</span>` : ''}</div>
     </button>`;
 }
 
