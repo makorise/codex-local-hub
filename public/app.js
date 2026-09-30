@@ -475,15 +475,6 @@ function setConnection(online, text) {
   dot.classList.toggle('is-online', online);
   dot.classList.toggle('is-offline', !online);
   $('#connection-text').textContent = text;
-  renderSuccessState();
-}
-
-function renderSuccessState() {
-  const currentVersion = String(state.version?.currentVersion || '');
-  const ready = state.connected && /^\d+\.\d+\.\d+$/.test(currentVersion);
-  $('#success-card').hidden = !ready;
-  $('#success-version').textContent = ready ? `v${currentVersion}` : '';
-  return ready;
 }
 
 function safeIssueDiagnostics() {
@@ -547,6 +538,10 @@ function renderVersionDetails() {
     ${canUpdate ? `<button class="version-action" type="button" data-action="version-update">${escapeHtml(t('version.update', { version: latest }))}</button>` : ''}
     <button class="version-action secondary" type="button" data-action="version-refresh">${escapeHtml(t('version.check'))}</button>
   </div>
+  <div class="version-support-actions">
+    <a class="version-action secondary" href="https://github.com/makorise/codex-local-hub" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(t('success.starAria'))}">${escapeHtml(t('success.star'))}</a>
+    <button class="version-action secondary" type="button" data-action="report-issue">${escapeHtml(t('success.report'))}</button>
+  </div>
   ${requiresDesktop ? `<p class="version-note">${escapeHtml(t('version.requiresDesktop'))}</p>` : ''}
   <p class="version-note">${escapeHtml(t('version.note'))}</p>`;
   $('#content-modal').hidden = false;
@@ -560,7 +555,6 @@ async function loadVersion({ force = false } = {}) {
   if (!response.ok) throw new Error(localizedError(payload.error, 'version.updateFailure'));
   state.version = payload.version;
   renderVersion();
-  renderSuccessState();
   return state.version;
 }
 
@@ -1195,7 +1189,6 @@ document.querySelectorAll('.filter').forEach((button) => button.addEventListener
   renderList();
 }));
 $('#refresh-button').addEventListener('click', refreshTasks);
-$('#report-issue').addEventListener('click', reportIssue);
 $('#delivery-list').addEventListener('click', (event) => {
   const button = event.target.closest('[data-delivery-id]');
   const delivery = state.deliveries.find((item) => item.id === button?.dataset.deliveryId);
@@ -1248,6 +1241,10 @@ $('#modal-content').addEventListener('click', async (event) => {
   }
   if (button.dataset.action === 'version-update') {
     await requestPhoneUpdate();
+    return;
+  }
+  if (button.dataset.action === 'report-issue') {
+    reportIssue();
     return;
   }
   if ($('#modal-content').classList.contains('management-menu')) {
@@ -1376,7 +1373,6 @@ export {
   loadDetail,
   loadProjects,
   setConnection,
-  renderSuccessState,
   safeIssueDiagnostics,
   buildIssueUrl,
   reportIssue,
