@@ -116,6 +116,24 @@ struct UpdateCheckerTests {
         if case .failed = waitForCheck(checker, force: true) { expect(true, "offline failures are reported without changing versions") }
         else { expect(false, "offline check should fail safely") }
 
+        checker.invalidateCache()
+        let fallbackPage = URL(string: "https://github.com/makorise/codex-local-hub/releases/tag/v0.3.0")!
+        let fallbackDigest = String(repeating: "b", count: 64)
+        StubURLProtocol.handler = { request in
+            if request.url?.host == "api.github.com" {
+                return (HTTPURLResponse(url: endpoint, statusCode: 403, httpVersion: nil, headerFields: nil)!, Data())
+            }
+            if request.url?.path.hasSuffix("/releases/latest") == true {
+                expect(request.httpMethod == "HEAD", "uses a lightweight release redirect fallback")
+                return (HTTPURLResponse(url: fallbackPage, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data())
+            }
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data("\(fallbackDigest)  Codex-Local-Hub-core-0.3.0.zip\n".utf8))
+        }
+        if case .available(let recovered) = waitForCheck(checker, force: true) {
+            expect(recovered.version == "0.3.0", "recovers the latest version when the GitHub API is rate limited")
+            expect(recovered.coreAsset?.sha256 == fallbackDigest, "recovers the trusted core checksum without the API")
+        } else { expect(false, "rate-limited API should fall back to the public release redirect") }
+
         if failures == 0 { print("Update checker tests passed") }
         exit(failures == 0 ? 0 : 1)
     }

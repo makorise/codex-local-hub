@@ -77,3 +77,110 @@ test('update reader caches, shares requests, refreshes, and fails closed', async
   const rejected = createUpdateReader({ currentVersion: '0.2.9', now: () => 201, fetchImpl: async () => ({ ok: false }) });
   assert.equal((await rejected()).state, 'unavailable');
 });
+
+test('update reader falls back to GitHub release redirects when the API is rate limited', async () => {
+  const digest = 'b'.repeat(64);
+  const requests = [];
+  const reader = createUpdateReader({
+    currentVersion: '0.2.9', hostUpdateEnabled: true, now: () => 300,
+    fetchImpl: async (url, options = {}) => {
+      requests.push({ url, options });
+      if (String(url).includes('api.github.com')) return { ok: false, status: 403 };
+      if (String(url).endsWith('/releases/latest')) {
+        return { ok: true, url: 'https://github.com/makorise/codex-local-hub/releases/tag/v0.3.0' };
+      }
+      return { ok: true, text: async () => `${digest}  Codex-Local-Hub-core-0.3.0.zip\n` };
+    },
+  });
+  assert.deepEqual(await reader(), {
+    currentVersion: '0.2.9', latestVersion: '0.3.0', state: 'available', updateAvailable: true,
+    canUpdate: true, requiresDesktop: false,
+    releaseUrl: 'https://github.com/makorise/codex-local-hub/releases/tag/v0.3.0', checkedAt: 300,
+  });
+  assert.equal(requests.length, 3);
+  assert.equal(requests[1].options.method, 'HEAD');
+  assert.match(requests[2].url, /Codex-Local-Hub-core-0\.3\.0\.zip\.sha256$/);
+
+  const current = createUpdateReader({
+    currentVersion: '0.3.0', now: () => 301,
+    fetchImpl: async (url) => String(url).includes('api.github.com')
+      ? { ok: false, status: 403 }
+      : { ok: true, url: 'https://github.com/makorise/codex-local-hub/releases/tag/v0.3.0' },
+  });
+  assert.equal((await current()).state, 'latest');
+
+  const untrusted = createUpdateReader({
+    currentVersion: '0.2.9', now: () => 302,
+    fetchImpl: async (url) => String(url).includes('api.github.com')
+      ? { ok: false, status: 403 }
+      : { ok: true, url: 'https://example.com/makorise/codex-local-hub/releases/tag/v0.3.0' },
+  });
+  assert.equal((await untrusted()).state, 'unavailable');
+
+  const malformed = createUpdateReader({
+    currentVersion: '0.2.9', now: () => 303,
+    fetchImpl: async (url) => String(url).includes('api.github.com')
+      ? { ok: false, status: 403 }
+      : { ok: true, url: '%' },
+  });
+  assert.equal((await malformed()).state, 'unavailable');
+
+  for (const badUrl of [
+    undefined,
+    'http://github.com/makorise/codex-local-hub/releases/tag/v0.3.0',
+    'https://github.com/makorise/another-project/releases/tag/v0.3.0',
+    'https://github.com/makorise/codex-local-hub/releases/tag/vnot-a-version',
+  ]) {
+    const badRedirect = createUpdateReader({
+      currentVersion: '0.2.9', now: () => 303,
+      fetchImpl: async (url) => String(url).includes('api.github.com')
+        ? { ok: false, status: 403 }
+        : { ok: true, url: badUrl },
+    });
+    assert.equal((await badRedirect()).state, 'unavailable');
+  }
+
+  let recoveredCalls = 0;
+  const recovered = createUpdateReader({
+    currentVersion: '0.3.0', now: () => 304,
+    fetchImpl: async () => {
+      recoveredCalls += 1;
+      if (recoveredCalls === 1) throw new Error('API offline');
+      return { ok: true, url: 'https://github.com/makorise/codex-local-hub/releases/tag/v0.3.0' };
+    },
+  });
+  assert.equal((await recovered()).state, 'latest');
+
+  let missingCalls = 0;
+  const missing = createUpdateReader({
+    currentVersion: '0.2.9', now: () => 305,
+    fetchImpl: async () => {
+      missingCalls += 1;
+      if (missingCalls === 1) throw new Error('API offline');
+      return { ok: false, status: 503 };
+    },
+  });
+  assert.equal((await missing()).state, 'unavailable');
+
+  let noCoreCalls = 0;
+  const noCore = createUpdateReader({
+    currentVersion: '0.2.9', hostUpdateEnabled: true, now: () => 306,
+    fetchImpl: async (url) => {
+      noCoreCalls += 1;
+      if (String(url).includes('api.github.com')) return { ok: false, status: 403 };
+      if (String(url).endsWith('/releases/latest')) return { ok: true, url: 'https://github.com/makorise/codex-local-hub/releases/tag/v0.3.0' };
+      return { ok: false, status: 404 };
+    },
+  });
+  assert.equal((await noCore()).requiresDesktop, true);
+
+  const badChecksum = createUpdateReader({
+    currentVersion: '0.2.9', hostUpdateEnabled: true, now: () => 307,
+    fetchImpl: async (url) => {
+      if (String(url).includes('api.github.com')) return { ok: false, status: 403 };
+      if (String(url).endsWith('/releases/latest')) return { ok: true, url: 'https://github.com/makorise/codex-local-hub/releases/tag/v0.3.0' };
+      return { ok: true, text: async () => 'not-a-checksum' };
+    },
+  });
+  assert.equal((await badChecksum()).canUpdate, false);
+});
