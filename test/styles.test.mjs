@@ -17,6 +17,7 @@ test('task pane has bounded desktop and touch scrolling styles', () => {
   assert.match(styles, /@media \(max-width: 760px\)[\s\S]*\.detail-scroll \{[^}]*overflow-y: auto;[^}]*overscroll-behavior: contain;[^}]*touch-action: pan-y;/);
   assert.match(styles, /\.composer-dock \{[^}]*overscroll-behavior: none;/);
   assert.match(styles, /\.account-badge span \{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/);
+  assert.match(styles, /\.success-actions a, \.success-actions button \{[^}]*display: inline-flex;[^}]*align-items: center;[^}]*justify-content: center;[^}]*line-height: 1;/);
   assert.match(html, /<div class="brand-title-row">[\s\S]*<h1[^>]*>[^<]+<\/h1>[\s\S]*<button id="version-button"/);
   assert.doesNotMatch(html, /<p>[\s\S]*?<button id="version-button"[\s\S]*?<\/p>/);
   assert.match(styles, /\.brand-title-row \{[^}]*display: flex;[^}]*align-items: center;/);

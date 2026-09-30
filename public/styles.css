@@ -112,7 +112,7 @@ button { color: inherit; }
 .success-state strong { color: #dff9ec; font-size: .7rem; }
 .success-state small { padding-left: 7px; border-left: 1px solid rgba(255,255,255,.08); color: #7e918a; font-size: .62rem; white-space: nowrap; }
 .success-actions { flex: 0 0 auto; }
-.success-actions a, .success-actions button { min-height: 26px; padding: 0 7px; border: 0; border-radius: 8px; color: #8fa59c; background: transparent; font: inherit; font-size: .61rem; text-decoration: none; cursor: pointer; }
+.success-actions a, .success-actions button { min-height: 26px; padding: 0 7px; border: 0; border-radius: 8px; color: #8fa59c; background: transparent; display: inline-flex; align-items: center; justify-content: center; font: inherit; font-size: .61rem; line-height: 1; text-decoration: none; cursor: pointer; }
 .success-actions a:hover, .success-actions button:hover { color: #dff9ec; background: rgba(95,226,172,.07); }
 .usage-overview { --usage-color: var(--green); --remaining: 0; width: 100%; min-height: 102px; margin: 0 0 8px; padding: 10px 12px 8px; border: 1px solid rgba(95,226,172,.13); border-radius: 18px; color: var(--text); background: linear-gradient(135deg, rgba(18,29,36,.98), rgba(13,20,29,.98)); box-shadow: inset 0 1px rgba(255,255,255,.035), 0 10px 30px rgba(0,0,0,.14); display: flex; flex-direction: column; text-align: left; cursor: pointer; }
 .usage-overview[hidden] { display: none !important; }

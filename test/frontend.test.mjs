@@ -16,9 +16,9 @@ test('unsupported task creation and steer controls are absent from the phone UI'
   assert.match(css, /\.connection-dot\s*\{[^}]*flex:\s*0 0 7px;/s);
   const mobileCss = css.slice(css.indexOf('@media (max-width: 760px)'));
   assert.match(mobileCss, /\.modal-sheet\s*\{[^}]*max-height:\s*calc\(100dvh - max\(8px, env\(safe-area-inset-top\)\)\);/s);
-  assert.match(html, /styles\.css\?v=44/);
+  assert.match(html, /styles\.css\?v=45/);
   assert.match(html, /app\.js\?v=48/);
-  assert.match(serviceWorker, /styles\.css\?v=44/);
+  assert.match(serviceWorker, /styles\.css\?v=45/);
   assert.match(serviceWorker, /app\.js\?v=48/);
   assert.match(serviceWorker, /['"]\/i18n\.js['"]/);
 });
