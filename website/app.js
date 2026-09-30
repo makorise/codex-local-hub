@@ -1,6 +1,6 @@
 const INSTALL_PROMPTS = {
-  en: 'Use $skill-installer to install https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub, then use $setup-codex-local-hub in this task to install or update Codex Lookout, launch it, and verify phone access. Preserve existing files and do not change my global Node.js environment.',
-  'zh-CN': '使用 $skill-installer 安装 https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub，然后在当前任务中使用 $setup-codex-local-hub：安装或更新 Codex 瞭望台、启动程序并验证手机访问。保护已有文件，不要修改我的全局 Node.js 环境。',
+  en: 'Use $skill-installer to install https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub, then use $setup-codex-local-hub in this task to automatically install or update Codex Lookout, preserve all existing data and files, leave my global Node.js environment unchanged, launch the app, and verify that my phone can access it.',
+  'zh-CN': '使用 $skill-installer 安装 https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub，然后在当前任务中使用 $setup-codex-local-hub：自动安装或更新 Codex 瞭望台，保留所有已有数据和文件，不修改我的全局 Node.js 环境，启动程序，并验证手机可以访问。',
 };
 
 const RECOVERY_PROMPTS = {
@@ -13,7 +13,7 @@ const COPY = {
     'a11y.skip': 'Skip to content', 'nav.demo': 'Demo', 'nav.features': 'Features', 'nav.how': 'How it works', 'nav.install': 'Install',
     'hero.eyebrow': 'LOCAL-FIRST · FOR CODEX', 'hero.title': 'Step away from your Mac.<br><em>Stay with the task.</em>',
     'hero.copy': 'See progress, reply, reorder queued work, and review screenshots from your phone. Your Codex work stays on your local network.',
-    'hero.install': 'Copy install prompt', 'hero.source': 'View source', 'hero.local': 'Local network', 'hero.twoway': 'Focused control', 'hero.open': 'Open source', 'hero.running': '3 tasks active',
+    'hero.install': 'Copy install prompt', 'hero.source': 'See it in action', 'hero.local': 'Local network', 'hero.twoway': 'Focused control', 'hero.open': 'Open source', 'hero.running': '3 tasks active',
     'demo.label': '30-SECOND TOUR', 'demo.title': 'The full loop, without returning to your desk.', 'demo.copy': 'Real product screens. One local connection. Three simple moves.',
     'demo.scan.title': 'Open locally', 'demo.scan.copy': 'The Mac app shows one phone address for the same Wi-Fi.',
     'demo.watch.title': 'Watch the queue', 'demo.watch.copy': 'See what is active, queued, or finished—grouped by project.',
@@ -27,8 +27,8 @@ const COPY = {
     'how.copy': 'A lightweight local service reads the useful Codex state and sends your actions back to the selected task. No hosted dashboard and no second chat archive.',
     'how.mac': 'Mac', 'how.macCopy': 'Codex keeps running', 'how.hubCopy': 'Syncs on trusted Wi-Fi', 'how.phone': 'Phone', 'how.phoneCopy': 'You decide what is next',
     'trust.local': 'Local by default', 'trust.localCopy': 'No hosted relay', 'trust.bounded': 'Bounded context', 'trust.boundedCopy': 'Only recent visible messages', 'trust.open': 'Open and auditable', 'trust.security': 'Read the security model ↗',
-    'install.label': 'ONE-MESSAGE INSTALL', 'install.title': 'Paste once. Codex handles the rest.', 'install.copy': 'The setup skill installs or updates the app, starts it, and verifies phone access.',
-    'install.requirements': 'macOS 15+ · Codex desktop · Same trusted Wi-Fi', 'install.latest': 'Latest', 'install.manual': 'Manual downloads · unsigned preview', 'install.promptLabel': 'PASTE INTO CODEX', 'install.copyButton': 'Copy', 'install.recovery': 'Update stuck? Copy the repair prompt',
+    'install.label': 'ONE-MESSAGE INSTALL', 'install.title': 'Paste once. Codex handles the rest.', 'install.copy': 'It installs automatically, preserves your data, leaves global Node.js untouched, and verifies phone access.',
+    'install.requirements': 'macOS 15+ · Codex desktop · Same trusted Wi-Fi', 'install.latest': 'Latest release', 'install.manual': 'Manual downloads · unsigned preview', 'install.promptLabel': 'PASTE INTO CODEX', 'install.copyButton': 'Copy', 'install.recovery': 'Update stuck? Copy the repair prompt',
     'install.compatibility': 'Previously released as Codex Local Hub. Internal identifiers remain unchanged for update compatibility.', 'install.copied': 'Installation prompt copied', 'install.recoveryCopied': 'Repair prompt copied',
     'image.desktop': 'Codex Lookout desktop dashboard', 'image.macHost': 'Codex Lookout Mac host with a local phone address', 'image.mobileDashboard': 'Codex Lookout mobile task dashboard', 'image.mobileConversation': 'Codex Lookout mobile conversation',
     'footer.note': 'Independent open-source project. Not affiliated with OpenAI.', 'footer.releases': 'Releases', 'footer.star': 'Star on GitHub',
@@ -37,7 +37,7 @@ const COPY = {
     'a11y.skip': '跳到正文', 'nav.demo': '演示', 'nav.features': '功能', 'nav.how': '原理', 'nav.install': '安装',
     'hero.eyebrow': '本地优先 · 为 CODEX 而生', 'hero.title': '离开电脑。<br><em>任务仍在手边。</em>',
     'hero.copy': '用手机看进度、回复消息、调整队列、验收截图。你的 Codex 工作始终留在局域网内。',
-    'hero.install': '复制安装词', 'hero.source': '查看源码', 'hero.local': '局域网运行', 'hero.twoway': '可靠控制', 'hero.open': '开源', 'hero.running': '3 个任务正在推进',
+    'hero.install': '复制安装词', 'hero.source': '查看效果', 'hero.local': '局域网运行', 'hero.twoway': '可靠控制', 'hero.open': '开源', 'hero.running': '3 个任务正在推进',
     'demo.label': '30 秒了解产品', 'demo.title': '不用回到电脑，也能完成整个任务闭环。', 'demo.copy': '真实产品界面，一次局域网连接，三个简单动作。',
     'demo.scan.title': '局域网打开', 'demo.scan.copy': 'Mac 程序显示同一 Wi-Fi 下的手机访问地址。',
     'demo.watch.title': '掌握队列', 'demo.watch.copy': '按项目查看正在运行、排队和已完成的任务。',
@@ -51,7 +51,7 @@ const COPY = {
     'how.copy': '轻量本地服务读取必要的 Codex 状态，再把操作送回指定任务。没有托管面板，也不复制完整对话。',
     'how.mac': 'Mac', 'how.macCopy': 'Codex 持续运行', 'how.hubCopy': '通过可信 Wi-Fi 同步', 'how.phone': '手机', 'how.phoneCopy': '你决定下一步',
     'trust.local': '默认本地运行', 'trust.localCopy': '不经过托管中继', 'trust.bounded': '有限上下文', 'trust.boundedCopy': '仅同步最近可见消息', 'trust.open': '开源可审计', 'trust.security': '查看安全模型 ↗',
-    'install.label': '一句话完成安装', 'install.title': '复制一次，剩下的交给 Codex。', 'install.copy': 'Setup Skill 会自动安装或更新程序、启动服务并验证手机访问。',
+    'install.label': '一句话完成安装', 'install.title': '复制一次，剩下的交给 Codex。', 'install.copy': '自动安装或更新，保留已有数据，不改全局 Node.js，并验证手机可以访问。',
     'install.requirements': 'macOS 15+ · Codex 桌面端 · 同一可信 Wi-Fi', 'install.latest': '最新版本', 'install.manual': '手动下载 · 未签名预览版', 'install.promptLabel': '复制到 CODEX', 'install.copyButton': '复制', 'install.recovery': '更新卡住？复制修复提示词',
     'install.compatibility': '旧版本曾使用 Codex Local Hub 名称；内部标识保持不变，以兼容现有升级。', 'install.copied': '安装词已复制', 'install.recoveryCopied': '修复提示词已复制',
     'image.desktop': 'Codex 瞭望台电脑端任务面板', 'image.macHost': '显示局域网手机访问地址的 Codex 瞭望台 Mac 程序', 'image.mobileDashboard': 'Codex 瞭望台手机任务面板', 'image.mobileConversation': 'Codex 瞭望台手机会话页面',
@@ -112,6 +112,44 @@ export async function copyRecoveryPrompt() {
   showToast(COPY[language]['install.recoveryCopied']);
 }
 
+const RELEASE_API = 'https://api.github.com/repos/makorise/codex-local-hub/releases/latest';
+const RELEASES_URL = 'https://github.com/makorise/codex-local-hub/releases/latest';
+
+export function normalizeLatestRelease(payload) {
+  const tag = String(payload?.tag_name || '');
+  const url = String(payload?.html_url || '');
+  if (payload?.draft || payload?.prerelease || !/^v\d+\.\d+\.\d+$/.test(tag)) return null;
+  if (!/^https:\/\/github\.com\/makorise\/codex-local-hub\/releases\/tag\/v\d+\.\d+\.\d+$/.test(url)) return null;
+  return { tag, version: tag.slice(1), url };
+}
+
+export function renderLatestRelease(release) {
+  const link = document.querySelector('[data-latest-release]');
+  const version = document.querySelector('[data-latest-version]');
+  link.href = release?.url || RELEASES_URL;
+  version.textContent = release?.tag || '';
+  const structuredNode = document.querySelector('script[type="application/ld+json"]');
+  const structuredData = JSON.parse(structuredNode.textContent);
+  if (release) structuredData.softwareVersion = release.version;
+  else delete structuredData.softwareVersion;
+  structuredNode.textContent = JSON.stringify(structuredData);
+  return release;
+}
+
+export async function loadLatestRelease(fetchImpl = fetch) {
+  const response = await fetchImpl(RELEASE_API, { headers: { Accept: 'application/vnd.github+json' } });
+  if (!response.ok) return renderLatestRelease(null);
+  return renderLatestRelease(normalizeLatestRelease(await response.json()));
+}
+
+export async function initializeLatestRelease(fetchImpl = fetch) {
+  try {
+    return await loadLatestRelease(fetchImpl);
+  } catch {
+    return renderLatestRelease(null);
+  }
+}
+
 document.querySelectorAll('[data-copy-prompt]').forEach((button) => button.addEventListener('click', () => copyInstallPrompt()));
 document.querySelector('[data-copy-recovery]').addEventListener('click', () => copyRecoveryPrompt());
 
@@ -130,3 +168,4 @@ document.querySelectorAll('.reveal').forEach((node, index) => {
 });
 
 applyLanguage(language);
+await initializeLatestRelease();

@@ -1,5 +1,5 @@
-const CACHE = 'codex-local-hub-v33';
-const SHELL = ['/', '/styles.css?v=42', '/app.js?v=46', '/i18n.js?v=2', '/favicon.svg', '/manifest.webmanifest'];
+const CACHE = 'codex-local-hub-v34';
+const SHELL = ['/', '/styles.css?v=43', '/app.js?v=47', '/i18n.js', '/favicon.svg', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => event.waitUntil(
   caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()),

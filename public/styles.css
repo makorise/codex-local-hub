@@ -105,6 +105,15 @@ button { color: inherit; }
 .install-tip small { overflow: hidden; color: #77849a; font-size: .6rem; text-overflow: ellipsis; white-space: nowrap; }
 .install-tip button { min-height: 30px; padding: 0 9px; border: 1px solid rgba(120,168,255,.14); border-radius: 9px; color: #afcaff; background: rgba(86,130,235,.08); font-size: .64rem; cursor: pointer; }
 .install-tip .install-dismiss { position: absolute; top: 5px; right: 5px; min-width: 28px; width: 28px; padding: 0; border: 0; color: #69758a; background: transparent; font-size: 1rem; }
+.success-card { min-height: 38px; margin: 0 0 8px; padding: 7px 9px 7px 11px; border: 1px solid rgba(95,226,172,.13); border-radius: 13px; background: rgba(95,226,172,.035); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.success-card[hidden] { display: none !important; }
+.success-state, .success-actions { min-width: 0; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.success-state i { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px rgba(95,226,172,.45); }
+.success-state strong { color: #dff9ec; font-size: .7rem; }
+.success-state small { padding-left: 7px; border-left: 1px solid rgba(255,255,255,.08); color: #7e918a; font-size: .62rem; white-space: nowrap; }
+.success-actions { flex: 0 0 auto; }
+.success-actions a, .success-actions button { min-height: 26px; padding: 0 7px; border: 0; border-radius: 8px; color: #8fa59c; background: transparent; font: inherit; font-size: .61rem; text-decoration: none; cursor: pointer; }
+.success-actions a:hover, .success-actions button:hover { color: #dff9ec; background: rgba(95,226,172,.07); }
 .usage-overview { --usage-color: var(--green); --remaining: 0; width: 100%; min-height: 102px; margin: 0 0 8px; padding: 10px 12px 8px; border: 1px solid rgba(95,226,172,.13); border-radius: 18px; color: var(--text); background: linear-gradient(135deg, rgba(18,29,36,.98), rgba(13,20,29,.98)); box-shadow: inset 0 1px rgba(255,255,255,.035), 0 10px 30px rgba(0,0,0,.14); display: flex; flex-direction: column; text-align: left; cursor: pointer; }
 .usage-overview[hidden] { display: none !important; }
 .usage-main { width: 100%; min-width: 0; display: grid; grid-template-columns: 34px minmax(0,1fr) 48px; align-items: center; gap: 10px; }
@@ -366,6 +375,8 @@ body.modal-open { overflow: hidden; }
   .language-button { width: var(--top-control-size); min-width: var(--top-control-size); height: var(--top-control-size); padding: 0; }
   .workspace { display: block; }
   .task-pane { height: 100%; min-height: 0; border-right: 0; padding: 18px 14px calc(36px + env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior-y: contain; touch-action: pan-y; scrollbar-gutter: auto; }
+  .success-card { overflow: hidden; }
+  .success-actions a, .success-actions button { padding: 0 5px; }
   .task-toolbar { margin-top: 2px; padding: 4px; gap: 4px; border-radius: 14px; }
   .filters { gap: 3px; }
   .filter { min-height: 34px; padding: 5px 2px; gap: 2px; font-size: .68rem; }
@@ -412,6 +423,11 @@ body.modal-open { overflow: hidden; }
   .queue-rank { width: 34px; height: 36px; }
   .queue-controls { gap: 3px; }
   .queue-controls button { width: 38px; height: 38px; }
+}
+
+@media (max-width: 360px) {
+  .success-card { flex-wrap: wrap; }
+  .success-actions { width: 100%; padding-left: 14px; justify-content: flex-start; }
 }
 
 @media (max-width: 360px) {

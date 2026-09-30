@@ -14,6 +14,7 @@ const state = {
   syncedAt: null,
   unreadTaskIds: new Set(),
   hasSyncedTasks: false,
+  connected: false,
 };
 
 function stripTokenFromUrl() {
@@ -468,10 +469,40 @@ async function loadProjects() {
 }
 
 function setConnection(online, text) {
+  state.connected = online;
   const dot = $('#connection-dot');
   dot.classList.toggle('is-online', online);
   dot.classList.toggle('is-offline', !online);
   $('#connection-text').textContent = text;
+  renderSuccessState();
+}
+
+function renderSuccessState() {
+  const currentVersion = String(state.version?.currentVersion || '');
+  const ready = state.connected && /^\d+\.\d+\.\d+$/.test(currentVersion);
+  $('#success-card').hidden = !ready;
+  $('#success-version').textContent = ready ? `v${currentVersion}` : '';
+  return ready;
+}
+
+function safeIssueDiagnostics() {
+  return {
+    version: state.version?.currentVersion || 'unknown',
+    service: state.connected ? 'healthy' : 'offline',
+    language: getLanguage(),
+  };
+}
+
+function buildIssueUrl(diagnostics = safeIssueDiagnostics()) {
+  const body = `### What happened\n\nPlease describe the problem.\n\n### Safe diagnostics\n- Codex Lookout: v${diagnostics.version}\n- Service: ${diagnostics.service}\n- Language: ${diagnostics.language}\n\nNo task content, IP address, or local path is included.`;
+  const query = new URLSearchParams({ title: '[Bug]: ', body });
+  return `https://github.com/makorise/codex-local-hub/issues/new?${query}`;
+}
+
+function reportIssue() {
+  const url = buildIssueUrl();
+  window.open(url, '_blank', 'noopener,noreferrer');
+  return url;
 }
 
 function versionStateLabel(version = state.version) {
@@ -528,6 +559,7 @@ async function loadVersion({ force = false } = {}) {
   if (!response.ok) throw new Error(localizedError(payload.error, 'version.updateFailure'));
   state.version = payload.version;
   renderVersion();
+  renderSuccessState();
   return state.version;
 }
 
@@ -1162,6 +1194,7 @@ document.querySelectorAll('.filter').forEach((button) => button.addEventListener
   renderList();
 }));
 $('#refresh-button').addEventListener('click', refreshTasks);
+$('#report-issue').addEventListener('click', reportIssue);
 $('#delivery-list').addEventListener('click', (event) => {
   const button = event.target.closest('[data-delivery-id]');
   const delivery = state.deliveries.find((item) => item.id === button?.dataset.deliveryId);
@@ -1342,6 +1375,10 @@ export {
   loadDetail,
   loadProjects,
   setConnection,
+  renderSuccessState,
+  safeIssueDiagnostics,
+  buildIssueUrl,
+  reportIssue,
   versionStateLabel,
   renderVersion,
   renderVersionDetails,

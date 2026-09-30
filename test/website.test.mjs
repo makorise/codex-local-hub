@@ -4,9 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
 
 const html = await readFile(new URL('../website/index.html', import.meta.url), 'utf8');
-const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-
-async function setup({ savedLanguage, browserLanguage = '' } = {}) {
+async function setup({ savedLanguage, browserLanguage = '', releaseStatus = 200, releasePayload = { tag_name: 'v9.8.7', html_url: 'https://github.com/makorise/codex-local-hub/releases/tag/v9.8.7', draft: false, prerelease: false } } = {}) {
   const dom = new JSDOM(html, { url: 'http://127.0.0.1:8792/', pretendToBeVisual: true });
   if (savedLanguage) dom.window.localStorage.setItem('codex-lookout-language', savedLanguage);
   Object.defineProperty(dom.window.navigator, 'language', { configurable: true, value: browserLanguage });
@@ -37,7 +35,7 @@ async function setup({ savedLanguage, browserLanguage = '' } = {}) {
   }
   FakeIntersectionObserver.instances = [];
 
-  const names = ['window', 'document', 'navigator', 'localStorage', 'IntersectionObserver', 'setTimeout', 'clearTimeout'];
+  const names = ['window', 'document', 'navigator', 'localStorage', 'IntersectionObserver', 'fetch', 'setTimeout', 'clearTimeout'];
   const descriptors = new Map(names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
   Object.defineProperties(globalThis, {
     window: { configurable: true, writable: true, value: dom.window },
@@ -45,11 +43,13 @@ async function setup({ savedLanguage, browserLanguage = '' } = {}) {
     navigator: { configurable: true, writable: true, value: dom.window.navigator },
     localStorage: { configurable: true, writable: true, value: dom.window.localStorage },
     IntersectionObserver: { configurable: true, writable: true, value: FakeIntersectionObserver },
+    fetch: { configurable: true, writable: true, value: async () => new Response(JSON.stringify(releasePayload), { status: releaseStatus }) },
     setTimeout: { configurable: true, writable: true, value: (callback) => { timerCallbacks.push(callback); return 7; } },
     clearTimeout: { configurable: true, writable: true, value: () => undefined },
   });
 
-  const module = await import('../website/app.js');
+  const module = await import(`../website/app.js?test=${Date.now()}-${Math.random()}`);
+  await new Promise((resolve) => setImmediate(resolve));
   const cleanup = () => {
     dom.window.close();
     for (const [name, descriptor] of descriptors) {
@@ -108,30 +108,59 @@ test('product website localizes, animates and copies the one-message installer',
   assert.equal(module.normalizeLanguage(null), 'en');
   assert.equal(module.preferredLanguage('', ''), 'en');
   assert.equal(module.preferredLanguage('zh-CN', 'en-US'), 'zh-CN');
+  assert.equal(document.querySelector('[data-latest-version]').textContent, 'v9.8.7');
+  assert.match(document.querySelector('[data-latest-release]').href, /releases\/tag\/v9\.8\.7$/);
+  const prompt = clipboardWrites[0];
+  assert.match(prompt, /automatically install or update/);
+  assert.match(prompt, /preserve all existing data and files/);
+  assert.match(prompt, /global Node\.js environment unchanged/);
+  assert.match(prompt, /verify that my phone can access it/);
 
   document.querySelector('.language-button').click();
   assert.equal(document.documentElement.lang, 'zh-CN');
   assert.match(document.querySelector('[data-install-prompt]').textContent, /使用 \$skill-installer/);
   module.applyLanguage('zh-TW');
   assert.equal(dom.window.document.documentElement.lang, 'zh-CN');
+  const invalidPayloads = [
+    { tag_name: 'v1.2.3', html_url: 'https://evil.example/releases/tag/v1.2.3' },
+    { tag_name: 'latest', html_url: 'https://github.com/makorise/codex-local-hub/releases/tag/latest' },
+    { tag_name: 'v1.2.3', html_url: 'https://github.com/makorise/codex-local-hub/releases/tag/v1.2.3', draft: true },
+    { tag_name: 'v1.2.3', html_url: 'https://github.com/makorise/codex-local-hub/releases/tag/v1.2.3', prerelease: true },
+    null,
+  ];
+  for (const payload of invalidPayloads) assert.equal(module.normalizeLatestRelease(payload), null);
+  const valid = module.normalizeLatestRelease({ tag_name: 'v1.2.3', html_url: 'https://github.com/makorise/codex-local-hub/releases/tag/v1.2.3' });
+  assert.deepEqual(valid, { tag: 'v1.2.3', version: '1.2.3', url: 'https://github.com/makorise/codex-local-hub/releases/tag/v1.2.3' });
+  assert.equal(await module.loadLatestRelease(async () => ({ ok: false })), null);
+  assert.equal(await module.loadLatestRelease(async () => ({ ok: true, json: async () => invalidPayloads[0] })), null);
+  await assert.rejects(module.loadLatestRelease(async () => { throw new Error('offline'); }), /offline/);
+  assert.equal(await module.initializeLatestRelease(async () => { throw new Error('offline'); }), null);
+  assert.equal(document.querySelector('[data-latest-version]').textContent, '');
+  assert.equal(document.querySelector('[data-latest-release]').href, 'https://github.com/makorise/codex-local-hub/releases/latest');
 });
 
 test('product website publishes complete SEO, trust and release metadata', async () => {
-  const [robots, sitemap, workflow] = await Promise.all([
+  const [robots, sitemap, workflow, websiteScript] = await Promise.all([
     readFile(new URL('../website/robots.txt', import.meta.url), 'utf8'),
     readFile(new URL('../website/sitemap.xml', import.meta.url), 'utf8'),
     readFile(new URL('../.github/workflows/pages.yml', import.meta.url), 'utf8'),
+    readFile(new URL('../website/app.js', import.meta.url), 'utf8'),
   ]);
   const dom = new JSDOM(html);
   const { document } = dom.window;
   assert.equal(document.querySelector('meta[property="og:image"]').content, 'https://makorise.github.io/codex-local-hub/assets/social-preview.png');
   assert.equal(document.querySelector('meta[name="twitter:card"]').content, 'summary_large_image');
   const structuredData = JSON.parse(document.querySelector('script[type="application/ld+json"]').textContent);
-  assert.equal(structuredData.softwareVersion, packageJson.version);
+  assert.equal(structuredData.softwareVersion, undefined);
   assert.equal(structuredData.offers.price, '0');
   assert.equal(document.querySelectorAll('.demo-card').length, 3);
   assert.equal(document.querySelectorAll('.trust-list > *').length, 3);
   assert.match(document.querySelector('.manual-download').textContent, /unsigned preview/);
+  assert.equal(document.querySelector('[data-latest-release]').href, 'https://github.com/makorise/codex-local-hub/releases/latest');
+  assert.doesNotMatch(html, /releases\/tag\/v\d+\.\d+\.\d+/);
+  assert.doesNotMatch(html, /v0\.2\.28/);
+  assert.doesNotMatch(`${html}\n${websiteScript}`, /\bv\d+\.\d+\.\d+\b/);
+  assert.match(websiteScript, /api\.github\.com\/repos\/makorise\/codex-local-hub\/releases\/latest/);
   assert.match(robots, /Sitemap: https:\/\/makorise\.github\.io\/codex-local-hub\/sitemap\.xml/);
   assert.match(sitemap, /<loc>https:\/\/makorise\.github\.io\/codex-local-hub\/<\/loc>/);
   for (const asset of ['mac-host.en.png', 'mac-host.zh-CN.png', 'mobile-dashboard.en.png', 'mobile-dashboard.zh-CN.png']) {

@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#080b12" />
-    <meta name="description" content="Codex Lookout is a local-first mobile dashboard for monitoring and controlling Codex tasks from your phone." />
+    <meta name="description" content="Codex Lookout is a local-first mobile dashboard for monitoring and continuing existing Codex tasks from your phone." />
     <meta name="keywords" content="Codex, mobile dashboard, local network, task monitor, remote control, macOS, Node.js, PWA" />
     <meta property="og:title" content="Codex Lookout" />
-    <meta property="og:description" content="Monitor and control Codex tasks from your phone on the local network." />
+    <meta property="og:description" content="Monitor and continue existing Codex tasks from your phone on the local network." />
     <meta property="og:type" content="website" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -16,7 +16,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/app-icon-192.png" />
-    <link rel="stylesheet" href="/styles.css?v=42" />
+    <link rel="stylesheet" href="/styles.css?v=43" />
     <title>Codex Lookout</title>
   </head>
   <body>
@@ -50,6 +50,10 @@
             <span><strong data-i18n="install.title">添加到手机桌面</strong><small data-i18n="install.summary">像 App 一样快速打开，仅在同一局域网使用</small></span>
             <button id="install-help" type="button" data-i18n="install.action">查看方法</button>
             <button id="install-dismiss" class="install-dismiss" type="button" aria-label="关闭" data-i18n-aria="action.close">×</button>
+          </aside>
+          <aside id="success-card" class="success-card" hidden aria-live="polite">
+            <span class="success-state"><i aria-hidden="true"></i><strong data-i18n="success.connected">已连接</strong><small id="success-version"></small><small data-i18n="success.healthy">服务正常</small></span>
+            <span class="success-actions"><a href="https://github.com/makorise/codex-local-hub" target="_blank" rel="noopener noreferrer" data-i18n="success.star" data-i18n-aria="success.starAria" aria-label="觉得有用，Star 一下">Star</a><button id="report-issue" type="button" data-i18n="success.report">报告问题</button></span>
           </aside>
           <button id="usage-card" class="usage-overview" type="button" hidden>
             <span class="usage-main">
@@ -183,6 +187,6 @@
         <div id="modal-content" class="modal-content"></div>
       </section>
     </div>
-    <script type="module" src="/app.js?v=46"></script>
+    <script type="module" src="/app.js?v=47"></script>
   </body>
 </html>

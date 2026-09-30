@@ -5,6 +5,7 @@ import { JSDOM } from 'jsdom';
 
 const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
 const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
+const serviceWorker = await readFile(new URL('../public/service-worker.js', import.meta.url), 'utf8');
 
 test('unsupported task creation and steer controls are absent from the phone UI', () => {
   const dom = new JSDOM(html);
@@ -15,6 +16,11 @@ test('unsupported task creation and steer controls are absent from the phone UI'
   assert.match(css, /\.connection-dot\s*\{[^}]*flex:\s*0 0 7px;/s);
   const mobileCss = css.slice(css.indexOf('@media (max-width: 760px)'));
   assert.match(mobileCss, /\.modal-sheet\s*\{[^}]*max-height:\s*calc\(100dvh - max\(8px, env\(safe-area-inset-top\)\)\);/s);
+  assert.match(html, /styles\.css\?v=43/);
+  assert.match(html, /app\.js\?v=47/);
+  assert.match(serviceWorker, /styles\.css\?v=43/);
+  assert.match(serviceWorker, /app\.js\?v=47/);
+  assert.match(serviceWorker, /['"]\/i18n\.js['"]/);
 });
 
 function response(body, status = 200) {
@@ -87,6 +93,8 @@ class FakeEventSource {
 
 async function setup({ failing = new Map(), empty = false, taskCount = 1 } = {}) {
   const dom = new JSDOM(html, { url: 'http://127.0.0.1:8787/?token=secret#11111111-1111-1111-1111-111111111111', pretendToBeVisual: true });
+  const openedUrls = [];
+  dom.window.open = (...args) => { openedUrls.push(args); return null; };
   dom.window.localStorage.setItem('codex-local-hub-language-choice', 'zh-CN');
   const previous = {};
   for (const name of ['window', 'document', 'location', 'history', 'localStorage', 'EventSource', 'fetch', 'requestAnimationFrame', 'setInterval', 'setTimeout', 'clearTimeout']) previous[name] = globalThis[name];
@@ -175,7 +183,7 @@ async function setup({ failing = new Map(), empty = false, taskCount = 1 } = {})
     }
   };
   return {
-    dom, module, calls, failing,
+    dom, module, calls, failing, openedUrls,
     setMessageMode: (mode) => { messageMode = mode; },
     setVersionInfo: (value) => { versionInfo = value; },
     setRuntimeVersion: (value) => { runtimeVersion = value; },
@@ -186,7 +194,7 @@ async function setup({ failing = new Map(), empty = false, taskCount = 1 } = {})
 
 test('frontend renders tasks, details, usage and every queue interaction', async (t) => {
   const failures = new Map();
-  const { dom, module: ui, calls, failing: activeFailures, setMessageMode, setVersionInfo, setRuntimeVersion, setUpdateResponse, cleanup } = await setup({ failing: failures, taskCount: 24 });
+  const { dom, module: ui, calls, failing: activeFailures, openedUrls, setMessageMode, setVersionInfo, setRuntimeVersion, setUpdateResponse, cleanup } = await setup({ failing: failures, taskCount: 24 });
   t.after(cleanup);
   const document = dom.window.document;
   assert.equal(dom.window.location.search, '');
@@ -194,6 +202,27 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.equal(ui.ignoreFailure(), undefined);
   assert.equal(document.querySelector('#version-current').textContent, 'v0.2.38');
   assert.equal(document.querySelector('#version-state').textContent, '最新');
+  assert.equal(document.querySelector('#success-card').hidden, false);
+  assert.match(document.querySelector('#success-card').textContent, /已连接.*v0\.2\.38.*服务正常/s);
+  assert.match(document.querySelector('.success-actions a').href, /github\.com\/makorise\/codex-local-hub/);
+  document.querySelector('#report-issue').click();
+  assert.equal(openedUrls.length, 1);
+  const issueUrl = new URL(openedUrls[0][0]);
+  assert.equal(issueUrl.origin + issueUrl.pathname, 'https://github.com/makorise/codex-local-hub/issues/new');
+  assert.match(issueUrl.searchParams.get('body'), /Codex Lookout: v0\.2\.38/);
+  assert.match(issueUrl.searchParams.get('body'), /Service: healthy/);
+  assert.doesNotMatch(issueUrl.searchParams.get('body'), /同步任务|192\.168|\/Users\//);
+  assert.deepEqual(ui.safeIssueDiagnostics(), { version: '0.2.38', service: 'healthy', language: 'zh-CN' });
+  assert.match(ui.buildIssueUrl({ version: '1.2.3', service: 'offline', language: 'en' }), /issues\/new\?/);
+  ui.state.connected = false;
+  ui.state.version = null;
+  assert.equal(ui.renderSuccessState(), false);
+  assert.deepEqual(ui.safeIssueDiagnostics(), { version: 'unknown', service: 'offline', language: 'zh-CN' });
+  ui.setConnection(true, '已同步');
+  ui.state.version = { currentVersion: 'unknown' };
+  assert.equal(ui.renderSuccessState(), false);
+  ui.state.version = { currentVersion: '0.2.38', latestVersion: '0.2.38', state: 'latest' };
+  assert.equal(ui.renderSuccessState(), true);
   document.querySelector('#version-button').click();
   assert.equal(document.querySelector('#modal-title').textContent, 'Codex 瞭望台版本');
   assert.match(document.querySelector('.version-card').textContent, /最新正式版/);
