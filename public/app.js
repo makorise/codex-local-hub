@@ -662,10 +662,19 @@ function renderUsage() {
   $('#usage-plan').textContent = plan ? plan[0].toUpperCase() + plan.slice(1) : '';
   const summaries = limits.map((limit) => t('usage.remaining', { window: usageWindowLabel(limit), percent: limit.remainingPercent }));
   $('#usage-summary').textContent = summaries.join(' · ');
-  $('#usage-reset').textContent = limits.map((limit) => t('usage.resetCompact', {
+  const resetSummaries = limits.map((limit) => t('usage.resetCompact', {
     window: usageWindowLabel(limit),
     time: formatReset(limit.resetsAt),
-  })).join(' · ');
+  }));
+  const resetCredits = state.usage?.resetCredits;
+  if (resetCredits?.availableCount) {
+    const expirations = (resetCredits.credits || []).map((credit) => credit.expiresAt).filter(Boolean).sort((a, b) => a - b);
+    resetSummaries.push(t('usage.resetCreditsCompact', {
+      count: resetCredits.availableCount,
+      time: expirations.length ? formatReset(expirations[0]) : t('usage.unknownExpiry'),
+    }));
+  }
+  $('#usage-reset').textContent = resetSummaries.join(' · ');
   $('#usage-ring-value').textContent = lowest;
   $('#usage-ring').style.setProperty('--remaining', lowest);
   card.dataset.tone = lowest <= 10 ? 'red' : lowest <= 30 ? 'amber' : 'green';
@@ -733,6 +742,7 @@ function renderActivityDashboard(range = activityRange) {
   const middleDay = days[Math.floor(days.length / 2)]?.date || firstDay;
   const lastDay = days.at(-1)?.date || firstDay;
   const accountName = state.account?.name || t('activity.localAccount');
+  const resetCredits = state.usage?.resetCredits;
   const resetWindows = limits.map((limit) => `
     <article class="activity-limit">
       <header><span>${escapeHtml(usageWindowLabel(limit))}</span><strong>${limit.remainingPercent}%</strong></header>
@@ -742,6 +752,8 @@ function renderActivityDashboard(range = activityRange) {
         <time datetime="${limit.resetsAt ? new Date(limit.resetsAt).toISOString() : ''}">${escapeHtml(formatReset(limit.resetsAt))}</time>
       </footer>
     </article>`).join('');
+  const resetCreditItems = (resetCredits?.credits || []).map((credit, index) => `
+    <article><span>${escapeHtml(t('activity.resetCreditIndex', { index: index + 1 }))}</span><strong>${escapeHtml(credit.expiresAt ? t('activity.resetCreditExpires', { time: formatReset(credit.expiresAt) }) : t('usage.unknownExpiry'))}</strong></article>`).join('');
   $('#modal-kicker').textContent = t('activity.kicker');
   $('#modal-title').textContent = t('activity.title');
   $('#content-modal .modal-sheet').classList.add('activity-sheet');
@@ -764,6 +776,10 @@ function renderActivityDashboard(range = activityRange) {
     ${limits.length ? `<section class="activity-limits">
       <header><div><span>${escapeHtml(t('activity.limits'))}</span><strong>${escapeHtml(t(limits.length === 1 ? 'activity.limitCycleOne' : 'activity.limitCycleOther', { count: limits.length }))}</strong></div><small>${escapeHtml(t('activity.limitHint'))}</small></header>
       <div class="activity-limit-grid">${resetWindows}</div>
+    </section>` : ''}
+    ${resetCredits?.availableCount ? `<section class="activity-reset-credits">
+      <header><div><span>${escapeHtml(t('activity.resetCredits'))}</span><strong>${escapeHtml(t(resetCredits.availableCount === 1 ? 'activity.resetCreditCountOne' : 'activity.resetCreditCountOther', { count: resetCredits.availableCount }))}</strong></div><small>${escapeHtml(t('activity.resetCreditHint'))}</small></header>
+      ${resetCreditItems ? `<div class="activity-reset-credit-list">${resetCreditItems}</div>` : `<p>${escapeHtml(t('usage.unknownExpiry'))}</p>`}
     </section>` : ''}
     <section class="activity-chart-card">
       <header>

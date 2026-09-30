@@ -36,18 +36,23 @@ test('usage normalization selects buckets, formats windows and clamps remaining 
   assert.equal(usageWindowLabel(10_080), '周');
   assert.equal(usageWindowLabel(0), '0 分钟');
   assert.equal(usageWindowLabel(), '0 分钟');
-  assert.deepEqual(normalizeUsage(null, 1), { available: false, planType: null, limits: [], updatedAt: 1 });
+  assert.deepEqual(normalizeUsage(null, 1), { available: false, planType: null, limits: [], resetCredits: { availableCount: 0, credits: [] }, updatedAt: 1 });
   assert.equal(typeof normalizeUsage(null).updatedAt, 'number');
 
   const result = normalizeUsage({ rateLimitsByLimitId: { codex: {
     planType: 'pro',
     primary: { usedPercent: 9, windowDurationMins: 10_080, resetsAt: 100 },
     secondary: { usedPercent: 120, windowDurationMins: 300, resetsAt: 0 },
-  } } }, 2);
+  } }, rateLimitResetCredits: { availableCount: 2, credits: [
+    { status: 'available', expiresAt: 300 },
+    { status: 'used', expiresAt: 200 },
+    { status: 'available' },
+  ] } }, 2);
   assert.equal(result.available, true);
   assert.equal(result.planType, 'pro');
   assert.deepEqual(result.limits.map((item) => [item.id, item.label, item.remainingPercent]), [['primary', '周', 91], ['secondary', '5 小时', 0]]);
   assert.equal(result.limits[0].resetsAt, 100_000);
+  assert.deepEqual(result.resetCredits, { availableCount: 2, credits: [{ expiresAt: 300_000 }, { expiresAt: 0 }] });
 
   const fallback = normalizeUsage({ rateLimits: { primary: { usedPercent: -5, windowDurationMins: 30 } } }, 3);
   assert.equal(fallback.limits[0].remainingPercent, 100);
@@ -57,6 +62,9 @@ test('usage normalization selects buckets, formats windows and clamps remaining 
 
   const firstBucket = normalizeUsage({ rateLimitsByLimitId: { other: { primary: null } } }, 4);
   assert.equal(firstBucket.available, false);
+
+  const creditsOnly = normalizeUsage({ rateLimitResetCredits: { credits: [{ status: 'available', expiresAt: 1 }] } }, 4);
+  assert.deepEqual(creditsOnly.resetCredits, { availableCount: 1, credits: [{ expiresAt: 1_000 }] });
 
   const emptyWindow = normalizeUsage({ rateLimits: { primary: {} } }, 5);
   assert.deepEqual(emptyWindow.limits[0], {

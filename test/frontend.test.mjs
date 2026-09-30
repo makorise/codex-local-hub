@@ -16,10 +16,10 @@ test('unsupported task creation and steer controls are absent from the phone UI'
   assert.match(css, /\.connection-dot\s*\{[^}]*flex:\s*0 0 7px;/s);
   const mobileCss = css.slice(css.indexOf('@media (max-width: 760px)'));
   assert.match(mobileCss, /\.modal-sheet\s*\{[^}]*max-height:\s*calc\(100dvh - max\(8px, env\(safe-area-inset-top\)\)\);/s);
-  assert.match(html, /styles\.css\?v=47/);
-  assert.match(html, /app\.js\?v=49/);
-  assert.match(serviceWorker, /styles\.css\?v=47/);
-  assert.match(serviceWorker, /app\.js\?v=49/);
+  assert.match(html, /styles\.css\?v=48/);
+  assert.match(html, /app\.js\?v=50/);
+  assert.match(serviceWorker, /styles\.css\?v=48/);
+  assert.match(serviceWorker, /app\.js\?v=50/);
   assert.match(serviceWorker, /['"]\/i18n\.js['"]/);
 });
 
@@ -147,7 +147,10 @@ async function setup({ failing = new Map(), empty = false, taskCount = 1 } = {})
     if (url.pathname === '/api/usage') return response({ usage: empty ? { available: false, limits: [], todayTokens: { available: false } } : { planType: 'pro', limits: [
       { label: '5 小时', windowDurationMins: 300, usedPercent: 20, remainingPercent: 80, resetsAt: Date.now() + 60_000 },
       { label: '周', windowDurationMins: 10_080, usedPercent: 35, remainingPercent: 65, resetsAt: Date.now() + 172_800_000 },
-    ], todayTokens: todayTokens() } });
+    ], resetCredits: { availableCount: 2, credits: [
+      { expiresAt: Date.now() + 864_000_000 },
+      { expiresAt: Date.now() + 432_000_000 },
+    ] }, todayTokens: todayTokens() } });
     if (url.pathname === '/api/activity') return response({ activity: activitySummary(empty ? { days: [], activeDays: 0, totalTurns: 0, completedTurns: 0, totalDurationMs: 0, projectCount: 0, taskCount: 0, recentTaskCount: 0 } : {}) });
     if (url.pathname === '/api/account') return response({ account: empty ? { available: false, name: null, initial: null } : { available: true, name: 'alice', initial: 'A' } });
     if (url.pathname === '/api/deliveries' && options.method === 'DELETE') {
@@ -394,6 +397,7 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.equal(document.querySelector('#usage-summary').textContent, '5 小时窗口剩余 80% · 周窗口剩余 65%');
   assert.match(document.querySelector('#usage-reset').textContent, /5 小时/);
   assert.match(document.querySelector('#usage-reset').textContent, /周/);
+  assert.match(document.querySelector('#usage-reset').textContent, /可重置 2 次/);
   assert.match(document.querySelector('#usage-today-value').textContent, /1\.2万 tokens/);
   assert.match(document.querySelector('#usage-card').getAttribute('aria-label'), /今日 Token/);
   assert.equal(document.querySelector('#account-badge').hidden, false);
@@ -684,6 +688,8 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.equal(document.querySelectorAll('.activity-limit').length, 2);
   assert.match(document.querySelector('.activity-limits').textContent, /2 个独立周期/);
   assert.match(document.querySelector('.activity-limits').textContent, /后重置/);
+  assert.match(document.querySelector('.activity-reset-credits').textContent, /可用 2 次/);
+  assert.equal(document.querySelectorAll('.activity-reset-credit-list article').length, 2);
   assert.equal(document.querySelector('[data-range="7"]').classList.contains('is-active'), true);
   document.querySelector('[data-range="30"]').click();
   assert.equal(document.querySelector('[data-range="30"]').classList.contains('is-active'), true);
@@ -803,11 +809,17 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   ui.renderDetail();
   assert.equal(document.querySelectorAll('.message-row.is-user').length, 1);
 
-  ui.state.usage = { planType: '', limits: [{ label: '周', usedPercent: 95, remainingPercent: 5, resetsAt: 0 }] };
+  ui.state.usage = { planType: '', limits: [{ label: '周', usedPercent: 95, remainingPercent: 5, resetsAt: 0 }], resetCredits: { availableCount: 1, credits: [{ expiresAt: 0 }] } };
   ui.renderUsage();
   assert.equal(document.querySelector('#usage-card').dataset.tone, 'red');
   document.querySelector('#usage-card').click();
   assert.match(document.querySelector('.activity-limits').textContent, /1 个独立周期/);
+  assert.match(document.querySelector('.activity-reset-credits').textContent, /可用 1 次/);
+  assert.match(document.querySelector('.activity-reset-credit-list').textContent, /有效期未知/);
+  delete ui.state.usage.resetCredits.credits;
+  ui.renderUsage();
+  document.querySelector('#usage-card').click();
+  assert.match(document.querySelector('.activity-reset-credits').textContent, /有效期未知/);
   ui.state.usage = { limits: [{ label: '周', usedPercent: 80, remainingPercent: 20, resetsAt: Date.now() }], todayTokens: todayTokens({ recorded: false }) };
   ui.renderUsage();
   assert.equal(document.querySelector('#usage-card').dataset.tone, 'amber');

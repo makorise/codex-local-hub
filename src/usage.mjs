@@ -28,7 +28,15 @@ export function usageWindowLabel(minutes) {
 export function normalizeUsage(result, updatedAt = Date.now()) {
   const buckets = result?.rateLimitsByLimitId || {};
   const bucket = buckets.codex || result?.rateLimits || Object.values(buckets)[0] || null;
-  if (!bucket) return { available: false, planType: null, limits: [], updatedAt };
+  const resetCreditSource = result?.rateLimitResetCredits || {};
+  const resetCreditItems = Array.isArray(resetCreditSource.credits)
+    ? resetCreditSource.credits.filter((credit) => credit?.status === 'available')
+    : [];
+  const resetCredits = {
+    availableCount: Math.max(0, Math.floor(Number(resetCreditSource.availableCount) || resetCreditItems.length)),
+    credits: resetCreditItems.map((credit) => ({ expiresAt: Number(credit.expiresAt || 0) * 1000 })),
+  };
+  if (!bucket) return { available: false, planType: null, limits: [], resetCredits, updatedAt };
   const limits = [bucket.primary, bucket.secondary].filter(Boolean).map((window, index) => ({
     id: index === 0 ? 'primary' : 'secondary',
     label: usageWindowLabel(window.windowDurationMins),
@@ -37,7 +45,7 @@ export function normalizeUsage(result, updatedAt = Date.now()) {
     resetsAt: Number(window.resetsAt || 0) * 1000,
     windowDurationMins: Number(window.windowDurationMins || 0),
   }));
-  return { available: limits.length > 0, planType: bucket.planType || null, limits, updatedAt };
+  return { available: limits.length > 0, planType: bucket.planType || null, limits, resetCredits, updatedAt };
 }
 
 export function localDateKey(timestamp) {
