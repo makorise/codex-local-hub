@@ -16,7 +16,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/app-icon-192.png" />
-    <link rel="stylesheet" href="/styles.css?v=48" />
+    <link rel="stylesheet" href="/styles.css?v=49" />
     <title>Codex Lookout</title>
   </head>
   <body>
@@ -59,15 +59,24 @@
               <span class="usage-copy">
                 <span class="usage-kicker"><span data-i18n="usage.title">Codex 用量</span> <em id="usage-plan"></em></span>
                 <strong id="usage-summary"></strong>
-                <span id="usage-reset"></span>
               </span>
               <span id="usage-ring" class="usage-ring" aria-hidden="true">
                 <span><strong id="usage-ring-value"></strong><small>%</small></span>
               </span>
             </span>
-            <span id="usage-today" class="usage-today" hidden>
-              <small data-i18n="usage.todayTitle">今日 Token</small>
-              <strong id="usage-today-value"></strong>
+            <span class="usage-stats">
+              <span class="usage-stat">
+                <small data-i18n="usage.allowanceReset">额度重置</small>
+                <strong id="usage-reset"></strong>
+              </span>
+              <span id="usage-credit-stat" class="usage-stat" hidden>
+                <small data-i18n="usage.fullResets">完整重置</small>
+                <strong id="usage-credit-value"></strong>
+              </span>
+              <span id="usage-today" class="usage-stat" hidden>
+                <small data-i18n="usage.todayTitle">今日 Token</small>
+                <strong id="usage-today-value"></strong>
+              </span>
             </span>
           </button>
 
@@ -183,6 +192,6 @@
         <div id="modal-content" class="modal-content"></div>
       </section>
     </div>
-    <script type="module" src="/app.js?v=50"></script>
+    <script type="module" src="/app.js?v=51"></script>
   </body>
 </html>

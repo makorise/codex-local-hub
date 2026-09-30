@@ -16,10 +16,10 @@ test('unsupported task creation and steer controls are absent from the phone UI'
   assert.match(css, /\.connection-dot\s*\{[^}]*flex:\s*0 0 7px;/s);
   const mobileCss = css.slice(css.indexOf('@media (max-width: 760px)'));
   assert.match(mobileCss, /\.modal-sheet\s*\{[^}]*max-height:\s*calc\(100dvh - max\(8px, env\(safe-area-inset-top\)\)\);/s);
-  assert.match(html, /styles\.css\?v=48/);
-  assert.match(html, /app\.js\?v=50/);
-  assert.match(serviceWorker, /styles\.css\?v=48/);
-  assert.match(serviceWorker, /app\.js\?v=50/);
+  assert.match(html, /styles\.css\?v=49/);
+  assert.match(html, /app\.js\?v=51/);
+  assert.match(serviceWorker, /styles\.css\?v=49/);
+  assert.match(serviceWorker, /app\.js\?v=51/);
   assert.match(serviceWorker, /['"]\/i18n\.js['"]/);
 });
 
@@ -394,10 +394,9 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   ui.state.tasks = originalTasks;
   ui.renderList();
   assert.equal(document.querySelector('#detail-pane').classList.contains('is-open'), true);
-  assert.equal(document.querySelector('#usage-summary').textContent, '5 小时窗口剩余 80% · 周窗口剩余 65%');
-  assert.match(document.querySelector('#usage-reset').textContent, /5 小时/);
-  assert.match(document.querySelector('#usage-reset').textContent, /周/);
-  assert.match(document.querySelector('#usage-reset').textContent, /可重置 2 次/);
+  assert.equal(document.querySelector('#usage-summary').textContent, '2 个额度周期');
+  assert.equal(document.querySelector('#usage-credit-stat').hidden, false);
+  assert.match(document.querySelector('#usage-credit-value').textContent, /2 次/);
   assert.match(document.querySelector('#usage-today-value').textContent, /1\.2万 tokens/);
   assert.match(document.querySelector('#usage-card').getAttribute('aria-label'), /今日 Token/);
   assert.equal(document.querySelector('#account-badge').hidden, false);
@@ -424,7 +423,7 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.equal(document.querySelector('[data-filter="all"] span').textContent, 'All');
   assert.equal(document.querySelector('#connection-text').textContent.includes('Synced'), true);
   assert.equal(document.querySelector('#account-badge').getAttribute('aria-label'), 'Current Codex account: alice');
-  assert.equal(document.querySelector('#usage-summary').textContent, '5 hr window: 80% remaining · Weekly window: 65% remaining');
+  assert.equal(document.querySelector('#usage-summary').textContent, '2 allowance windows');
   assert.match(document.querySelector('#usage-card').getAttribute('aria-label'), /Tokens today/);
   assert.equal(document.querySelector('#delivery-count').textContent, '2 images');
   assert.equal(document.querySelector('.task-card-foot span').textContent, 'Making progress');
@@ -812,6 +811,7 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   ui.state.usage = { planType: '', limits: [{ label: '周', usedPercent: 95, remainingPercent: 5, resetsAt: 0 }], resetCredits: { availableCount: 1, credits: [{ expiresAt: 0 }] } };
   ui.renderUsage();
   assert.equal(document.querySelector('#usage-card').dataset.tone, 'red');
+  assert.equal(document.querySelector('#usage-summary').textContent, '周额度');
   document.querySelector('#usage-card').click();
   assert.match(document.querySelector('.activity-limits').textContent, /1 个独立周期/);
   assert.match(document.querySelector('.activity-reset-credits').textContent, /可用 1 次/);
@@ -823,6 +823,7 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   ui.state.usage = { limits: [{ label: '周', usedPercent: 80, remainingPercent: 20, resetsAt: Date.now() }], todayTokens: todayTokens({ recorded: false }) };
   ui.renderUsage();
   assert.equal(document.querySelector('#usage-card').dataset.tone, 'amber');
+  assert.equal(document.querySelector('#usage-credit-stat').hidden, true);
   document.querySelector('#usage-card').click();
   ui.state.usage = null;
   ui.renderUsage();

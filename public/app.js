@@ -661,20 +661,20 @@ function renderUsage() {
   const plan = state.usage?.planType || '';
   $('#usage-plan').textContent = plan ? plan[0].toUpperCase() + plan.slice(1) : '';
   const summaries = limits.map((limit) => t('usage.remaining', { window: usageWindowLabel(limit), percent: limit.remainingPercent }));
-  $('#usage-summary').textContent = summaries.join(' · ');
-  const resetSummaries = limits.map((limit) => t('usage.resetCompact', {
-    window: usageWindowLabel(limit),
-    time: formatReset(limit.resetsAt),
-  }));
+  $('#usage-summary').textContent = limits.length === 1
+    ? t('usage.overviewSingle', { window: usageWindowLabel(primary) })
+    : t('usage.overviewMultiple', { count: limits.length });
+  $('#usage-reset').textContent = formatReset(primary.resetsAt);
   const resetCredits = state.usage?.resetCredits;
+  const creditStat = $('#usage-credit-stat');
+  creditStat.hidden = !resetCredits?.availableCount;
   if (resetCredits?.availableCount) {
     const expirations = (resetCredits.credits || []).map((credit) => credit.expiresAt).filter(Boolean).sort((a, b) => a - b);
-    resetSummaries.push(t('usage.resetCreditsCompact', {
+    $('#usage-credit-value').textContent = t('usage.resetCreditValue', {
       count: resetCredits.availableCount,
       time: expirations.length ? formatReset(expirations[0]) : t('usage.unknownExpiry'),
-    }));
+    });
   }
-  $('#usage-reset').textContent = resetSummaries.join(' · ');
   $('#usage-ring-value').textContent = lowest;
   $('#usage-ring').style.setProperty('--remaining', lowest);
   card.dataset.tone = lowest <= 10 ? 'red' : lowest <= 30 ? 'amber' : 'green';

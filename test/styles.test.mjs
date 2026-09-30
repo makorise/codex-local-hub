@@ -39,7 +39,8 @@ test('task pane has bounded desktop and touch scrolling styles', () => {
   assert.match(styles, /\.filter \{[^}]*flex: 0 0 auto;/);
   assert.doesNotMatch(styles, /new-task-button|new-task-form|project-picker|queue-steer/);
   assert.match(styles, /@media \(max-width: 760px\)[\s\S]*\.filter-count \{[^}]*min-width: 14px;[^}]*height: 14px;/);
-  assert.match(styles, /\.usage-today \{[^}]*min-height: 28px;[^}]*justify-content: space-between;/);
+  assert.match(styles, /\.usage-stats \{[^}]*grid-auto-flow: column;[^}]*grid-auto-columns: minmax\(0,1fr\);/);
+  assert.match(styles, /\.usage-stat \{[^}]*flex-direction: column;[^}]*border-left:/);
   assert.match(styles, /\.task-card\.is-unread:not\(\.is-selected\) \{[^}]*border-color:/);
   assert.match(styles, /\.unread-dot \{[^}]*width: 7px;[^}]*background: var\(--blue\);/);
   assert.match(styles, /\.task-card-head \{[^}]*grid-template-columns: minmax\(0, 1fr\) max-content;/);
