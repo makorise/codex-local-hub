@@ -4,7 +4,7 @@ set -euo pipefail
 project_dir="${0:A:h:h}"
 version="$(cd "$project_dir" && node -p "require('./package.json').version")"
 app_path="$project_dir/dist/Codex Local Hub.app"
-dmg_path="$project_dir/dist/Codex-Local-Hub-${version}-universal.dmg"
+dmg_path="$project_dir/dist/Codex-Lookout-${version}-universal.dmg"
 stage_dir="$(mktemp -d /tmp/codex-local-hub-dmg.XXXXXX)"
 
 BUNDLE_NODE=1 "$project_dir/scripts/build-macos-app.sh"

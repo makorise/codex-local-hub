@@ -2,6 +2,13 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.46 - 2026-10-01
+
+- Consolidated the post-0.2.45 phone experience into a stable release: task model labels, compact allowance reset details, and a clearer single status hierarchy.
+- Made update checks resilient to GitHub API limits and connected the website, mobile version view, Star prompt, and privacy-safe issue report to the live stable release channel.
+- Kept existing v0.2.45 installations on the checksum-verified core hot-update path while publishing the complete Mac installer under the Codex Lookout brand.
+- Updated the GitHub Pages deployment actions and retained full line, branch, and function coverage.
+
 ## 0.2.28 - 2026-09-27
 
 - Fixed long-running conversations staying on an old message when Codex updated the text of an existing assistant record without changing its timestamp.

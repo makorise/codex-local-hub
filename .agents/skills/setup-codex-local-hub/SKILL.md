@@ -18,7 +18,7 @@ When the user asks to continue or invokes this skill again, reuse the checkpoint
 ## Choose the installation source
 
 1. Confirm the host is macOS 15 or newer. Report a clear blocker on another operating system; do not attempt to install the Mac app there.
-2. Prefer the latest stable GitHub Release when it contains a universal, notarized `Codex-Local-Hub-*-universal.dmg` asset. Download it to a temporary directory and keep macOS security checks enabled.
+2. Prefer the latest stable GitHub Release when it contains a universal, notarized `Codex-Lookout-*-universal.dmg` asset. For compatibility with older releases, also accept the legacy `Codex-Local-Hub-*-universal.dmg` name. Download it to a temporary directory and keep macOS security checks enabled.
 3. When no suitable stable release exists, build from source. Use the current checkout if it is this repository. Otherwise clone or fast-forward a clean checkout under `~/Library/Application Support/Codex Local Hub/source`. Never overwrite local changes; use a fresh temporary checkout if the managed source directory is dirty.
 
 This skill is also the full-upgrade fallback for the app's built-in core hot updater. A routine `src` or `public` release should be applied by the running app's checksum-verified hot updater. Use this skill when the user requests a new installation, when the release requires a newer native host, when they explicitly ask Codex to perform the complete upgrade, or when the built-in updater reports that a compatible core asset is unavailable.

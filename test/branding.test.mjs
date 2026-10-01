@@ -38,5 +38,6 @@ test('marketing and release surfaces keep one explicit compatibility note', asyn
   assert.equal((website.match(/Previously released as Codex Local Hub\./gu) || []).length, 1);
   assert.equal((websiteCopy.match(/Previously released as Codex Local Hub\./gu) || []).length, 1);
   assert.equal((websiteCopy.match(/旧版本曾使用 Codex Local Hub 名称/gu) || []).length, 1);
-  assert.match(release, /--title "Codex Lookout v\$version"/u);
+  assert.match(release, /--title "Codex Lookout v\$version · Stable"/u);
+  assert.match(release, /Codex-Lookout-\$version-universal/u);
 });

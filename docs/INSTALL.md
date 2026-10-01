@@ -8,7 +8,7 @@ The GitHub Release also includes an explicitly named `unsigned-preview.dmg` for 
 
 Once a notarized DMG is available:
 
-1. Download `Codex-Local-Hub-<version>-universal.dmg` from GitHub Releases.
+1. Download `Codex-Lookout-<version>-universal.dmg` from GitHub Releases.
 2. Open the DMG.
 3. Drag **Codex Lookout** to **Applications**.
 4. Open the app and allow Local Network access when macOS asks.

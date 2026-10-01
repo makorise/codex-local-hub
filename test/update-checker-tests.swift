@@ -33,12 +33,13 @@ private func releaseJSON(
     prerelease: Bool = false,
     page: String = "https://github.com/makorise/codex-local-hub/releases/tag/v0.3.0",
     includeCore: Bool = true,
-    validDigest: Bool = true
+    validDigest: Bool = true,
+    installerName: String = "Codex-Lookout-0.3.0-universal.dmg"
 ) -> Data {
     let digest = validDigest ? String(repeating: "a", count: 64) : "broken"
     let core = includeCore ? "{\"name\":\"Codex-Local-Hub-core-0.3.0.zip\",\"browser_download_url\":\"https://github.com/makorise/codex-local-hub/releases/download/v0.3.0/Codex-Local-Hub-core-0.3.0.zip\",\"digest\":\"sha256:\(digest)\"}," : ""
     return Data("""
-    {"tag_name":"\(tag)","html_url":"\(page)","draft":\(draft),"prerelease":\(prerelease),"assets":[\(core){"name":"Codex-Local-Hub-0.3.0-universal.dmg","browser_download_url":"https://github.com/makorise/codex-local-hub/releases/download/v0.3.0/Codex-Local-Hub-0.3.0-universal.dmg","digest":"sha256:\(digest)"}]}
+    {"tag_name":"\(tag)","html_url":"\(page)","draft":\(draft),"prerelease":\(prerelease),"assets":[\(core){"name":"\(installerName)","browser_download_url":"https://github.com/makorise/codex-local-hub/releases/download/v0.3.0/\(installerName)","digest":"sha256:\(digest)"}]}
     """.utf8)
 }
 
@@ -57,7 +58,12 @@ struct UpdateCheckerTests {
         let update = GitHubUpdateChecker.release(from: releaseJSON(), currentVersion: current)
         expect(update?.version == "0.3.0", "accepts a newer stable release")
         expect(update?.coreAsset?.name == "Codex-Local-Hub-core-0.3.0.zip", "selects the expected hot-update core")
-        expect(update?.installerAsset?.name == "Codex-Local-Hub-0.3.0-universal.dmg", "selects the expected universal DMG")
+        expect(update?.installerAsset?.name == "Codex-Lookout-0.3.0-universal.dmg", "selects the branded universal DMG")
+        let legacyInstaller = GitHubUpdateChecker.release(
+            from: releaseJSON(installerName: "Codex-Local-Hub-0.3.0-universal.dmg"),
+            currentVersion: current
+        )
+        expect(legacyInstaller?.installerAsset?.name == "Codex-Local-Hub-0.3.0-universal.dmg", "keeps legacy installer compatibility")
         expect(update?.coreAsset?.url.host == "github.com", "keeps downloads on GitHub")
         expect(GitHubUpdateChecker.release(from: releaseJSON(tag: "v0.2.1"), currentVersion: current) == nil, "does not reinstall the same version")
         expect(GitHubUpdateChecker.release(from: releaseJSON(tag: "v0.1.9"), currentVersion: current) == nil, "does not downgrade")

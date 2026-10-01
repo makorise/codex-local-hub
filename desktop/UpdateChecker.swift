@@ -134,7 +134,8 @@ final class GitHubUpdateChecker {
               payload.htmlURL.host == "github.com" else { return nil }
 
         let coreAsset = trustedAsset(named: "Codex-Local-Hub-core-\(remoteVersion).zip", in: payload.assets)
-        let installerAsset = trustedAsset(named: "Codex-Local-Hub-\(remoteVersion)-universal.dmg", in: payload.assets)
+        let installerAsset = trustedAsset(named: "Codex-Lookout-\(remoteVersion)-universal.dmg", in: payload.assets)
+            ?? trustedAsset(named: "Codex-Local-Hub-\(remoteVersion)-universal.dmg", in: payload.assets)
         return UpdateRelease(
             version: remoteVersion.description,
             pageURL: payload.htmlURL,
