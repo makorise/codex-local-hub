@@ -1,4 +1,33 @@
+import { existsSync as nodeExistsSync } from 'node:fs';
+
 export const MAX_MESSAGE_LENGTH = 12_000;
+export const CORE_READY_MARKER = 'CODEX_LOOKOUT_READY';
+export const LEGACY_HOST_READY_MARKER = 'Codex 掌上任务台已启动';
+export const LEGACY_READY_DELAYS_MS = [100, 350, 750];
+export const MAC_CODEX_BIN_CANDIDATES = [
+  '/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex',
+  '/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex',
+  '/Applications/Codex.app/Contents/Resources/codex',
+  '/Applications/ChatGPT.app/Contents/Resources/codex',
+];
+
+export function resolveCodexBin({
+  configured = '',
+  platform = process.platform,
+  existsSync = nodeExistsSync,
+} = {}) {
+  const requested = String(configured || '').trim();
+  if (requested && !requested.includes('/')) return requested;
+  const candidates = [requested, ...(platform === 'darwin' ? MAC_CODEX_BIN_CANDIDATES : [])].filter(Boolean);
+  return candidates.find((candidate) => existsSync(candidate)) || requested || 'codex';
+}
+
+export function scheduleCoreReadySignals({ write, schedule }) {
+  write(CORE_READY_MARKER);
+  for (const delay of LEGACY_READY_DELAYS_MS) {
+    schedule(() => write(LEGACY_HOST_READY_MARKER), delay);
+  }
+}
 
 export function truncate(value, length = 180) {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim();
@@ -93,6 +122,7 @@ export function presentTask(row, snapshot = {}, now = Date.now()) {
     id: row.id,
     title,
     project,
+    projectId: row.project_id || null,
     cwd: row.cwd,
     updatedAt: Math.max(Number(row.recency_at_ms || 0), Number(row.updated_at_ms || 0), Number(row.last_activity_at || 0), Number(snapshot.lastActivityAt || 0)),
     model: row.model || null,
@@ -118,6 +148,17 @@ export function validateMessageInput(body) {
   if (!message) return { ok: false, error: '请输入消息' };
   if (message.length > MAX_MESSAGE_LENGTH) return { ok: false, error: `消息不能超过 ${MAX_MESSAGE_LENGTH} 个字符` };
   return { ok: true, threadId, message };
+}
+
+export function validateProjectTaskInput(projectId, body) {
+  const normalizedProjectId = String(projectId ?? '').trim();
+  const message = String(body?.message ?? '').trim();
+  const requestId = String(body?.requestId ?? '').trim();
+  if (!/^[0-9a-f-]{20,}$/i.test(normalizedProjectId)) return { ok: false, error: '项目 ID 无效' };
+  if (!message) return { ok: false, error: '请输入临时任务内容' };
+  if (message.length > MAX_MESSAGE_LENGTH) return { ok: false, error: `任务内容不能超过 ${MAX_MESSAGE_LENGTH} 个字符` };
+  if (requestId && !/^[a-z0-9_-]{16,128}$/i.test(requestId)) return { ok: false, error: '创建请求标识无效' };
+  return { ok: true, projectId: normalizedProjectId, message, requestId };
 }
 
 export function isAuthorized(url, headers, token) {

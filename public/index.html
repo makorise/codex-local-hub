@@ -4,19 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#080b12" />
-    <meta name="description" content="Codex Local Hub is a local-first mobile dashboard for monitoring and controlling Codex tasks from your phone." />
+    <meta name="description" content="Codex Lookout is a local-first mobile dashboard for monitoring and continuing existing Codex tasks from your phone." />
     <meta name="keywords" content="Codex, mobile dashboard, local network, task monitor, remote control, macOS, Node.js, PWA" />
-    <meta property="og:title" content="Codex Local Hub" />
-    <meta property="og:description" content="Monitor and control Codex tasks from your phone on the local network." />
+    <meta property="og:title" content="Codex Lookout" />
+    <meta property="og:description" content="Monitor and continue existing Codex tasks from your phone on the local network." />
     <meta property="og:type" content="website" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Codex Hub" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/app-icon-192.png" />
-    <link rel="stylesheet" href="/styles.css?v=23" />
-    <title>Codex Local Hub</title>
+    <link rel="stylesheet" href="/styles.css?v=49" />
+    <title>Codex Lookout</title>
   </head>
   <body>
     <div class="app-shell">
@@ -24,8 +25,14 @@
         <div class="brand">
           <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
           <div>
-            <h1 data-i18n="brand.name">Codex 随身工作台</h1>
-            <p><span id="connection-dot" class="connection-dot"></span><span id="connection-text" data-i18n="connection.connecting">正在连接 Mac</span></p>
+            <div class="brand-title-row">
+              <h1 data-i18n="brand.name">Codex 瞭望台</h1>
+              <button id="version-button" class="version-button" type="button" hidden><span id="version-current"></span><em id="version-state"></em></button>
+            </div>
+            <p>
+              <span class="connection-state"><span id="connection-dot" class="connection-dot"></span><span id="connection-text" data-i18n="connection.connecting">正在连接 Mac</span></span>
+              <span id="account-badge" class="account-badge" hidden><i id="account-initial" aria-hidden="true"></i><span id="account-name"></span></span>
+            </p>
           </div>
         </div>
         <div class="top-actions">
@@ -45,16 +52,31 @@
             <button id="install-dismiss" class="install-dismiss" type="button" aria-label="关闭" data-i18n-aria="action.close">×</button>
           </aside>
           <button id="usage-card" class="usage-overview" type="button" hidden>
-            <span class="usage-symbol" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><path d="M5 19V9m7 10V5m7 14v-7" /></svg>
+            <span class="usage-main">
+              <span class="usage-symbol" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M5 19V9m7 10V5m7 14v-7" /></svg>
+              </span>
+              <span class="usage-copy">
+                <span class="usage-kicker"><span data-i18n="usage.title">Codex 用量</span> <em id="usage-plan"></em></span>
+                <strong id="usage-summary"></strong>
+              </span>
+              <span id="usage-ring" class="usage-ring" aria-hidden="true">
+                <span><strong id="usage-ring-value"></strong><small>%</small></span>
+              </span>
             </span>
-            <span class="usage-copy">
-              <span class="usage-kicker"><span data-i18n="usage.title">Codex 用量</span> <em id="usage-plan"></em></span>
-              <strong id="usage-summary"></strong>
-              <span id="usage-reset"></span>
-            </span>
-            <span id="usage-ring" class="usage-ring" aria-hidden="true">
-              <span><strong id="usage-ring-value"></strong><small>%</small></span>
+            <span class="usage-stats">
+              <span class="usage-stat">
+                <small data-i18n="usage.allowanceReset">额度重置</small>
+                <strong id="usage-reset"></strong>
+              </span>
+              <span id="usage-credit-stat" class="usage-stat" hidden>
+                <small data-i18n="usage.fullResets">完整重置</small>
+                <strong id="usage-credit-value"></strong>
+              </span>
+              <span id="usage-today" class="usage-stat" hidden>
+                <small data-i18n="usage.todayTitle">今日 Token</small>
+                <strong id="usage-today-value"></strong>
+              </span>
             </span>
           </button>
 
@@ -69,17 +91,13 @@
             <div id="delivery-list" class="delivery-list"></div>
           </section>
 
-          <div class="summary-row">
-            <div><span id="active-count">0</span><small data-i18n="summary.running">正在进行</small></div>
-            <div><span id="queued-count">0</span><small data-i18n="summary.queued">等待处理</small></div>
-            <div><span id="task-count">0</span><small data-i18n="summary.all">全部任务</small></div>
-          </div>
-
-          <div class="filters" role="tablist" aria-label="任务筛选" data-i18n-aria="nav.taskFilter">
-            <button class="filter is-active" type="button" data-filter="all" data-i18n="filter.all">全部</button>
-            <button class="filter" type="button" data-filter="running" data-i18n="filter.running">进行中</button>
-            <button class="filter" type="button" data-filter="queued" data-i18n="filter.queued">已排队</button>
-            <button class="filter" type="button" data-filter="done" data-i18n="filter.done">已完成</button>
+          <div class="task-toolbar">
+            <div class="filters" role="tablist" aria-label="任务筛选" data-i18n-aria="nav.taskFilter">
+              <button class="filter is-active" type="button" data-filter="all"><span data-i18n="filter.all">全部</span><em id="task-count" class="filter-count">0</em></button>
+              <button class="filter" type="button" data-filter="running"><span data-i18n="filter.running">进行中</span><em id="active-count" class="filter-count">0</em></button>
+              <button class="filter" type="button" data-filter="queued"><span data-i18n="filter.queued">已排队</span><em id="queued-count" class="filter-count">0</em></button>
+              <button class="filter" type="button" data-filter="done"><span data-i18n="filter.done">已完成</span><em id="done-count" class="filter-count">0</em></button>
+            </div>
           </div>
 
           <div id="task-list" class="task-list" aria-live="polite">
@@ -106,13 +124,19 @@
               </div>
               <span id="detail-status" class="status-pill"></span>
               <button id="resume-button" class="resume-button" type="button" hidden data-i18n="action.resume">继续任务</button>
+              <button id="task-menu-button" class="task-menu-button" type="button" aria-label="管理任务" data-i18n-aria="manage.open">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>
+              </button>
             </div>
 
             <div class="detail-scroll">
               <section class="conversation-card">
                 <div class="conversation-heading">
                   <div class="section-label" data-i18n="conversation.title">对话记录</div>
-                  <span data-i18n="conversation.hint">越上越早 · 最多 20 条</span>
+                  <div class="conversation-heading-meta">
+                    <span data-i18n="conversation.hint">越上越早 · 最多 20 条</span>
+                    <button id="new-message-indicator" class="new-message-indicator" type="button" hidden data-i18n="conversation.newMessages">有新消息 ↓</button>
+                  </div>
                 </div>
                 <div id="recent-messages" class="recent-messages"></div>
               </section>
@@ -168,6 +192,6 @@
         <div id="modal-content" class="modal-content"></div>
       </section>
     </div>
-    <script type="module" src="/app.js?v=25"></script>
+    <script type="module" src="/app.js?v=51"></script>
   </body>
 </html>

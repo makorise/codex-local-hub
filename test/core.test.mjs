@@ -2,8 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MAX_MESSAGE_LENGTH,
+  CORE_READY_MARKER,
+  LEGACY_HOST_READY_MARKER,
+  LEGACY_READY_DELAYS_MS,
+  MAC_CODEX_BIN_CANDIDATES,
   activityLabel,
   cleanUserMessage,
+  scheduleCoreReadySignals,
   extractMessageText,
   folderName,
   formatDuration,
@@ -12,10 +17,36 @@ import {
   isAuthorized,
   isInternalMessage,
   presentTask,
+  resolveCodexBin,
   safeJson,
   truncate,
   validateMessageInput,
+  validateProjectTaskInput,
 } from '../src/core.mjs';
+
+test('Codex executable resolution follows the current desktop bundle and safe fallbacks', () => {
+  const current = MAC_CODEX_BIN_CANDIDATES[0];
+  assert.equal(resolveCodexBin({ configured: '/missing/codex', existsSync: (path) => path === current, platform: 'darwin' }), current);
+  assert.equal(resolveCodexBin({ configured: '/custom/codex', existsSync: (path) => path === '/custom/codex', platform: 'darwin' }), '/custom/codex');
+  assert.equal(resolveCodexBin({ configured: 'codex-preview', existsSync: () => false, platform: 'darwin' }), 'codex-preview');
+  assert.equal(resolveCodexBin({ configured: '', existsSync: () => false, platform: 'linux' }), 'codex');
+  assert.equal(resolveCodexBin({ configured: '/missing/codex', existsSync: () => false, platform: 'linux' }), '/missing/codex');
+});
+
+test('core readiness signal isolates ASCII and retries v0.2.8 host detection', () => {
+  const writes = [];
+  const scheduled = [];
+  scheduleCoreReadySignals({
+    write: (line) => writes.push(line),
+    schedule: (callback, delay) => scheduled.push({ callback, delay }),
+  });
+  assert.equal(CORE_READY_MARKER, 'CODEX_LOOKOUT_READY');
+  assert.equal(LEGACY_HOST_READY_MARKER, 'Codex 掌上任务台已启动');
+  assert.deepEqual(writes, ['CODEX_LOOKOUT_READY']);
+  assert.deepEqual(scheduled.map(({ delay }) => delay), LEGACY_READY_DELAYS_MS);
+  for (const { callback } of scheduled) callback();
+  assert.deepEqual(writes, ['CODEX_LOOKOUT_READY', ...Array(3).fill('Codex 掌上任务台已启动')]);
+});
 
 test('text helpers normalize, extract and filter visible messages', () => {
   assert.equal(truncate(null), '');
@@ -72,14 +103,15 @@ test('goal presentation covers every state and readable elapsed time', () => {
 
 test('task presentation selects safe fallbacks and running activity', () => {
   const base = { id: 'id', cwd: '/work/demo', updated_at_ms: 4, recency_at_ms: 5, queued_count: 0, is_pinned: 1 };
-  const running = presentTask({ ...base, name: 'Named', project_name: 'Project', model: 'model' }, { lifecycle: 'task_started', lastActivityType: 'web_search', lastActivityAt: 10, latestUser: 'Next', latestAssistant: 'Result' }, 10);
-  assert.deepEqual({ title: running.title, project: running.project, activity: running.activity, pinned: running.pinned }, { title: 'Named', project: 'Project', activity: '正在检索资料', pinned: true });
+  const running = presentTask({ ...base, name: 'Named', project_id: 'project-1', project_name: 'Project', model: 'model' }, { lifecycle: 'task_started', lastActivityType: 'web_search', lastActivityAt: 10, latestUser: 'Next', latestAssistant: 'Result' }, 10);
+  assert.deepEqual({ title: running.title, project: running.project, projectId: running.projectId, activity: running.activity, pinned: running.pinned }, { title: 'Named', project: 'Project', projectId: 'project-1', activity: '正在检索资料', pinned: true });
   assert.equal(running.updatedAt, Date.parse('1970-01-01T00:00:00.010Z'));
   const idle = presentTask({ ...base, name: '', title: '', preview: '', project_name: '', section_name: 'Pinned', recency_at_ms: 0, is_pinned: 0 }, {}, 200_000);
   assert.equal(idle.title, '未命名任务');
   assert.equal(idle.project, 'Pinned');
   assert.equal(idle.activity, '待命');
   assert.equal(idle.latestResult, '');
+  assert.equal(idle.projectId, null);
   assert.equal(presentTask({ ...base, name: '', title: 'T', project_name: '', section_name: '', cwd: '', recency_at_ms: 0 }, {}, 200_000).project, '未分组');
   const fallbacks = presentTask({ id: 'x', name: '', title: '', preview: 'Preview', cwd: null, updated_at_ms: 0, recency_at_ms: null, queued_count: null }, { lastActivityAt: 0, messages: null }, 200_000);
   assert.equal(fallbacks.title, 'Preview');
@@ -105,6 +137,17 @@ test('message validation and authorization reject unsafe requests', () => {
   assert.equal(validateMessageInput({ threadId: '1234567890abcdef1234', message: ' ' }).error, '请输入消息');
   assert.match(validateMessageInput({ threadId: '1234567890abcdef1234', message: 'x'.repeat(MAX_MESSAGE_LENGTH + 1) }).error, /不能超过/);
   assert.deepEqual(validateMessageInput({ threadId: ' 1234567890abcdef1234 ', message: ' hi ' }), { ok: true, threadId: '1234567890abcdef1234', message: 'hi' });
+  assert.equal(validateProjectTaskInput('bad', { message: 'x' }).error, '项目 ID 无效');
+  assert.equal(validateProjectTaskInput(undefined, undefined).error, '项目 ID 无效');
+  assert.equal(validateProjectTaskInput('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {}).error, '请输入临时任务内容');
+  assert.match(validateProjectTaskInput('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', { message: 'x'.repeat(MAX_MESSAGE_LENGTH + 1) }).error, /不能超过/);
+  assert.equal(validateProjectTaskInput('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', { message: 'x', requestId: 'short' }).error, '创建请求标识无效');
+  assert.deepEqual(validateProjectTaskInput(' aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa ', { message: ' fix it ' }), {
+    ok: true, projectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', message: 'fix it', requestId: '',
+  });
+  assert.deepEqual(validateProjectTaskInput('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', { message: 'fix it', requestId: ' 12345678-1234-4123-8123-123456789012 ' }), {
+    ok: true, projectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', message: 'fix it', requestId: '12345678-1234-4123-8123-123456789012',
+  });
   const url = new URL('http://x/?token=secret');
   assert.equal(isAuthorized(url, {}, ''), true);
   assert.equal(isAuthorized(url, {}, 'secret'), true);

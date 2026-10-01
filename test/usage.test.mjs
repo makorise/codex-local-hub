@@ -1,7 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { createUsageReader, normalizeUsage, requestRateLimits, usageWindowLabel } from '../src/usage.mjs';
+import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  addTokenCountLine, createTodayTokenReader, createUsageHistoryStore, createUsageReader, emptyTodayTokenUsage,
+  findModifiedRollouts, localDateKey, normalizeUsage, normalizeUsageHistoryState, recentUsageDays,
+  requestRateLimits, scanTokenRollout, updateUsageHistory, usageWindowLabel,
+} from '../src/usage.mjs';
 
 function fakeChild({ onWrite, killEmitsExit = true, withKill = true } = {}) {
   const child = new EventEmitter();
@@ -29,18 +36,23 @@ test('usage normalization selects buckets, formats windows and clamps remaining 
   assert.equal(usageWindowLabel(10_080), '周');
   assert.equal(usageWindowLabel(0), '0 分钟');
   assert.equal(usageWindowLabel(), '0 分钟');
-  assert.deepEqual(normalizeUsage(null, 1), { available: false, planType: null, limits: [], updatedAt: 1 });
+  assert.deepEqual(normalizeUsage(null, 1), { available: false, planType: null, limits: [], resetCredits: { availableCount: 0, credits: [] }, updatedAt: 1 });
   assert.equal(typeof normalizeUsage(null).updatedAt, 'number');
 
   const result = normalizeUsage({ rateLimitsByLimitId: { codex: {
     planType: 'pro',
     primary: { usedPercent: 9, windowDurationMins: 10_080, resetsAt: 100 },
     secondary: { usedPercent: 120, windowDurationMins: 300, resetsAt: 0 },
-  } } }, 2);
+  } }, rateLimitResetCredits: { availableCount: 2, credits: [
+    { status: 'available', expiresAt: 300 },
+    { status: 'used', expiresAt: 200 },
+    { status: 'available' },
+  ] } }, 2);
   assert.equal(result.available, true);
   assert.equal(result.planType, 'pro');
   assert.deepEqual(result.limits.map((item) => [item.id, item.label, item.remainingPercent]), [['primary', '周', 91], ['secondary', '5 小时', 0]]);
   assert.equal(result.limits[0].resetsAt, 100_000);
+  assert.deepEqual(result.resetCredits, { availableCount: 2, credits: [{ expiresAt: 300_000 }, { expiresAt: 0 }] });
 
   const fallback = normalizeUsage({ rateLimits: { primary: { usedPercent: -5, windowDurationMins: 30 } } }, 3);
   assert.equal(fallback.limits[0].remainingPercent, 100);
@@ -50,6 +62,9 @@ test('usage normalization selects buckets, formats windows and clamps remaining 
 
   const firstBucket = normalizeUsage({ rateLimitsByLimitId: { other: { primary: null } } }, 4);
   assert.equal(firstBucket.available, false);
+
+  const creditsOnly = normalizeUsage({ rateLimitResetCredits: { credits: [{ status: 'available', expiresAt: 1 }] } }, 4);
+  assert.deepEqual(creditsOnly.resetCredits, { availableCount: 1, credits: [{ expiresAt: 1_000 }] });
 
   const emptyWindow = normalizeUsage({ rateLimits: { primary: {} } }, 5);
   assert.deepEqual(emptyWindow.limits[0], {
@@ -66,12 +81,21 @@ test('usage reader caches results and shares an in-flight request', async () => 
     calls += 1;
     return new Promise((resolve) => { resolveRequest = resolve; });
   };
-  const read = createUsageReader({ request, now: () => clock, ttlMs: 100 });
+  const recorded = [];
+  const read = createUsageReader({
+    request,
+    historyStore: { record: async (usage) => { recorded.push(usage.updatedAt); return [{ date: 'day' }]; } },
+    todayTokenReader: async () => ({ available: true, totalTokens: 42 }),
+    now: () => clock,
+    ttlMs: 100,
+  });
   const first = read();
   const concurrent = read();
   assert.equal(calls, 1);
   resolveRequest({ rateLimits: { primary: { usedPercent: 25, windowDurationMins: 300, resetsAt: 1 } } });
   assert.equal((await first).limits[0].remainingPercent, 75);
+  assert.deepEqual((await first).dailyUsage, [{ date: 'day' }]);
+  assert.equal((await first).todayTokens.totalTokens, 42);
   assert.equal(await concurrent, await first);
   assert.equal(await read(), await first);
   assert.equal(calls, 1);
@@ -80,9 +104,152 @@ test('usage reader caches results and shares an in-flight request', async () => 
   assert.equal(calls, 2);
   resolveRequest({ rateLimits: { primary: { usedPercent: 30, windowDurationMins: 300, resetsAt: 2 } } });
   assert.equal((await refreshed).limits[0].remainingPercent, 70);
+  assert.deepEqual(recorded, [10, 200]);
 
   const readWithDefaults = createUsageReader({ request: async () => ({}) });
   assert.equal((await readWithDefaults()).available, false);
+  const readWithBrokenHistory = createUsageReader({ request: async () => ({}), historyStore: { record: async () => { throw new Error('history'); } } });
+  assert.deepEqual((await readWithBrokenHistory()).dailyUsage, []);
+  const readWithBrokenTokens = createUsageReader({ request: async () => ({}), todayTokenReader: async () => { throw new Error('tokens'); }, now: () => 1 });
+  assert.equal((await readWithBrokenTokens()).todayTokens.available, false);
+});
+
+test('today token usage sums local Codex token events without reading message content', async (t) => {
+  const now = new Date(2026, 8, 23, 12).getTime();
+  const summary = emptyTodayTokenUsage(now);
+  assert.equal(summary.date, '2026-09-23');
+  assert.equal(addTokenCountLine(summary, 'ordinary message'), summary);
+  assert.equal(addTokenCountLine(summary, '{bad "token_count" json'), summary);
+  assert.equal(addTokenCountLine(summary, JSON.stringify({ type: 'other', payload: { type: 'token_count' }, timestamp: new Date(now).toISOString() })), summary);
+  assert.equal(addTokenCountLine(summary, JSON.stringify({ type: 'event_msg', payload: { type: 'token_count' }, timestamp: 'bad' })), summary);
+  assert.equal(addTokenCountLine(summary, JSON.stringify({ type: 'event_msg', payload: { type: 'token_count' }, timestamp: '2026-09-22T10:00:00+08:00' })), summary);
+  assert.equal(addTokenCountLine(summary, JSON.stringify({ type: 'event_msg', payload: { type: 'token_count', info: {} }, timestamp: '2026-09-23T10:00:00+08:00' })), summary);
+  const event = JSON.stringify({
+    type: 'event_msg', timestamp: '2026-09-23T10:00:00+08:00',
+    payload: { type: 'token_count', info: { last_token_usage: {
+      input_tokens: 100, cached_input_tokens: 70, output_tokens: 20,
+      reasoning_output_tokens: 5, total_tokens: 120,
+    } } },
+  });
+  addTokenCountLine(summary, event);
+  addTokenCountLine(summary, JSON.stringify({
+    type: 'event_msg', timestamp: '2026-09-23T11:00:00+08:00',
+    payload: { type: 'token_count', info: { last_token_usage: { input_tokens: -1, total_tokens: '30', output_tokens: 'bad' } } },
+  }));
+  assert.deepEqual({ total: summary.totalTokens, input: summary.inputTokens, output: summary.outputTokens, events: summary.eventCount }, {
+    total: 150, input: 100, output: 20, events: 2,
+  });
+
+  const root = await mkdtemp(join(tmpdir(), 'today-tokens-'));
+  t.after(() => rm(root, { recursive: true }));
+  const nested = join(root, '2026', '09', '23');
+  await mkdir(nested, { recursive: true });
+  const current = join(nested, 'rollout-current.jsonl');
+  const stale = join(root, 'rollout-stale.jsonl');
+  const huge = `{"message":"${'x'.repeat(140_000)}"}`;
+  await writeFile(current, `${huge}\n${event}\n${event}`);
+  await writeFile(stale, `${event}\n`);
+  await utimes(stale, new Date(now - 86_400_000), new Date(now - 86_400_000));
+  const files = await findModifiedRollouts(root, new Date(2026, 8, 23).getTime());
+  assert.deepEqual(files, [current]);
+  const scanned = emptyTodayTokenUsage(now);
+  await scanTokenRollout(current, scanned, { lineLimit: 32 });
+  assert.equal(scanned.totalTokens, 240);
+  assert.equal(scanned.eventCount, 2);
+
+  const readToday = createTodayTokenReader({ sessionsDir: root, now: () => now });
+  const today = await readToday();
+  assert.equal(today.available, true);
+  assert.equal(today.fileCount, 1);
+  assert.equal(today.totalTokens, 240);
+  const defaultClock = await createTodayTokenReader({ sessionsDir: root, findRollouts: async () => [], scanRollout: async () => {} })();
+  assert.equal(defaultClock.available, true);
+
+  assert.deepEqual(await findModifiedRollouts(join(root, 'missing'), 0), []);
+  const fakeDirectory = [{ name: 'vanished.jsonl', isDirectory: () => false, isFile: () => true }];
+  assert.deepEqual(await findModifiedRollouts('/virtual', 0, { readdir: async () => fakeDirectory, stat: async () => { throw new Error('gone'); } }), []);
+});
+
+test('seven-day usage history records only locally observed weekly deltas', () => {
+  const now = new Date(2026, 8, 23, 12).getTime();
+  assert.equal(localDateKey(now), '2026-09-23');
+  assert.deepEqual(recentUsageDays(now, 2).map((day) => day.date), ['2026-09-22', '2026-09-23']);
+  assert.deepEqual(normalizeUsageHistoryState({ days: [], lastUsedPercent: -1, lastResetsAt: 0 }), {
+    schemaVersion: 1, lastUsedPercent: null, lastResetsAt: null, days: {},
+  });
+  const normalized = normalizeUsageHistoryState({
+    lastUsedPercent: 10,
+    lastResetsAt: 1_000,
+    days: {
+      bad: { usedPercent: 1, observed: true },
+      '2026-09-22': { usedPercent: -1, observed: true },
+      '2026-09-23': { usedPercent: 2.5, observed: true },
+    },
+  });
+  assert.deepEqual(normalized.days, { '2026-09-23': { usedPercent: 2.5, observed: true } });
+
+  const unavailable = updateUsageHistory({ days: { '2026-01-01': { usedPercent: 99, observed: true } } }, { limits: [] }, now);
+  assert.equal(unavailable.days.length, 7);
+  assert.equal(unavailable.days.some((day) => day.observed), false);
+  assert.equal(updateUsageHistory(null, { limits: [{ windowDurationMins: 10_080 }] }, now).state.lastUsedPercent, 0);
+
+  const baseline = updateUsageHistory(null, { limits: [{ usedPercent: 21, resetsAt: 10_000_000, windowDurationMins: 10_080 }] }, now);
+  assert.equal(baseline.days.at(-1).observed, true);
+  assert.equal(baseline.days.at(-1).usedPercent, 0);
+  const increased = updateUsageHistory(baseline.state, { limits: [{ usedPercent: 26.5, resetsAt: 10_001_000, windowDurationMins: 10_080 }] }, now);
+  assert.equal(increased.days.at(-1).usedPercent, 5.5);
+  const stale = updateUsageHistory(increased.state, { limits: [{ usedPercent: 24, resetsAt: 10_002_000, windowDurationMins: 10_080 }] }, now);
+  assert.equal(stale.state.lastUsedPercent, 26.5);
+  assert.equal(stale.days.at(-1).usedPercent, 5.5);
+  const reset = updateUsageHistory(stale.state, { limits: [{ usedPercent: 3, resetsAt: 20_000_000, windowDurationMins: 10_080 }] }, now);
+  assert.equal(reset.days.at(-1).usedPercent, 8.5);
+  const resetUnknown = updateUsageHistory({ ...reset.state, lastResetsAt: null }, { limits: [{ usedPercent: 4, resetsAt: 0, windowDurationMins: 10_080 }] }, now);
+  assert.equal(resetUnknown.state.lastUsedPercent, 4);
+  assert.equal(resetUnknown.state.lastResetsAt, null);
+});
+
+test('usage history store persists a bounded private snapshot and survives file errors', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'usage-history-'));
+  t.after(() => rm(root, { recursive: true }));
+  const path = join(root, 'nested', 'usage.json');
+  let clock = new Date(2026, 8, 23, 12).getTime();
+  const store = createUsageHistoryStore({ path, now: () => clock });
+  const usage = { limits: [{ usedPercent: 10, resetsAt: 10_000_000, windowDurationMins: 10_080 }] };
+  assert.equal((await store.record(usage)).at(-1).usedPercent, 0);
+  usage.limits[0].usedPercent = 14;
+  const [second, third] = await Promise.all([store.record(usage), store.record(usage)]);
+  assert.equal(second.at(-1).usedPercent, 4);
+  assert.equal(third.at(-1).usedPercent, 4);
+  assert.equal(JSON.parse(await readFile(path, 'utf8')).days['2026-09-23'].usedPercent, 4);
+  assert.equal((await createUsageHistoryStore({ path: join(root, 'default-now.json') }).record(usage)).length, 7);
+
+  let unlinks = 0;
+  const broken = createUsageHistoryStore({
+    path: '/broken/usage.json', now: () => clock,
+    readFile: async () => '{invalid', mkdir: async () => {},
+    writeFile: async () => { throw new Error('write'); }, rename: async () => {},
+    unlink: async () => { unlinks += 1; },
+  });
+  assert.equal((await broken.record(usage)).length, 7);
+  assert.equal(unlinks, 1);
+
+  const brokenCleanup = createUsageHistoryStore({
+    path: '/broken/usage.json', now: () => clock,
+    readFile: async () => JSON.stringify(normalizeUsageHistoryState(null)), mkdir: async () => {},
+    writeFile: async () => {}, rename: async () => { throw new Error('rename'); },
+    unlink: async () => { throw new Error('unlink'); },
+  });
+  assert.equal((await brokenCleanup.record(usage)).at(-1).observed, true);
+
+  let failClock = true;
+  const recovered = createUsageHistoryStore({
+    path: join(root, 'recovered.json'), now: () => {
+      if (failClock) { failClock = false; throw new Error('clock'); }
+      return clock;
+    },
+  });
+  await assert.rejects(recovered.record(usage), /clock/);
+  assert.equal((await recovered.record(usage)).at(-1).observed, true);
 });
 
 test('app-server transport completes the handshake and parses a rate-limit response', async () => {

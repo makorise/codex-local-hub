@@ -3,21 +3,22 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { networkInterfaces } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createAccountReader, requestAccount } from './account.mjs';
 import { CodexRepository } from './repository.mjs';
 import { CodexAppToolsClient, CodexControlClient } from './control.mjs';
 import { DeliveryInbox } from './deliveries.mjs';
 import { createBridgeServer, resolveRuntimeInfo } from './server.mjs';
-import { createUsageReader, requestRateLimits } from './usage.mjs';
+import { createTodayTokenReader, createUsageReader, requestRateLimits } from './usage.mjs';
+import { resolveCodexBin, scheduleCoreReadySignals } from './core.mjs';
+import { createUpdateReader } from './updates.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const home = process.env.HOME;
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || '0.0.0.0';
 const requirePairing = process.env.BRIDGE_REQUIRE_PAIRING === '1';
-const codexBin = process.env.CODEX_BIN || '/Applications/ChatGPT.app/Contents/Resources/codex';
-const appTools = new CodexAppToolsClient({
-  codexBin,
-});
+const codexBin = resolveCodexBin({ configured: process.env.CODEX_BIN });
+const appTools = new CodexAppToolsClient({ codexBin });
 const control = new CodexControlClient({
   codexBin,
   socketPath: process.env.CODEX_APP_SERVER_SOCKET || '',
@@ -42,22 +43,31 @@ const repository = new CodexRepository({
   historyDb: process.env.CODEX_HISTORY_DB || join(home, '.codex', 'thread_history_1.sqlite'),
   goalsDb: process.env.CODEX_GOALS_DB || join(home, '.codex', 'goals_1.sqlite'),
   codexBin,
-  steerMessage: (threadId, turnId, message) => control.steer(threadId, turnId, message),
-  startTurn: (threadId, message, cwd) => control.resume(threadId, message, cwd),
+  archiveTask: (threadId) => control.archiveThread(threadId),
+  interruptTurn: (threadId, turnId) => control.interruptTurn(threadId, turnId),
+  deleteProject: (projectId) => control.deleteProject(projectId),
 });
-const usageReader = createUsageReader({ request: () => requestRateLimits({ codexBin }) });
+const todayTokenReader = createTodayTokenReader({ sessionsDir: join(home, '.codex', 'sessions') });
+const usageReader = createUsageReader({ request: () => requestRateLimits({ codexBin }), todayTokenReader });
+const accountReader = createAccountReader({ request: () => requestAccount({ codexBin }) });
 const runtimeInfo = await resolveRuntimeInfo({ root });
-const { server } = createBridgeServer({ repository, token, requirePairing, publicDir: join(root, 'public'), usageReader, deliveryInbox, runtimeInfo });
+const hostUpdateEnabled = process.env.CODEX_LOCAL_HUB_HOST_UPDATE === '1';
+const updateReader = createUpdateReader({ currentVersion: runtimeInfo.version, hostUpdateEnabled });
+const requestHostUpdate = hostUpdateEnabled ? async () => { console.log('CODEX_LOOKOUT_UPDATE_REQUEST'); } : null;
+const { server } = createBridgeServer({ repository, token, requirePairing, publicDir: join(root, 'public'), usageReader, accountReader, deliveryInbox, runtimeInfo, updateReader, requestHostUpdate });
 
 server.listen(port, host, () => {
   const addresses = lanAddresses().map((address) => `http://${address}:${port}/`);
-  console.log('\nCodex Local Hub / Codex 掌上任务台已启动');
-  console.log(`本机：http://127.0.0.1:${port}/`);
-  for (const address of addresses) {
-    console.log(`手机：${address}`);
-    if (requirePairing) console.log(`配对：${address}pair/${encodeURIComponent(token)}`);
-  }
-  console.log('按 Ctrl+C 停止\n');
+  scheduleCoreReadySignals({ write: (line) => console.log(line), schedule: setTimeout });
+  setTimeout(() => {
+    console.log('\nCodex Lookout / Codex 瞭望台已启动');
+    console.log(`本机：http://127.0.0.1:${port}/`);
+    for (const address of addresses) {
+      console.log(`手机：${address}`);
+      if (requirePairing) console.log(`配对：${address}pair/${encodeURIComponent(token)}`);
+    }
+    console.log('按 Ctrl+C 停止\n');
+  }, 1_000);
 });
 
 async function loadOrCreateSecret(path) {

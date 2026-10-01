@@ -37,6 +37,10 @@ jobs:
           cp docs/assets/social-preview/codex-local-hub-social-preview.png _site/assets/social-preview.png
           cp docs/assets/screenshots/desktop-dashboard.en.png _site/assets/desktop-dashboard.en.png
           cp docs/assets/screenshots/desktop-dashboard.zh-CN.png _site/assets/desktop-dashboard.zh-CN.png
+          cp docs/assets/screenshots/mac-host.en.png _site/assets/mac-host.en.png
+          cp docs/assets/screenshots/mac-host.zh-CN.png _site/assets/mac-host.zh-CN.png
+          cp docs/assets/screenshots/mobile-dashboard.en.png _site/assets/mobile-dashboard.en.png
+          cp docs/assets/screenshots/mobile-dashboard.zh-CN.png _site/assets/mobile-dashboard.zh-CN.png
           cp docs/assets/screenshots/mobile-conversation.en.png _site/assets/mobile-conversation.en.png
           cp docs/assets/screenshots/mobile-conversation.zh-CN.png _site/assets/mobile-conversation.zh-CN.png
           touch _site/.nojekyll
