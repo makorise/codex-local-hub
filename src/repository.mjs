@@ -6,7 +6,7 @@ import { cleanUserMessage, extractMessageText, isInternalMessage } from './core.
 const defaultExec = promisify(nodeExecFile);
 
 const TASK_SQL = `
-SELECT t.id, t.name, t.title, t.preview, t.cwd, t.model, t.is_pinned,
+SELECT t.id, t.name, t.title, t.preview, t.cwd, t.model, t.is_pinned, p.id AS project_id,
        t.updated_at_ms, t.recency_at_ms, t.rollout_path,
        p.name AS project_name, s.name AS section_name,
        (SELECT COUNT(*) FROM queue_db.queued_items qi WHERE qi.thread_id = t.id) AS queued_count,
@@ -14,20 +14,27 @@ SELECT t.id, t.name, t.title, t.preview, t.cwd, t.model, t.is_pinned,
        (SELECT ht.status FROM history_db.thread_turns ht WHERE ht.thread_id = t.id ORDER BY ht.rollout_ordinal DESC LIMIT 1) AS turn_status,
        (SELECT hi.item_type FROM history_db.thread_items hi WHERE hi.thread_id = t.id ORDER BY hi.rollout_ordinal DESC LIMIT 1) AS last_item_type,
        (SELECT hi.created_at_ms FROM history_db.thread_items hi WHERE hi.thread_id = t.id ORDER BY hi.rollout_ordinal DESC LIMIT 1) AS last_activity_at,
-       (SELECT json_extract(hi.item_json, '$.content[0].text') FROM history_db.thread_items hi WHERE hi.thread_id = t.id AND hi.item_type = 'userMessage' ORDER BY hi.rollout_ordinal DESC LIMIT 1) AS latest_user,
-       (SELECT json_extract(hi.item_json, '$.text') FROM history_db.thread_items hi WHERE hi.thread_id = t.id AND hi.item_type = 'agentMessage' ORDER BY hi.rollout_ordinal DESC LIMIT 1) AS latest_assistant,
+       NULL AS latest_user,
+       NULL AS latest_assistant,
        g.goal_id, g.objective AS goal_objective, g.status AS goal_status,
        g.time_used_seconds AS goal_time_used_seconds
 FROM threads t
-LEFT JOIN projects p ON p.id = t.project_id
+LEFT JOIN projects p ON p.id = COALESCE(t.project_id, (
+  SELECT pr.project_id FROM project_roots pr
+  WHERE t.cwd = pr.path OR t.cwd LIKE pr.path || '/%'
+  ORDER BY LENGTH(pr.path) DESC LIMIT 1
+))
 LEFT JOIN thread_sections s ON s.id = t.thread_section_id
 LEFT JOIN goal_db.thread_goals g ON g.thread_id = t.id
-WHERE t.archived = 0 AND t.preview <> '' AND t.thread_source = 'user'
+WHERE t.archived = 0 AND t.preview <> '' AND (
+  t.thread_source = 'user'
+  OR (t.thread_source IS NULL AND t.originator = 'Codex Desktop' AND t.project_id IS NOT NULL)
+)
 ORDER BY t.is_pinned DESC, t.recency_at_ms DESC
 LIMIT 80;`;
 
 const BASIC_TASK_SQL = `
-SELECT t.id, t.name, t.title, t.preview, t.cwd, t.model, t.is_pinned,
+SELECT t.id, t.name, t.title, t.preview, t.cwd, t.model, t.is_pinned, NULL AS project_id,
        t.updated_at_ms, t.recency_at_ms, t.rollout_path,
        NULL AS project_name, NULL AS section_name,
        0 AS queued_count, NULL AS queued_message,
@@ -36,7 +43,10 @@ SELECT t.id, t.name, t.title, t.preview, t.cwd, t.model, t.is_pinned,
        NULL AS goal_id, NULL AS goal_objective, NULL AS goal_status,
        NULL AS goal_time_used_seconds
 FROM threads t
-WHERE t.archived = 0 AND t.preview <> '' AND t.thread_source = 'user'
+WHERE t.archived = 0 AND t.preview <> '' AND (
+  t.thread_source = 'user'
+  OR (t.thread_source IS NULL AND t.originator = 'Codex Desktop' AND t.project_id IS NOT NULL)
+)
 ORDER BY t.is_pinned DESC, t.recency_at_ms DESC
 LIMIT 80;`;
 
@@ -49,8 +59,10 @@ export class CodexRepository {
     codexBin = 'codex',
     execFile = defaultExec,
     now = () => Date.now(),
-    steerMessage = async () => { throw Object.assign(new Error('当前 Codex 不支持立即执行'), { statusCode: 503 }); },
-    startTurn = async () => { throw Object.assign(new Error('当前 Codex 不支持启动任务'), { statusCode: 503 }); },
+    platform = process.platform,
+    archiveTask = async () => { throw Object.assign(new Error('当前 Codex 不支持归档任务'), { statusCode: 503 }); },
+    interruptTurn = async () => { throw Object.assign(new Error('当前 Codex 不支持停止任务'), { statusCode: 503 }); },
+    deleteProject = async () => { throw Object.assign(new Error('当前 Codex 不支持删除项目'), { statusCode: 503 }); },
   }) {
     this.stateDb = stateDb;
     this.queueDb = queueDb;
@@ -59,8 +71,10 @@ export class CodexRepository {
     this.codexBin = codexBin;
     this.execFile = execFile;
     this.now = now;
-    this.steerMessage = steerMessage;
-    this.startTurn = startTurn;
+    this.platform = platform;
+    this.archiveTask = archiveTask;
+    this.interruptTurn = interruptTurn;
+    this.deleteProject = deleteProject;
     this.details = new Map();
   }
 
@@ -88,6 +102,59 @@ export class CodexRepository {
     if (!task) return null;
     const [messages, queuedTasks] = await Promise.all([this.loadMessages(threadId), this.loadQueuedTasks(threadId)]);
     return { ...task, messages, queuedTasks };
+  }
+
+  async listProjects() {
+    const sql = `SELECT p.id, p.name FROM projects p WHERE EXISTS (SELECT 1 FROM project_roots pr WHERE pr.project_id = p.id) ORDER BY p.position ASC, p.id ASC;`;
+    const { stdout = '' } = await this.execFile('sqlite3', ['-json', this.stateDb, sql], { maxBuffer: 1024 * 1024 });
+    return stdout.trim() ? JSON.parse(stdout).map((project) => ({ id: project.id, name: project.name })) : [];
+  }
+
+  async activitySummary() {
+    const anchor = new Date(this.now());
+    anchor.setHours(12, 0, 0, 0);
+    const days = Array.from({ length: 30 }, (_, index) => {
+      const date = new Date(anchor);
+      date.setDate(anchor.getDate() - (29 - index));
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    });
+    const start = new Date(`${days[0]}T00:00:00`).getTime();
+    const historySql = `ATTACH DATABASE '${escapeSqlite(this.stateDb)}' AS state_db; SELECT strftime('%Y-%m-%d', ht.started_at, 'unixepoch', 'localtime') AS date, COUNT(*) AS turns, SUM(CASE WHEN ht.status = 'completed' THEN 1 ELSE 0 END) AS completed_turns, SUM(COALESCE(ht.duration_ms, 0)) AS duration_ms FROM thread_turns ht JOIN state_db.threads t ON t.id = ht.thread_id WHERE ht.started_at >= ${Math.floor(start / 1000)} AND t.preview <> '' AND (t.thread_source = 'user' OR (t.thread_source IS NULL AND t.originator = 'Codex Desktop')) GROUP BY date ORDER BY date ASC;`;
+    let historyRows = [];
+    try {
+      const { stdout = '' } = await this.execFile('sqlite3', ['-json', this.historyDb, historySql], { maxBuffer: 1024 * 1024 });
+      historyRows = stdout.trim() ? JSON.parse(stdout) : [];
+    } catch (error) {
+      if (!isOptionalDataUnavailable(error)) throw error;
+    }
+    const stateSql = `SELECT (SELECT COUNT(*) FROM projects p WHERE EXISTS (SELECT 1 FROM project_roots pr WHERE pr.project_id = p.id)) AS project_count, COUNT(*) AS task_count, SUM(CASE WHEN created_at >= ${Math.floor(start / 1000)} THEN 1 ELSE 0 END) AS recent_task_count, SUM(CASE WHEN archived = 1 THEN 1 ELSE 0 END) AS archived_task_count FROM threads WHERE preview <> '' AND (thread_source = 'user' OR (thread_source IS NULL AND originator = 'Codex Desktop'));`;
+    const { stdout: stateStdout = '' } = await this.execFile('sqlite3', ['-json', this.stateDb, stateSql], { maxBuffer: 1024 * 1024 });
+    const totals = stateStdout.trim() ? JSON.parse(stateStdout)[0] : {};
+    const indexed = new Map(historyRows.map((row) => [row.date, row]));
+    const daily = days.map((date) => {
+      const row = indexed.get(date) || {};
+      return {
+        date,
+        turns: Math.max(0, Number(row.turns) || 0),
+        completedTurns: Math.max(0, Number(row.completed_turns) || 0),
+        durationMs: Math.max(0, Number(row.duration_ms) || 0),
+      };
+    });
+    return {
+      days: daily,
+      activeDays: daily.filter((day) => day.turns > 0).length,
+      totalTurns: daily.reduce((sum, day) => sum + day.turns, 0),
+      completedTurns: daily.reduce((sum, day) => sum + day.completedTurns, 0),
+      totalDurationMs: daily.reduce((sum, day) => sum + day.durationMs, 0),
+      projectCount: Math.max(0, Number(totals?.project_count) || 0),
+      taskCount: Math.max(0, Number(totals?.task_count) || 0),
+      recentTaskCount: Math.max(0, Number(totals?.recent_task_count) || 0),
+      archivedTaskCount: Math.max(0, Number(totals?.archived_task_count) || 0),
+      updatedAt: this.now(),
+    };
   }
 
   async loadMessages(threadId) {
@@ -164,39 +231,84 @@ SELECT valid FROM mutation_guard;`;
     return this.loadQueuedTasks(threadId);
   }
 
-  async steerQueuedTask(threadId, itemId, revision) {
+  async wakeQueuedTaskIfIdle(threadId) {
+    if (await this.activeTurnId(threadId)) return { started: false, reason: 'active' };
     const queuedTasks = await this.loadQueuedTasks(threadId);
-    const item = queuedTasks.find((message) => message.id === itemId);
-    if (!item || item.queueRevision !== revision) throw Object.assign(new Error('任务队列已变化，请刷新后重试'), { statusCode: 409 });
-    const activeSql = `SELECT turn_id FROM thread_turns WHERE thread_id = '${escapeSqlite(threadId)}' AND status = 'inProgress' ORDER BY rollout_ordinal DESC LIMIT 1;`;
-    const { stdout } = await this.execFile('sqlite3', ['-json', this.historyDb, activeSql], { maxBuffer: 1024 * 1024 });
-    const activeTurn = stdout.trim() ? JSON.parse(stdout)[0]?.turn_id : null;
-    const result = activeTurn
-      ? await this.steerMessage(threadId, activeTurn, item.text)
-      : await this.startTurn(threadId, item.text, await this.threadCwd(threadId));
-    const deleteSql = `DELETE FROM queued_items WHERE thread_id = '${escapeSqlite(threadId)}' AND id = '${escapeSqlite(itemId)}';`;
-    await this.execFile('sqlite3', [this.queueDb, deleteSql], { maxBuffer: 1024 * 1024 });
-    return { result, queuedTasks: await this.loadQueuedTasks(threadId) };
+    const item = queuedTasks[0];
+    if (!item) return { started: false, reason: 'empty' };
+    const result = await this.wakeDesktopThread(threadId);
+    return { started: true, itemId: item.id, result };
+  }
+
+  async wakeDesktopThread(threadId) {
+    if (this.platform !== 'darwin') {
+      throw Object.assign(new Error('当前系统无法唤醒 Codex Desktop 任务，消息已保留在队列中'), {
+        statusCode: 503,
+        code: 'DESKTOP_WAKE_UNAVAILABLE',
+      });
+    }
+    await this.execFile('/usr/bin/open', ['-g', `codex://threads/${encodeURIComponent(threadId)}`], { maxBuffer: 1024 * 1024 });
+    return { accepted: true, mode: 'wake-requested', via: 'codex-deep-link' };
   }
 
   async sendMessage(threadId, message) {
-    const activeSql = `SELECT turn_id FROM thread_turns WHERE thread_id = '${escapeSqlite(threadId)}' AND status = 'inProgress' ORDER BY rollout_ordinal DESC LIMIT 1;`;
-    let activeOutput = '';
-    try {
-      ({ stdout: activeOutput = '' } = await this.execFile('sqlite3', ['-json', this.historyDb, activeSql], { maxBuffer: 1024 * 1024 }));
-    } catch (error) {
-      if (!isOptionalDataUnavailable(error)) throw error;
-    }
-    const activeTurn = activeOutput.trim() ? JSON.parse(activeOutput)[0]?.turn_id : null;
-    if (!activeTurn) {
-      try {
-        return { accepted: true, mode: 'started', result: await this.startTurn(threadId, message, await this.threadCwd(threadId)) };
-      } catch (error) {
-        const queued = await this.queueMessage(threadId, message);
-        return { ...queued, warning: error.message };
-      }
-    }
+    // Persist first so the phone can return immediately. The server makes one
+    // native-owner wake attempt for an idle task after this durable write.
     return this.queueMessage(threadId, message);
+  }
+
+  async stopTask(threadId) {
+    const turnId = await this.activeTurnId(threadId);
+    if (!turnId) throw Object.assign(new Error('这个任务当前没有正在执行的回合'), { statusCode: 409 });
+    await this.interruptTurn(threadId, turnId);
+    return { stopped: true, threadId };
+  }
+
+  async archiveThread(threadId) {
+    if (!this.details.has(threadId)) await this.listTasks();
+    if (!this.details.has(threadId)) throw Object.assign(new Error('任务不存在或已经归档'), { statusCode: 404 });
+    try {
+      await this.archiveTask(threadId);
+    } catch (error) {
+      // A Desktop-owned thread can reject the legacy app-server archive call
+      // because that secondary process is not its active writer. The official
+      // Desktop archive action ultimately persists these same two fields, so
+      // use a narrow local-state fallback instead of sending the user back to
+      // the Mac. The visible-task check above keeps this scoped to a known
+      // Codex thread, and SQLite still serializes the concurrent write safely.
+      if (error?.code !== 'ACTIVE_WRITER') throw error;
+      const sql = `UPDATE threads SET archived = 1, archived_at = CAST(strftime('%s', 'now') AS INTEGER) WHERE id = '${escapeSqlite(threadId)}' AND archived = 0;`;
+      await this.execFile('sqlite3', [this.stateDb, sql], { maxBuffer: 1024 * 1024 });
+    }
+    this.details.delete(threadId);
+    return { archived: true, threadId };
+  }
+
+  async removeProject(projectId, expectedName) {
+    const sql = `SELECT id, name FROM projects WHERE id = '${escapeSqlite(projectId)}' LIMIT 1;`;
+    const { stdout = '' } = await this.execFile('sqlite3', ['-json', this.stateDb, sql], { maxBuffer: 1024 * 1024 });
+    const project = stdout.trim() ? JSON.parse(stdout)[0] : null;
+    if (!project) throw Object.assign(new Error('项目不存在或已经删除'), { statusCode: 404 });
+    if (String(project.name) !== String(expectedName)) throw Object.assign(new Error('项目名称不匹配，请刷新后重试'), { statusCode: 409 });
+    await this.deleteProject(projectId);
+    for (const [threadId, task] of this.details) {
+      if (task.projectId === projectId) this.details.delete(threadId);
+    }
+    return { deleted: true, projectId, name: project.name, filesDeleted: false };
+  }
+
+  async activeTurnId(threadId) {
+    const sql = `SELECT turn_id, status FROM thread_turns WHERE thread_id = '${escapeSqlite(threadId)}' ORDER BY rollout_ordinal DESC LIMIT 1;`;
+    let stdout = '';
+    try {
+      ({ stdout = '' } = await this.execFile('sqlite3', ['-json', this.historyDb, sql], { maxBuffer: 1024 * 1024 }));
+    } catch (error) {
+      if (isOptionalDataUnavailable(error)) return null;
+      throw error;
+    }
+    if (!stdout.trim()) return null;
+    const latest = JSON.parse(stdout)[0];
+    return latest?.status === 'inProgress' ? latest.turn_id || null : null;
   }
 
   async queueMessage(threadId, message) {
@@ -240,6 +352,10 @@ export function escapeSqlite(value) {
 
 export function isOptionalDataUnavailable(error) {
   const detail = `${error?.message || ''}\n${error?.stderr || ''}`;
-  return /no such table: (?:queue_db\.|history_db\.|goal_db\.|main\.)?(?:queued_items|queued_thread_revisions|thread_turns|thread_items|thread_goals|projects|thread_sections)\b/i.test(detail)
+  return /no such table: (?:queue_db\.|history_db\.|goal_db\.|main\.)?(?:queued_items|queued_thread_revisions|thread_turns|thread_items|thread_goals|projects|project_roots|thread_sections)\b/i.test(detail)
     || /unable to open database(?: file)?/i.test(detail);
+}
+
+export function isClosedTurnError(error) {
+  return /(?:thread|turn|interaction|channel).*(?:closed|completed|interrupted|not found)|(?:closed|completed|interrupted).*(?:thread|turn|interaction|channel)|已关闭|已经关闭|已完成|已中断|找不到.*(?:任务|回合)/i.test(String(error?.message || error || ''));
 }

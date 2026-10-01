@@ -1,5 +1,5 @@
 interface:
-  display_name: "Send to Codex Local Hub"
+  display_name: "Send to Codex Lookout"
   short_description: "Send screenshots and images to the phone delivery inbox"
   brand_color: "#78A8FF"
   default_prompt: "Use $deliver-to-codex-local-hub to send this image to my phone delivery inbox."

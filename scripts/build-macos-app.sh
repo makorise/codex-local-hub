@@ -25,8 +25,8 @@ done
 cp "$project_dir/src/"*.mjs "$server_dir/src/"
 cp "$project_dir/public/"* "$server_dir/public/"
 
-/usr/bin/swiftc -parse-as-library -O -target arm64-apple-macos13 -framework AppKit -framework CoreImage -framework CryptoKit "$project_dir/desktop/UpdateChecker.swift" "$project_dir/desktop/CoreUpdateManager.swift" "$project_dir/desktop/CodexBridgeApp.swift" -o "$stage_dir/CodexLocalHub-arm64"
-/usr/bin/swiftc -parse-as-library -O -target x86_64-apple-macos13 -framework AppKit -framework CoreImage -framework CryptoKit "$project_dir/desktop/UpdateChecker.swift" "$project_dir/desktop/CoreUpdateManager.swift" "$project_dir/desktop/CodexBridgeApp.swift" -o "$stage_dir/CodexLocalHub-x64"
+/usr/bin/swiftc -parse-as-library -O -target arm64-apple-macos13 -framework AppKit -framework CoreImage -framework CryptoKit "$project_dir/desktop/UpdateChecker.swift" "$project_dir/desktop/CoreUpdateManager.swift" "$project_dir/desktop/ServerEnvironment.swift" "$project_dir/desktop/RuntimeHealth.swift" "$project_dir/desktop/CodexBridgeApp.swift" -o "$stage_dir/CodexLocalHub-arm64"
+/usr/bin/swiftc -parse-as-library -O -target x86_64-apple-macos13 -framework AppKit -framework CoreImage -framework CryptoKit "$project_dir/desktop/UpdateChecker.swift" "$project_dir/desktop/CoreUpdateManager.swift" "$project_dir/desktop/ServerEnvironment.swift" "$project_dir/desktop/RuntimeHealth.swift" "$project_dir/desktop/CodexBridgeApp.swift" -o "$stage_dir/CodexLocalHub-x64"
 /usr/bin/lipo -create "$stage_dir/CodexLocalHub-arm64" "$stage_dir/CodexLocalHub-x64" -output "$contents_dir/MacOS/CodexLocalHub"
 /usr/bin/swiftc -O -framework AppKit "$project_dir/desktop/IconGenerator.swift" -o "$stage_dir/icon-generator"
 "$stage_dir/icon-generator" "$stage_dir/icon-1024.png"
@@ -67,4 +67,8 @@ if [[ -e "$target" ]]; then
   mv "$target" "$backup"
 fi
 mv "$app_dir" "$target"
+old_backups=("$dist_dir"/Codex\ Local\ Hub.previous.*.app(Nom[2,-1]))
+for old_backup in "$old_backups[@]"; do
+  /bin/rm -rf "$old_backup"
+done
 echo "$target"

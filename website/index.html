@@ -4,20 +4,28 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#080b12">
-    <meta name="description" content="Codex Lookout is a local-first phone dashboard for monitoring and steering Codex tasks running on your Mac.">
+    <meta name="description" content="Codex Lookout is a local-first phone dashboard for monitoring and continuing existing Codex tasks running on your Mac.">
     <meta name="keywords" content="Codex mobile dashboard, Codex remote control, Codex task monitor, local-first, macOS, open source">
     <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Codex Lookout">
     <meta property="og:title" content="Codex Lookout — Codex on your phone">
     <meta property="og:description" content="Watch tasks, reply, manage queued prompts, and review screenshots from your phone.">
-    <meta property="og:image" content="assets/social-preview.png">
+    <meta property="og:image" content="https://makorise.github.io/codex-local-hub/assets/social-preview.png">
+    <meta property="og:image:width" content="1280">
+    <meta property="og:image:height" content="640">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:locale:alternate" content="zh_CN">
     <meta property="og:url" content="https://makorise.github.io/codex-local-hub/">
     <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Codex Lookout — Codex on your phone">
+    <meta name="twitter:description" content="Monitor and continue existing Codex tasks from your phone, directly over your local network.">
+    <meta name="twitter:image" content="https://makorise.github.io/codex-local-hub/assets/social-preview.png">
     <link rel="canonical" href="https://makorise.github.io/codex-local-hub/">
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="styles.css">
     <title>Codex Lookout — Codex on your phone</title>
     <script type="application/ld+json">
-      {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Codex Lookout","alternateName":"Codex Local Hub","applicationCategory":"DeveloperApplication","operatingSystem":"macOS 15 or later","isAccessibleForFree":true,"license":"https://opensource.org/licenses/MIT","downloadUrl":"https://github.com/makorise/codex-local-hub/releases/latest","codeRepository":"https://github.com/makorise/codex-local-hub","description":"A local-first phone dashboard for monitoring and controlling Codex tasks running on a Mac."}
+      {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Codex Lookout","alternateName":"Codex 瞭望台","applicationCategory":"DeveloperApplication","operatingSystem":"macOS 15 or later","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://opensource.org/licenses/MIT","downloadUrl":"https://github.com/makorise/codex-local-hub/releases/latest","codeRepository":"https://github.com/makorise/codex-local-hub","screenshot":"https://makorise.github.io/codex-local-hub/assets/social-preview.png","featureList":["Monitor Codex tasks from a phone","Continue existing tasks","Manage queued prompts","Review screenshot deliveries"],"description":"A local-first phone dashboard for monitoring and continuing existing Codex tasks running on a Mac."}
     </script>
   </head>
   <body>
@@ -25,7 +33,7 @@
 
     <header class="site-header">
       <a class="brand" href="#top" aria-label="Codex Lookout home"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>Codex Lookout</span></a>
-      <nav aria-label="Primary navigation"><a href="#features" data-i18n="nav.features">Features</a><a href="#how" data-i18n="nav.how">How it works</a><a href="#install" data-i18n="nav.install">Install</a></nav>
+      <nav aria-label="Primary navigation"><a href="#demo" data-i18n="nav.demo">Demo</a><a href="#features" data-i18n="nav.features">Features</a><a href="#how" data-i18n="nav.how">How it works</a><a href="#install" data-i18n="nav.install">Install</a></nav>
       <div class="header-actions">
         <button class="language-button" type="button" aria-label="Switch language"><span data-lang-label>中文</span></button>
         <a class="github-button" href="https://github.com/makorise/codex-local-hub" target="_blank" rel="noreferrer" aria-label="GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .7A11.3 11.3 0 0 0 8.4 22.8c.6.1.8-.2.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.5-1.4-1.3-1.7-1.3-1.7-1.1-.8.1-.8.1-.8 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.4-1.3-5.4-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.1 1.2a10.7 10.7 0 0 1 5.7 0c2.2-1.5 3.1-1.2 3.1-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.8 5.5-5.4 5.8.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6A11.3 11.3 0 0 0 12 .7Z"/></svg></a>
@@ -40,16 +48,34 @@
           <p data-i18n="hero.copy">See progress, reply, reorder queued work, and review screenshots from your phone. Your Codex work stays on your local network.</p>
           <div class="hero-actions">
             <button class="button button-primary" type="button" data-copy-prompt><span data-i18n="hero.install">Copy install prompt</span><span aria-hidden="true">⌘C</span></button>
-            <a class="button button-secondary" href="https://github.com/makorise/codex-local-hub" target="_blank" rel="noreferrer"><span data-i18n="hero.source">View source</span><span aria-hidden="true">↗</span></a>
+            <a class="button button-secondary" href="#demo"><span data-i18n="hero.source">See it in action</span><span aria-hidden="true">↓</span></a>
           </div>
           <div class="hero-notes"><span><i class="dot green"></i><span data-i18n="hero.local">Local network</span></span><span><i class="dot blue"></i><span data-i18n="hero.twoway">Two-way control</span></span><span><i class="dot violet"></i><span data-i18n="hero.open">Open source</span></span></div>
         </div>
 
         <div class="product-preview reveal" aria-label="Codex Lookout product interface">
           <div class="preview-bar"><span></span><span></span><span></span><small>lookout.local</small></div>
-          <img class="desktop-shot" data-product-image="desktop" src="assets/desktop-dashboard.en.png" alt="Codex Lookout desktop dashboard">
-          <div class="phone-shot"><span></span><img data-product-image="mobile" src="assets/mobile-conversation.en.png" alt="Codex Lookout mobile dashboard"></div>
+          <img class="desktop-shot" data-product-image="desktop" data-i18n-alt="image.desktop" src="assets/desktop-dashboard.en.png" alt="Codex Lookout desktop dashboard">
+          <div class="phone-shot"><span></span><img data-product-image="mobile" data-i18n-alt="image.mobileConversation" src="assets/mobile-conversation.en.png" alt="Codex Lookout mobile conversation"></div>
           <div class="live-status"><i></i><span data-i18n="hero.running">3 tasks active</span></div>
+        </div>
+      </section>
+
+      <section class="section demo" id="demo" aria-labelledby="demo-title">
+        <div class="section-head"><div><span class="section-label" data-i18n="demo.label">30-SECOND TOUR</span><h2 id="demo-title" data-i18n="demo.title">The full loop, without returning to your desk.</h2></div><p data-i18n="demo.copy">Real product screens. One local connection. Three simple moves.</p></div>
+        <div class="demo-grid">
+          <article class="demo-card desktop reveal">
+            <div class="demo-visual"><img data-demo-image="host" data-i18n-alt="image.macHost" src="assets/mac-host.en.png" alt="Codex Lookout Mac host with a local phone address"></div>
+            <div class="demo-copy"><span>01</span><div><h3 data-i18n="demo.scan.title">Open locally</h3><p data-i18n="demo.scan.copy">The Mac app shows one phone address for the same Wi-Fi.</p></div></div>
+          </article>
+          <article class="demo-card phone reveal">
+            <div class="demo-visual"><img data-demo-image="dashboard" data-i18n-alt="image.mobileDashboard" src="assets/mobile-dashboard.en.png" alt="Codex Lookout mobile task dashboard"></div>
+            <div class="demo-copy"><span>02</span><div><h3 data-i18n="demo.watch.title">Watch the queue</h3><p data-i18n="demo.watch.copy">See what is active, queued, or finished—grouped by project.</p></div></div>
+          </article>
+          <article class="demo-card phone reveal">
+            <div class="demo-visual"><img data-demo-image="conversation" data-i18n-alt="image.mobileConversation" src="assets/mobile-conversation.en.png" alt="Codex Lookout mobile conversation"></div>
+            <div class="demo-copy"><span>03</span><div><h3 data-i18n="demo.continue.title">Continue a task</h3><p data-i18n="demo.continue.copy">Send the next prompt to an existing task without returning to the Mac.</p></div></div>
+          </article>
         </div>
       </section>
 
@@ -57,14 +83,14 @@
         <div class="section-head"><span class="section-label" data-i18n="features.label">WHAT IT DOES</span><h2 id="features-title" data-i18n="features.title">Only the controls you need.</h2></div>
         <div class="feature-grid">
           <article class="feature-card reveal"><span class="feature-icon blue">◉</span><h3 data-i18n="features.progress.title">Track progress</h3><p data-i18n="features.progress.copy">Running, queued, paused, and finished tasks—grouped by project.</p></article>
-          <article class="feature-card reveal"><span class="feature-icon violet">↗</span><h3 data-i18n="features.reply.title">Reply and steer</h3><p data-i18n="features.reply.copy">Continue a task or send urgent context into the active turn.</p></article>
+          <article class="feature-card reveal"><span class="feature-icon violet">↗</span><h3 data-i18n="features.reply.title">Continue existing tasks</h3><p data-i18n="features.reply.copy">Send follow-up prompts while Codex remains the owner of the task.</p></article>
           <article class="feature-card reveal"><span class="feature-icon amber">≋</span><h3 data-i18n="features.queue.title">Manage the queue</h3><p data-i18n="features.queue.copy">Reorder priorities or remove work you no longer need.</p></article>
           <article class="feature-card reveal"><span class="feature-icon green">▣</span><h3 data-i18n="features.inbox.title">Review results</h3><p data-i18n="features.inbox.copy">Open recent screenshots and visual deliveries on your phone.</p></article>
         </div>
       </section>
 
       <section class="section how" id="how" aria-labelledby="how-title">
-        <div class="how-copy"><span class="section-label" data-i18n="how.label">HOW IT WORKS</span><h2 id="how-title" data-i18n-html="how.title">Your Mac does the work.<br>Your phone stays in reach.</h2><p data-i18n="how.copy">A lightweight local service reads the useful Codex state and sends your actions back to the selected task. No hosted dashboard and no second chat archive.</p></div>
+        <div class="how-copy"><span class="section-label" data-i18n="how.label">HOW IT WORKS</span><h2 id="how-title" data-i18n-html="how.title">Your Mac does the work.<br>Your phone stays in reach.</h2><p data-i18n="how.copy">A lightweight local service reads the useful Codex state and sends your actions back to the selected task. No hosted dashboard and no second chat archive.</p><div class="trust-list"><span><i></i><b data-i18n="trust.local">Local by default</b><small data-i18n="trust.localCopy">No hosted relay</small></span><span><i></i><b data-i18n="trust.bounded">Bounded context</b><small data-i18n="trust.boundedCopy">Only recent visible messages</small></span><a href="https://github.com/makorise/codex-local-hub/blob/main/SECURITY.md" target="_blank" rel="noreferrer"><i></i><b data-i18n="trust.open">Open and auditable</b><small data-i18n="trust.security">Read the security model ↗</small></a></div></div>
         <div class="flow reveal" aria-label="How Codex Lookout works">
           <div class="flow-step"><span>⌘</span><div><strong data-i18n="how.mac">Mac</strong><small data-i18n="how.macCopy">Codex keeps running</small></div></div><i>→</i>
           <div class="flow-step active"><span class="mini-mark"><b></b><b></b><b></b></span><div><strong>Lookout</strong><small data-i18n="how.hubCopy">Syncs on trusted Wi-Fi</small></div></div><i>→</i>
@@ -74,14 +100,14 @@
 
       <section class="section install" id="install" aria-labelledby="install-title">
         <div class="install-card">
-          <div class="install-copy"><span class="section-label" data-i18n="install.label">ONE-MESSAGE INSTALL</span><h2 id="install-title" data-i18n="install.title">Paste once. Codex handles the rest.</h2><p data-i18n="install.copy">The setup skill installs or updates the app, starts it, and verifies phone access.</p><small data-i18n="install.requirements">macOS 15+ · Codex desktop · Same trusted Wi-Fi</small></div>
-          <div class="prompt-box"><div class="prompt-head"><span data-i18n="install.promptLabel">PASTE INTO CODEX</span><button type="button" data-copy-prompt><span data-i18n="install.copyButton">Copy</span><b>⌘C</b></button></div><pre><code data-install-prompt>Use $skill-installer to install https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub, then use $setup-codex-local-hub in this task to install or update Codex Local Hub, launch it, and verify phone access. Preserve existing files and do not change my global Node.js environment.</code></pre></div>
+          <div class="install-copy"><span class="section-label" data-i18n="install.label">ONE-MESSAGE INSTALL</span><h2 id="install-title" data-i18n="install.title">Paste once. Codex handles the rest.</h2><p data-i18n="install.copy">It installs automatically, preserves your data, leaves global Node.js untouched, and verifies phone access.</p><div class="release-line"><small data-i18n="install.requirements">macOS 15+ · Codex desktop · Same trusted Wi-Fi</small><a href="https://github.com/makorise/codex-local-hub/releases/latest" data-latest-release target="_blank" rel="noreferrer"><span data-i18n="install.latest">Latest release</span> <strong data-latest-version></strong></a></div><button class="recovery-link" type="button" data-copy-recovery><span data-i18n="install.recovery">Update stuck? Copy the repair prompt</span><span aria-hidden="true">→</span></button><a class="manual-download" href="https://github.com/makorise/codex-local-hub/releases/latest" target="_blank" rel="noreferrer"><span data-i18n="install.manual">Manual downloads · unsigned preview</span><span aria-hidden="true">↗</span></a></div>
+          <div class="prompt-box"><div class="prompt-head"><span data-i18n="install.promptLabel">PASTE INTO CODEX</span><button type="button" data-copy-prompt><span data-i18n="install.copyButton">Copy</span><b>⌘C</b></button></div><pre><code data-install-prompt>Use $skill-installer to install https://github.com/makorise/codex-local-hub/tree/main/.agents/skills/setup-codex-local-hub, then use $setup-codex-local-hub in this task to automatically install or update Codex Lookout, preserve all existing data and files, leave my global Node.js environment unchanged, launch the app, and verify that my phone can access it.</code></pre></div>
         </div>
-        <p class="compatibility-note" data-i18n="install.compatibility">Downloads keep the Codex Local Hub app name so existing installations can update safely.</p>
+        <p class="compatibility-note" data-i18n="install.compatibility">Previously released as Codex Local Hub. Internal identifiers remain unchanged for update compatibility.</p>
       </section>
     </main>
 
-    <footer><a class="brand" href="#top"><span class="brand-mark small" aria-hidden="true"><i></i><i></i><i></i></span><span>Codex Lookout</span></a><p data-i18n="footer.note">Independent open-source project. Not affiliated with OpenAI.</p><div><a href="https://github.com/makorise/codex-local-hub" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/makorise/codex-local-hub/releases/latest" target="_blank" rel="noreferrer" data-i18n="footer.download">Download</a></div></footer>
+    <footer><a class="brand" href="#top"><span class="brand-mark small" aria-hidden="true"><i></i><i></i><i></i></span><span>Codex Lookout</span></a><p data-i18n="footer.note">Independent open-source project. Not affiliated with OpenAI.</p><div><a href="https://github.com/makorise/codex-local-hub" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/makorise/codex-local-hub/releases/latest" target="_blank" rel="noreferrer" data-i18n="footer.releases">Releases</a><a href="https://github.com/makorise/codex-local-hub/stargazers" target="_blank" rel="noreferrer" data-i18n="footer.star">Star on GitHub</a></div></footer>
 
     <div class="toast" role="status" aria-live="polite" data-toast></div>
     <script type="module" src="app.js"></script>

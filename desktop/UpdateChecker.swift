@@ -81,6 +81,7 @@ enum UpdateCheckResult {
 final class GitHubUpdateChecker {
     static let checkInterval: TimeInterval = 24 * 60 * 60
     static let defaultEndpoint = URL(string: "https://api.github.com/repos/makorise/codex-local-hub/releases/latest")!
+    static let fallbackEndpoint = URL(string: "https://github.com/makorise/codex-local-hub/releases/latest")!
 
     private enum Key {
         static let checkedAt = "CodexLocalHubUpdateCheckedAt"
@@ -99,6 +100,7 @@ final class GitHubUpdateChecker {
     private let defaults: UserDefaults
     private let session: URLSession
     private let endpoint: URL
+    private let fallbackEndpoint: URL
     private let now: () -> Date
 
     init(
@@ -106,12 +108,14 @@ final class GitHubUpdateChecker {
         defaults: UserDefaults = .standard,
         session: URLSession = .shared,
         endpoint: URL = GitHubUpdateChecker.defaultEndpoint,
+        fallbackEndpoint: URL = GitHubUpdateChecker.fallbackEndpoint,
         now: @escaping () -> Date = Date.init
     ) {
         self.currentVersion = SemanticVersion(currentVersion) ?? SemanticVersion("0.0.0")!
         self.defaults = defaults
         self.session = session
         self.endpoint = endpoint
+        self.fallbackEndpoint = fallbackEndpoint
         self.now = now
     }
 
@@ -164,6 +168,15 @@ final class GitHubUpdateChecker {
         )
     }
 
+    func invalidateCache() {
+        defaults.removeObject(forKey: Key.checkedAt)
+        defaults.removeObject(forKey: Key.version)
+        defaults.removeObject(forKey: Key.pageURL)
+        defaults.removeObject(forKey: Key.noStableRelease)
+        store(nil, urlKey: Key.coreURL, nameKey: Key.coreName, digestKey: Key.coreSHA256)
+        store(nil, urlKey: Key.installerURL, nameKey: Key.installerName, digestKey: Key.installerSHA256)
+    }
+
     func check(force: Bool = false, completion: @escaping (UpdateCheckResult) -> Void) {
         let checkedAt = defaults.object(forKey: Key.checkedAt) as? Date
         guard Self.shouldCheck(lastCheckedAt: checkedAt, now: now(), force: force) else {
@@ -181,11 +194,31 @@ final class GitHubUpdateChecker {
         session.dataTask(with: request) { [weak self] data, response, error in
             guard let self else { return }
             if let error {
-                completion(.failed(error.localizedDescription))
+                self.checkFallback(failure: error.localizedDescription, completion: completion)
                 return
             }
             guard let response = response as? HTTPURLResponse else {
-                completion(.failed("Invalid update response"))
+                self.checkFallback(failure: "Invalid update response", completion: completion)
+                return
+            }
+            guard (200..<300).contains(response.statusCode), let data else {
+                self.checkFallback(failure: "GitHub returned HTTP \(response.statusCode)", completion: completion)
+                return
+            }
+            let update = Self.release(from: data, currentVersion: self.currentVersion)
+            self.recordSuccessfulCheck(update: update, noStableRelease: false)
+            completion(update.map(UpdateCheckResult.available) ?? .upToDate)
+        }.resume()
+    }
+
+    private func checkFallback(failure: String, completion: @escaping (UpdateCheckResult) -> Void) {
+        var request = URLRequest(url: fallbackEndpoint, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
+        request.httpMethod = "HEAD"
+        request.setValue("Codex-Local-Hub/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+        session.dataTask(with: request) { [weak self] _, response, error in
+            guard let self else { return }
+            guard error == nil, let response = response as? HTTPURLResponse else {
+                completion(.failed(failure))
                 return
             }
             if response.statusCode == 404 {
@@ -193,13 +226,53 @@ final class GitHubUpdateChecker {
                 completion(.noRelease)
                 return
             }
-            guard (200..<300).contains(response.statusCode), let data else {
-                completion(.failed("GitHub returned HTTP \(response.statusCode)"))
+            guard (200..<300).contains(response.statusCode),
+                  let pageURL = response.url,
+                  let remoteVersion = Self.fallbackVersion(from: pageURL) else {
+                completion(.failed(failure))
                 return
             }
-            let update = Self.release(from: data, currentVersion: self.currentVersion)
+            guard remoteVersion > self.currentVersion else {
+                self.recordSuccessfulCheck(update: nil, noStableRelease: false)
+                completion(.upToDate)
+                return
+            }
+            self.fetchFallbackCore(version: remoteVersion, pageURL: pageURL, completion: completion)
+        }.resume()
+    }
+
+    private static func fallbackVersion(from url: URL) -> SemanticVersion? {
+        let prefix = "/makorise/codex-local-hub/releases/tag/v"
+        guard url.scheme == "https", url.host == "github.com", url.path.hasPrefix(prefix) else { return nil }
+        let suffix = String(url.path.dropFirst(prefix.count))
+        guard !suffix.isEmpty, !suffix.contains("/") else { return nil }
+        return SemanticVersion(suffix)
+    }
+
+    private func fetchFallbackCore(version: SemanticVersion, pageURL: URL, completion: @escaping (UpdateCheckResult) -> Void) {
+        let assetName = "Codex-Local-Hub-core-\(version).zip"
+        let base = "https://github.com/makorise/codex-local-hub/releases/download/v\(version)"
+        guard let assetURL = URL(string: "\(base)/\(assetName)"),
+              let checksumURL = URL(string: "\(base)/\(assetName).sha256") else {
+            completion(.failed("Invalid fallback update URL"))
+            return
+        }
+        var request = URLRequest(url: checksumURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
+        request.setValue("Codex-Local-Hub/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+        session.dataTask(with: request) { [weak self] data, response, _ in
+            guard let self else { return }
+            var coreAsset: UpdateAsset?
+            if let response = response as? HTTPURLResponse,
+               (200..<300).contains(response.statusCode),
+               let data,
+               let value = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+               let digest = value.split(whereSeparator: { $0.isWhitespace }).first.map(String.init)?.lowercased(),
+               digest.count == 64, digest.allSatisfy({ $0.isHexDigit }) {
+                coreAsset = UpdateAsset(name: assetName, url: assetURL, sha256: digest)
+            }
+            let update = UpdateRelease(version: version.description, pageURL: pageURL, coreAsset: coreAsset, installerAsset: nil)
             self.recordSuccessfulCheck(update: update, noStableRelease: false)
-            completion(update.map(UpdateCheckResult.available) ?? .upToDate)
+            completion(.available(update))
         }.resume()
     }
 

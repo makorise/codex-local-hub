@@ -1,6 +1,6 @@
-# Contributing to Codex Local Hub
+# Contributing to Codex Lookout
 
-Thank you for helping improve Codex Local Hub.
+Thank you for helping improve Codex Lookout.
 
 1. Search existing issues before opening a new one.
 2. Keep changes focused and explain the user problem they solve.

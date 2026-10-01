@@ -2,12 +2,19 @@ import { applyTranslations, getLanguage, initializeLanguage, setLanguage, t } fr
 
 const state = {
   tasks: [],
+  projects: [],
   selectedId: null,
   filter: 'all',
   details: new Map(),
   usage: null,
+  activity: null,
+  account: null,
+  version: null,
   deliveries: [],
   syncedAt: null,
+  unreadTaskIds: new Set(),
+  hasSyncedTasks: false,
+  connected: false,
 };
 
 function stripTokenFromUrl() {
@@ -38,10 +45,14 @@ const input = $('#message-input');
 let toastTimer;
 let source;
 let queueNotice = null;
+let optimisticSequence = 0;
+let activityRange = 7;
 
 function api(path) {
   return new URL(path, location.origin);
 }
+
+function ignoreFailure() { return undefined; }
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
@@ -139,24 +150,74 @@ function setProjectCollapsed(name, collapsed) {
   else localStorage.removeItem(projectCollapseKey(name));
 }
 
+function taskReadKey(id) {
+  return `codex-lookout-task-read:${id}`;
+}
+
+function updateUnreadPresentation() {
+  const count = state.unreadTaskIds.size;
+  document.title = count ? t('brand.unreadTitle', { count }) : t('brand.name');
+  return count;
+}
+
+function markTaskRead(task) {
+  if (!task) return false;
+  const changed = state.unreadTaskIds.delete(task.id);
+  localStorage.setItem(taskReadKey(task.id), String(Math.max(0, Number(task.updatedAt) || Date.now())));
+  updateUnreadPresentation();
+  return changed;
+}
+
+function isTaskActivelyViewed(id) {
+  return state.selectedId === id && detailPane.classList.contains('is-open') && !document.hidden;
+}
+
+function syncUnreadTasks(previousTasks, nextTasks, initialSync = false) {
+  const nextIds = new Set(nextTasks.map((task) => task.id));
+  for (const id of state.unreadTaskIds) {
+    if (!nextIds.has(id)) state.unreadTaskIds.delete(id);
+  }
+  nextTasks.forEach((task) => {
+    const previous = previousTasks.get(task.id);
+    const readAt = Math.max(0, Number(localStorage.getItem(taskReadKey(task.id))) || 0);
+    if (isTaskActivelyViewed(task.id)) {
+      markTaskRead(task);
+    } else if (initialSync) {
+      if (readAt && Number(task.updatedAt) > readAt) state.unreadTaskIds.add(task.id);
+      else if (!readAt) localStorage.setItem(taskReadKey(task.id), String(Math.max(0, Number(task.updatedAt) || Date.now())));
+    } else if (!previous || taskViewChanged(previous, task)) {
+      state.unreadTaskIds.add(task.id);
+    }
+  });
+  return updateUnreadPresentation();
+}
+
 function renderTaskCard(task, showProject = false) {
   const project = projectLabel(projectName(task));
+  const unread = state.unreadTaskIds.has(task.id);
+  const model = String(task.model || '').trim();
   return `
-    <button class="task-card ${showProject ? 'shows-project' : ''} ${task.id === state.selectedId ? 'is-selected' : ''}" type="button" data-id="${escapeHtml(task.id)}">
-      <div class="task-card-top">
-        ${showProject ? `<span class="task-project">${escapeHtml(project)}</span>` : ''}
-        <span class="status-pill" data-tone="${escapeHtml(task.progress.tone)}">${escapeHtml(localizedProgress(task))}</span>
+    <button class="task-card ${showProject ? 'shows-project' : ''} ${task.id === state.selectedId ? 'is-selected' : ''} ${unread ? 'is-unread' : ''}" type="button" data-id="${escapeHtml(task.id)}">
+      ${showProject ? `<span class="task-project">${escapeHtml(project)}</span>` : ''}
+      <div class="task-card-head">
+        <h3 title="${escapeHtml(task.title)}">${escapeHtml(task.title)}</h3>
+        <span class="task-card-meta">
+          ${unread ? `<span class="unread-dot" role="status" aria-label="${escapeHtml(t('task.unread'))}" title="${escapeHtml(t('task.unread'))}"></span>` : ''}
+          <span class="status-pill" data-tone="${escapeHtml(task.progress.tone)}">${escapeHtml(localizedProgress(task))}</span>
+          <time>${relativeTime(task.updatedAt)}</time>
+        </span>
       </div>
-      <h3>${escapeHtml(task.title)}</h3>
       <p>${escapeHtml(task.latestTask || t('empty.task'))}</p>
-      <div class="task-card-foot"><span>${escapeHtml(localizedActivity(task))}</span><time>${relativeTime(task.updatedAt)}</time></div>
+      <div class="task-card-foot"><span>${escapeHtml(localizedActivity(task))}</span>${model ? `<span class="task-model" title="${escapeHtml(model)}" aria-label="${escapeHtml(t('task.model', { model }))}">${escapeHtml(model)}</span>` : ''}</div>
     </button>`;
 }
 
 function renderList() {
   const tasks = visibleTasks();
+  updateUnreadPresentation();
   $('#active-count').textContent = state.tasks.filter((task) => task.progress.state === 'running').length;
   $('#queued-count').textContent = state.tasks.reduce((total, task) => total + task.queuedCount, 0);
+  $('#done-count').textContent = state.tasks.filter((task) => task.progress.state === 'done').length;
   $('#task-count').textContent = state.tasks.length;
   if (!tasks.length) {
     list.innerHTML = `<div class="list-empty">${escapeHtml(t('empty.filtered'))}</div>`;
@@ -192,14 +253,67 @@ function renderList() {
 
 function selectTask(id) {
   state.selectedId = id;
+  markTaskRead(state.tasks.find((task) => task.id === id));
   renderList();
   renderDetail();
   detailPane.classList.add('is-open');
   history.replaceState(null, '', `#${id}`);
-  loadDetail(id).catch((error) => showToast(error.message));
+  loadDetail(id, { followLatest: true }).catch((error) => showToast(error.message));
 }
 
-function renderDetail() {
+function captureConversationScroll(followLatest = false) {
+  const scroller = $('.detail-scroll');
+  if (!scroller) return null;
+  const maxScrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+  const scrollerTop = scroller.getBoundingClientRect().top;
+  const anchor = [...$('#recent-messages').querySelectorAll('.message-row')]
+    .find((row) => row.getBoundingClientRect().bottom > scrollerTop + 1);
+  return {
+    followLatest: followLatest || maxScrollTop - scroller.scrollTop <= 8,
+    scrollTop: Math.max(0, scroller.scrollTop),
+    anchorId: anchor?.dataset.messageId || null,
+    anchorOffset: anchor ? anchor.getBoundingClientRect().top - scrollerTop : 0,
+  };
+}
+
+function restoreConversationScroll(snapshot) {
+  if (!snapshot) return;
+  const scroller = $('.detail-scroll');
+  if (!scroller) return;
+  const maxScrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+  if (snapshot.followLatest) {
+    scroller.scrollTop = maxScrollTop;
+    return;
+  }
+  const anchor = snapshot.anchorId
+    ? [...$('#recent-messages').querySelectorAll('.message-row')].find((row) => row.dataset.messageId === snapshot.anchorId)
+    : null;
+  if (anchor) {
+    const currentOffset = anchor.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+    scroller.scrollTop = Math.min(Math.max(0, snapshot.scrollTop + currentOffset - snapshot.anchorOffset), maxScrollTop);
+    return;
+  }
+  scroller.scrollTop = Math.min(snapshot.scrollTop, maxScrollTop);
+}
+
+function messageSignature(messages = []) {
+  return messages.map((message) => [message.id, message.role, message.text, message.timestamp, Boolean(message.pending)].join('\u001f')).join('\u001e');
+}
+
+function scrollConversationToLatest() {
+  const scroller = $('.detail-scroll');
+  if (!scroller) return;
+  const indicator = $('#new-message-indicator');
+  if (!indicator.hidden) {
+    delete $('#recent-messages').dataset.signature;
+    renderDetail({ followLatest: true });
+  }
+  scroller.scrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+  indicator.hidden = true;
+}
+
+function renderDetail({ followLatest = false } = {}) {
+  const scrollSnapshot = captureConversationScroll(followLatest);
   const task = state.tasks.find((item) => item.id === state.selectedId);
   if (!task) {
     detailPane.classList.add('is-empty');
@@ -232,13 +346,32 @@ function renderDetail() {
   $('#queue-card').hidden = queuedTasks.length === 0;
   $('#queue-count-label').textContent = t('queue.count', { count: queuedTasks.length });
   $('#queue-card').setAttribute('aria-label', t('queue.aria', { count: queuedTasks.length }));
-  $('#recent-messages').innerHTML = messages.length ? messages.map((message) => `
-    <div class="message-row ${message.role === 'user' ? 'is-user' : 'is-assistant'}">
-      <div class="message-bubble">
-        <p>${escapeHtml(message.text)}</p>
-        <time>${message.role === 'user' ? t('conversation.user') : 'Codex'} · ${relativeTime(message.timestamp)}</time>
-      </div>
-    </div>`).join('') : `<div class="list-empty">${escapeHtml(t('conversation.loading'))}</div>`;
+  const messageList = $('#recent-messages');
+  const signature = messageSignature(messages);
+  const sameTask = messageList.dataset.taskId === task.id;
+  const previousLastMessageId = sameTask ? messageList.dataset.lastMessageId : '';
+  const lastMessageId = String(messages.at(-1)?.id || '');
+  const receivedNewMessage = previousLastMessageId && lastMessageId && previousLastMessageId !== lastMessageId;
+  if (receivedNewMessage && !scrollSnapshot.followLatest) {
+    $('#new-message-indicator').hidden = false;
+    return;
+  }
+  if (!sameTask || messageList.dataset.signature !== signature) {
+    messageList.innerHTML = messages.length ? messages.map((message) => `
+      <div class="message-row ${message.role === 'user' ? 'is-user' : 'is-assistant'}" data-message-id="${escapeHtml(message.id)}">
+        <div class="message-bubble">
+          <p>${escapeHtml(message.text)}</p>
+          <time>${message.role === 'user' ? t('conversation.user') : 'Codex'} · ${relativeTime(message.timestamp)}</time>
+        </div>
+      </div>`).join('') : `<div class="list-empty">${escapeHtml(t('conversation.loading'))}</div>`;
+    messageList.dataset.taskId = task.id;
+    messageList.dataset.signature = signature;
+    messageList.dataset.lastMessageId = lastMessageId;
+    $('#new-message-indicator').hidden = true;
+    restoreConversationScroll(scrollSnapshot);
+  } else if (followLatest) {
+    scrollConversationToLatest();
+  }
 }
 
 function switchLanguage() {
@@ -246,10 +379,13 @@ function switchLanguage() {
   setLanguage(next);
   localStorage.setItem('codex-local-hub-language-choice', next);
   applyTranslations();
+  delete $('#recent-messages').dataset.signature;
   $('#language-button').textContent = languageButtonLabel();
   renderList();
   renderDetail();
   renderUsage();
+  renderAccount();
+  renderVersion();
   renderDeliveries();
   resetDeliveryClearButton();
   if (state.syncedAt) {
@@ -273,12 +409,19 @@ function renderInstallTip() {
 function registerServiceWorker() {
   const localSecureContext = location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname);
   if (!localSecureContext || !window.navigator.serviceWorker) return Promise.resolve(false);
-  return window.navigator.serviceWorker.register('/service-worker.js').then(() => true).catch(() => false);
+  return window.navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' }).then(async (registration) => {
+    try { await registration.update?.(); } catch { /* The active worker can keep serving this visit. */ }
+    return true;
+  }).catch(() => false);
 }
 
 function updateTasks(payload) {
+  const previousTasks = new Map(state.tasks.map((task) => [task.id, task]));
+  const initialSync = !state.hasSyncedTasks;
   const previous = state.tasks.find((task) => task.id === state.selectedId);
   state.tasks = payload.tasks || [];
+  state.hasSyncedTasks = true;
+  syncUnreadTasks(previousTasks, state.tasks, initialSync);
   state.syncedAt = payload.syncedAt;
   const time = new Date(payload.syncedAt).toLocaleTimeString(getLanguage(), { hour: '2-digit', minute: '2-digit' });
   setConnection(true, t('connection.synced', { time }));
@@ -297,38 +440,192 @@ function taskViewChanged(previous, current) {
   if (!previous || !current) return previous !== current;
   return previous.updatedAt !== current.updatedAt
     || previous.progress.state !== current.progress.state
+    || previous.activity !== current.activity
     || previous.queuedCount !== current.queuedCount
     || previous.latestTask !== current.latestTask
+    || previous.latestResult !== current.latestResult
     || previous.title !== current.title
     || previous.project !== current.project
+    || previous.projectId !== current.projectId
     || previous.goal?.elapsedSeconds !== current.goal?.elapsedSeconds
     || previous.goal?.status?.state !== current.goal?.status?.state;
 }
 
-async function loadDetail(id) {
+async function loadDetail(id, { followLatest = false } = {}) {
   const response = await fetch(api(`/api/tasks/${id}`));
   const payload = await response.json();
   if (!response.ok) throw new Error(localizedError(payload.error, 'error.readTask'));
   state.details.set(id, payload.task);
   if (state.selectedId === id) {
-    renderDetail();
-    requestAnimationFrame(() => {
-      const scroller = $('.detail-scroll');
-      scroller.scrollTop = scroller.scrollHeight;
-    });
+    renderDetail({ followLatest });
   }
 }
 
+async function loadProjects() {
+  const response = await fetch(api('/api/projects'));
+  const payload = await response.json();
+  if (!response.ok) throw new Error(localizedError(payload.error, 'create.failure'));
+  state.projects = payload.projects || [];
+  return state.projects;
+}
+
 function setConnection(online, text) {
+  state.connected = online;
   const dot = $('#connection-dot');
   dot.classList.toggle('is-online', online);
   dot.classList.toggle('is-offline', !online);
   $('#connection-text').textContent = text;
 }
 
+function safeIssueDiagnostics() {
+  return {
+    version: state.version?.currentVersion || 'unknown',
+    service: state.connected ? 'healthy' : 'offline',
+    language: getLanguage(),
+  };
+}
+
+function buildIssueUrl(diagnostics = safeIssueDiagnostics()) {
+  const body = `### What happened\n\nPlease describe the problem.\n\n### Safe diagnostics\n- Codex Lookout: v${diagnostics.version}\n- Service: ${diagnostics.service}\n- Language: ${diagnostics.language}\n\nNo task content, IP address, or local path is included.`;
+  const query = new URLSearchParams({ title: '[Bug]: ', body });
+  return `https://github.com/makorise/codex-local-hub/issues/new?${query}`;
+}
+
+function reportIssue() {
+  const url = buildIssueUrl();
+  window.open(url, '_blank', 'noopener,noreferrer');
+  return url;
+}
+
+function versionStateLabel(version = state.version) {
+  return t(`version.state.${version?.state || 'unavailable'}`);
+}
+
+function renderVersion() {
+  const button = $('#version-button');
+  const version = state.version;
+  button.hidden = !version;
+  if (!version) return;
+  const current = version.currentVersion || t('version.unknown');
+  const latest = version.latestVersion || t('version.unknown');
+  $('#version-current').textContent = `v${current}`;
+  $('#version-state').textContent = versionStateLabel(version);
+  button.classList.toggle('is-update', version.state === 'available');
+  button.setAttribute('aria-label', t('version.aria', { current, status: versionStateLabel(version), latest }));
+}
+
+function renderVersionDetails() {
+  const version = state.version;
+  if (!version) return false;
+  $('#modal-kicker').textContent = t('version.kicker');
+  $('#modal-title').textContent = t('version.title');
+  const current = version.currentVersion || t('version.unknown');
+  const latest = version.latestVersion || t('version.unknown');
+  const canUpdate = version.state === 'available' && version.canUpdate;
+  const requiresDesktop = version.state === 'available' && !version.canUpdate;
+  const modalContent = $('#modal-content');
+  modalContent.className = 'modal-content version-dashboard';
+  modalContent.innerHTML = `<section class="version-card">
+    <span>${escapeHtml(versionStateLabel(version))}</span>
+    <strong>${escapeHtml(t(`version.summary.${version.state || 'unavailable'}`))}</strong>
+    <div class="version-compare">
+      <div class="version-number"><small>${escapeHtml(t('version.current'))}</small><strong>v${escapeHtml(current)}</strong></div>
+      <span class="version-arrow" aria-hidden="true">→</span>
+      <div class="version-number"><small>${escapeHtml(t('version.latest'))}</small><strong>v${escapeHtml(latest)}</strong></div>
+    </div>
+  </section>
+  <div class="version-actions">
+    ${canUpdate ? `<button class="version-action" type="button" data-action="version-update">${escapeHtml(t('version.update', { version: latest }))}</button>` : ''}
+    <button class="version-action secondary" type="button" data-action="version-refresh">${escapeHtml(t('version.check'))}</button>
+  </div>
+  <div class="version-support-actions">
+    <a class="version-action secondary" href="https://github.com/makorise/codex-local-hub" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(t('success.starAria'))}">${escapeHtml(t('success.star'))}</a>
+    <button class="version-action secondary" type="button" data-action="report-issue">${escapeHtml(t('success.report'))}</button>
+  </div>
+  ${requiresDesktop ? `<p class="version-note">${escapeHtml(t('version.requiresDesktop'))}</p>` : ''}
+  <p class="version-note">${escapeHtml(t('version.note'))}</p>`;
+  $('#content-modal').hidden = false;
+  document.body.classList.add('modal-open');
+  return true;
+}
+
+async function loadVersion({ force = false } = {}) {
+  const response = await fetch(api(`/api/version${force ? '?refresh=1' : ''}`));
+  const payload = await response.json();
+  if (!response.ok) throw new Error(localizedError(payload.error, 'version.updateFailure'));
+  state.version = payload.version;
+  renderVersion();
+  return state.version;
+}
+
+async function waitForRuntimeVersion(previousVersion, { attempts = 40, pause = (delay) => new Promise((resolve) => setTimeout(resolve, delay)), fetchImpl = fetch } = {}) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    await pause(1_500);
+    try {
+      const response = await fetchImpl(api('/api/health'), { cache: 'no-store' });
+      if (!response.ok) continue;
+      const health = await response.json();
+      if (health.version && health.version !== previousVersion) return health.version;
+    } catch {
+      // A brief disconnect is expected while the Mac restarts the local service.
+    }
+  }
+  return null;
+}
+
+async function requestPhoneUpdate() {
+  const previousVersion = state.version?.currentVersion;
+  const action = $('#modal-content').querySelector('[data-action="version-update"]');
+  if (action) {
+    action.disabled = true;
+    action.textContent = t('version.updating');
+  }
+  try {
+    const response = await fetch(api('/api/update'), { method: 'POST' });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(localizedError(payload.error, 'version.updateFailure'));
+    if (!payload.accepted) {
+      state.version = payload.version;
+      renderVersion();
+      renderVersionDetails();
+      return false;
+    }
+    state.version = { ...payload.version, state: 'installing' };
+    renderVersion();
+    renderVersionDetails();
+    showToast(t('version.updateAccepted'));
+    const installedVersion = await waitForRuntimeVersion(previousVersion);
+    if (!installedVersion) throw new Error(t('version.updateFailure'));
+    await loadVersion({ force: true });
+    showToast(t('version.updateComplete', { version: installedVersion }));
+    renderVersionDetails();
+    return true;
+  } catch (error) {
+    await loadVersion({ force: true }).catch(() => undefined);
+    renderVersionDetails();
+    showToast(localizedError(error.message, 'version.updateFailure'));
+    return false;
+  }
+}
+
 function formatReset(timestamp) {
   if (!timestamp) return t('usage.unknownReset');
   return new Intl.DateTimeFormat(getLanguage(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(timestamp);
+}
+
+function formatResetCountdown(timestamp, now = Date.now()) {
+  const resetAt = Number(timestamp);
+  const currentTime = Number(now);
+  if (!timestamp || !Number.isFinite(resetAt) || !Number.isFinite(currentTime)) return t('usage.unknownReset');
+  const remainingMs = resetAt - currentTime;
+  if (remainingMs <= 0) return t('usage.resetPending');
+  const totalMinutes = Math.max(1, Math.ceil(remainingMs / 60_000));
+  const days = Math.floor(totalMinutes / 1_440);
+  const hours = Math.floor((totalMinutes % 1_440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days) return t('usage.countdown.daysHours', { days, hours });
+  if (hours) return t('usage.countdown.hoursMinutes', { hours, minutes });
+  return t('usage.countdown.minutes', { minutes });
 }
 
 function usageWindowLabel(limit) {
@@ -341,6 +638,19 @@ function usageWindowLabel(limit) {
   return limit.label || t('usage.window.week');
 }
 
+function formatTokenCount(value) {
+  return new Intl.NumberFormat(getLanguage(), { notation: 'compact', maximumFractionDigits: 1 }).format(Math.max(0, Number(value) || 0));
+}
+
+function renderTodayTokens(usage = state.usage?.todayTokens) {
+  const row = $('#usage-today');
+  row.hidden = !usage?.available;
+  if (row.hidden) return '';
+  const value = usage.recorded ? t('usage.todayValue', { count: formatTokenCount(usage.totalTokens) }) : t('usage.todayEmpty');
+  $('#usage-today-value').textContent = value;
+  return value;
+}
+
 function renderUsage() {
   const card = $('#usage-card');
   const limits = state.usage?.limits || [];
@@ -351,12 +661,26 @@ function renderUsage() {
   const plan = state.usage?.planType || '';
   $('#usage-plan').textContent = plan ? plan[0].toUpperCase() + plan.slice(1) : '';
   const summaries = limits.map((limit) => t('usage.remaining', { window: usageWindowLabel(limit), percent: limit.remainingPercent }));
-  $('#usage-summary').textContent = summaries.join(' · ');
-  $('#usage-reset').textContent = t('usage.reset', { time: formatReset(primary.resetsAt) });
+  $('#usage-summary').textContent = limits.length === 1
+    ? t('usage.overviewSingle', { window: usageWindowLabel(primary) })
+    : t('usage.overviewMultiple', { count: limits.length });
+  $('#usage-reset').textContent = formatReset(primary.resetsAt);
+  const resetCredits = state.usage?.resetCredits;
+  const creditStat = $('#usage-credit-stat');
+  creditStat.hidden = !resetCredits?.availableCount;
+  if (resetCredits?.availableCount) {
+    const expirations = (resetCredits.credits || []).map((credit) => credit.expiresAt).filter(Boolean).sort((a, b) => a - b);
+    $('#usage-credit-value').textContent = t('usage.resetCreditValue', {
+      count: resetCredits.availableCount,
+      time: expirations.length ? formatReset(expirations[0]) : t('usage.unknownExpiry'),
+    });
+  }
   $('#usage-ring-value').textContent = lowest;
   $('#usage-ring').style.setProperty('--remaining', lowest);
   card.dataset.tone = lowest <= 10 ? 'red' : lowest <= 30 ? 'amber' : 'green';
-  card.setAttribute('aria-label', t('usage.aria', { summary: summaries.join(getLanguage() === 'zh-CN' ? '，' : ', ') }));
+  const todaySummary = renderTodayTokens();
+  const currentSummary = summaries.join(getLanguage() === 'zh-CN' ? '，' : ', ');
+  card.setAttribute('aria-label', `${t('usage.aria', { summary: currentSummary })}${todaySummary ? ` · ${t('usage.todayAria', { summary: todaySummary })}` : ''}`);
 }
 
 async function loadUsage() {
@@ -369,6 +693,145 @@ async function loadUsage() {
     state.usage = null;
     renderUsage();
   }
+}
+
+async function loadActivity() {
+  try {
+    const response = await fetch(api('/api/activity'));
+    if (!response.ok) throw new Error(t('activity.loadFailure'));
+    state.activity = (await response.json()).activity;
+  } catch {
+    state.activity = null;
+  }
+  return state.activity;
+}
+
+function activityChartGeometry(days = []) {
+  const series = days.length ? days : [{ turns: 0 }];
+  const max = Math.max(1, ...series.map((day) => Math.max(0, Number(day.turns) || 0)));
+  const points = series.map((day, index) => ({
+    x: 8 + (304 * index) / Math.max(1, series.length - 1),
+    y: 108 - (96 * Math.max(0, Number(day.turns) || 0)) / max,
+  }));
+  const line = points.map((point, index) => `${index ? 'L' : 'M'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
+  const area = `${line} L ${points.at(-1).x.toFixed(2)} 112 L ${points[0].x.toFixed(2)} 112 Z`;
+  return { max, points, line, area };
+}
+
+function activityDayLabel(date) {
+  return new Intl.DateTimeFormat(getLanguage(), { month: 'numeric', day: 'numeric' }).format(new Date(`${date}T12:00:00`));
+}
+
+function renderActivityDashboard(range = activityRange) {
+  const activity = state.activity;
+  if (!activity) return false;
+  activityRange = range === 30 ? 30 : 7;
+  const allDays = activity.days || [];
+  const days = allDays.slice(-activityRange);
+  const chartDays = days.map((day) => ({ ...day, turns: Number(day.completedTurns || 0) }));
+  const chart = activityChartGeometry(chartDays);
+  const peak = chartDays.reduce((best, day) => day.turns > best.turns ? day : best, chartDays[0] || { date: '', turns: 0 });
+  const rangeTurns = chartDays.reduce((sum, day) => sum + day.turns, 0);
+  const rangeActiveDays = chartDays.filter((day) => day.turns > 0).length;
+  const limits = state.usage?.limits || [];
+  const primary = limits[0];
+  const today = state.usage?.todayTokens;
+  const todayTokens = today?.recorded ? formatTokenCount(today.totalTokens) : '—';
+  const duration = formatDuration(Math.round(Number(activity.totalDurationMs || 0) / 1000));
+  const firstDay = days[0]?.date;
+  const middleDay = days[Math.floor(days.length / 2)]?.date || firstDay;
+  const lastDay = days.at(-1)?.date || firstDay;
+  const accountName = state.account?.name || t('activity.localAccount');
+  const resetCredits = state.usage?.resetCredits;
+  const resetWindows = limits.map((limit) => `
+    <article class="activity-limit">
+      <header><span>${escapeHtml(usageWindowLabel(limit))}</span><strong>${limit.remainingPercent}%</strong></header>
+      <div class="activity-limit-track" aria-hidden="true"><i style="--remaining:${limit.remainingPercent}"></i></div>
+      <footer>
+        <span>${escapeHtml(t('usage.resetsIn', { countdown: formatResetCountdown(limit.resetsAt) }))}</span>
+        <time datetime="${limit.resetsAt ? new Date(limit.resetsAt).toISOString() : ''}">${escapeHtml(formatReset(limit.resetsAt))}</time>
+      </footer>
+    </article>`).join('');
+  const resetCreditItems = (resetCredits?.credits || []).map((credit, index) => `
+    <article><span>${escapeHtml(t('activity.resetCreditIndex', { index: index + 1 }))}</span><strong>${escapeHtml(credit.expiresAt ? t('activity.resetCreditExpires', { time: formatReset(credit.expiresAt) }) : t('usage.unknownExpiry'))}</strong></article>`).join('');
+  $('#modal-kicker').textContent = t('activity.kicker');
+  $('#modal-title').textContent = t('activity.title');
+  $('#content-modal .modal-sheet').classList.add('activity-sheet');
+  const modalContent = $('#modal-content');
+  modalContent.className = 'modal-content activity-dashboard';
+  modalContent.innerHTML = `
+    <section class="activity-hero">
+      <div class="activity-hero-glow" aria-hidden="true"></div>
+      <span>${escapeHtml(t('activity.eyebrow', { account: accountName }))}</span>
+      <strong>${escapeHtml(t('activity.hero', { count: activity.completedTurns }))}</strong>
+      <small>${escapeHtml(t('activity.period'))}</small>
+      ${primary ? `<div class="activity-allowance"><i style="--remaining:${primary.remainingPercent}"></i><span>${escapeHtml(t('activity.allowance', { window: usageWindowLabel(primary), percent: primary.remainingPercent }))}</span></div>` : ''}
+    </section>
+    <section class="activity-metrics" aria-label="${escapeHtml(t('activity.metrics'))}">
+      <article><span>${escapeHtml(t('activity.tokensToday'))}</span><strong>${escapeHtml(todayTokens)}</strong><small>tokens</small></article>
+      <article><span>${escapeHtml(t('activity.completedTurns'))}</span><strong>${activity.completedTurns}</strong><small>${escapeHtml(t('activity.turnsUnit'))}</small></article>
+      <article><span>${escapeHtml(t('activity.runTime'))}</span><strong>${escapeHtml(duration)}</strong><small>${escapeHtml(t('activity.localOnly'))}</small></article>
+      <article><span>${escapeHtml(t('activity.projects'))}</span><strong>${activity.projectCount}</strong><small>${escapeHtml(t('activity.projectsUnit'))}</small></article>
+    </section>
+    ${limits.length ? `<section class="activity-limits">
+      <header><div><span>${escapeHtml(t('activity.limits'))}</span><strong>${escapeHtml(t(limits.length === 1 ? 'activity.limitCycleOne' : 'activity.limitCycleOther', { count: limits.length }))}</strong></div><small>${escapeHtml(t('activity.limitHint'))}</small></header>
+      <div class="activity-limit-grid">${resetWindows}</div>
+    </section>` : ''}
+    ${resetCredits?.availableCount ? `<section class="activity-reset-credits">
+      <header><div><span>${escapeHtml(t('activity.resetCredits'))}</span><strong>${escapeHtml(t(resetCredits.availableCount === 1 ? 'activity.resetCreditCountOne' : 'activity.resetCreditCountOther', { count: resetCredits.availableCount }))}</strong></div><small>${escapeHtml(t('activity.resetCreditHint'))}</small></header>
+      ${resetCreditItems ? `<div class="activity-reset-credit-list">${resetCreditItems}</div>` : `<p>${escapeHtml(t('usage.unknownExpiry'))}</p>`}
+    </section>` : ''}
+    <section class="activity-chart-card">
+      <header>
+        <div><span>${escapeHtml(t('activity.rhythm'))}</span><strong>${escapeHtml(t('activity.rhythmSummary', { days: rangeActiveDays, turns: rangeTurns }))}</strong></div>
+        <div class="activity-range" role="group" aria-label="${escapeHtml(t('activity.range'))}">
+          <button type="button" data-action="activity-range" data-range="7" class="${activityRange === 7 ? 'is-active' : ''}">${escapeHtml(t('activity.sevenDays'))}</button>
+          <button type="button" data-action="activity-range" data-range="30" class="${activityRange === 30 ? 'is-active' : ''}">${escapeHtml(t('activity.thirtyDays'))}</button>
+        </div>
+      </header>
+      <div class="activity-chart" aria-label="${escapeHtml(t('activity.chartAria', { count: peak.turns }))}">
+        <svg viewBox="0 0 320 120" preserveAspectRatio="none" role="img">
+          <defs><linearGradient id="activity-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#79aaff" stop-opacity=".34"/><stop offset="1" stop-color="#7964ff" stop-opacity="0"/></linearGradient></defs>
+          <path class="activity-chart-grid" d="M8 12H312 M8 44H312 M8 76H312 M8 108H312" />
+          <path class="activity-chart-area" d="${chart.area}" />
+          <path class="activity-chart-line" d="${chart.line}" />
+          ${chart.points.map((point, index) => index === chart.points.length - 1 ? `<circle cx="${point.x}" cy="${point.y}" r="4" />` : '').join('')}
+        </svg>
+      </div>
+      <div class="activity-chart-labels"><span>${firstDay ? activityDayLabel(firstDay) : ''}</span><span>${middleDay ? activityDayLabel(middleDay) : ''}</span><span>${lastDay ? activityDayLabel(lastDay) : ''}</span></div>
+      <p>${peak.date ? escapeHtml(t('activity.peak', { date: activityDayLabel(peak.date), count: peak.turns })) : escapeHtml(t('activity.noActivity'))}</p>
+    </section>
+    <section class="activity-facts">
+      <article><span>${escapeHtml(t('activity.newTasks'))}</span><strong>${activity.recentTaskCount}</strong></article>
+      <article><span>${escapeHtml(t('activity.activeDays'))}</span><strong>${activity.activeDays}</strong></article>
+      <article><span>${escapeHtml(t('activity.allTasks'))}</span><strong>${activity.taskCount}</strong></article>
+    </section>
+    <p class="activity-note">${escapeHtml(t('activity.note'))}</p>`;
+  $('#content-modal').hidden = false;
+  document.body.classList.add('modal-open');
+  $('#modal-close').focus();
+  return true;
+}
+
+function renderAccount() {
+  const badge = $('#account-badge');
+  const account = state.account;
+  badge.hidden = !account?.available || !account.name;
+  if (badge.hidden) return;
+  $('#account-name').textContent = account.name;
+  $('#account-initial').textContent = account.initial || '#';
+  badge.setAttribute('aria-label', t('account.aria', { name: account.name }));
+}
+
+async function loadAccount() {
+  try {
+    const response = await fetch(api('/api/account'));
+    if (!response.ok) throw new Error('account');
+    state.account = (await response.json()).account;
+  } catch {
+    state.account = null;
+  }
+  renderAccount();
 }
 
 function renderDeliveries() {
@@ -437,16 +900,65 @@ async function loadTasks() {
   updateTasks(await response.json());
 }
 
-async function sendTaskMessage(message) {
-  if (!message || !state.selectedId) return null;
+async function refreshTasks() {
+  const button = $('#refresh-button');
+  const selectedId = state.selectedId;
+  button.disabled = true;
+  button.classList.add('is-refreshing');
+  button.setAttribute('aria-busy', 'true');
+  button.setAttribute('aria-label', t('action.refreshing'));
+  let succeeded = false;
+  try {
+    await loadTasks();
+    if (selectedId) await loadDetail(selectedId);
+    showToast(t('action.refreshed'));
+    succeeded = true;
+  } catch (error) {
+    showToast(localizedError(error.message, 'error.sync'));
+  } finally {
+    button.disabled = false;
+    button.classList.remove('is-refreshing');
+    button.removeAttribute('aria-busy');
+    button.setAttribute('aria-label', t('action.refresh'));
+  }
+  return succeeded;
+}
+
+async function sendTaskMessage(message, threadId = state.selectedId) {
+  if (!message || !threadId) return null;
   const response = await fetch(api('/api/messages'), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ threadId: state.selectedId, message }),
+    body: JSON.stringify({ threadId, message }),
   });
   const result = await response.json();
   if (!response.ok) throw new Error(localizedError(result.error, 'error.send'));
   return result;
+}
+
+function addOptimisticQueueItem(threadId, text) {
+  const full = state.details.get(threadId) || { messages: [], queuedTasks: [] };
+  const queuedTasks = full.queuedTasks || [];
+  const item = {
+    id: `optimistic-${Date.now()}-${++optimisticSequence}`,
+    role: 'user',
+    text,
+    timestamp: Date.now(),
+    pending: true,
+    optimistic: true,
+    queueOrder: queuedTasks.length + 1,
+    queueRevision: queueRevision(queuedTasks),
+  };
+  if (!state.details.has(threadId)) state.details.set(threadId, full);
+  applyQueuedTasks([...queuedTasks, item], threadId);
+  return item.id;
+}
+
+function removeOptimisticQueueItem(threadId, itemId) {
+  const full = state.details.get(threadId);
+  if (!full) return false;
+  applyQueuedTasks((full.queuedTasks || []).filter((item) => item.id !== itemId), threadId);
+  return true;
 }
 
 function connectEvents() {
@@ -480,12 +992,12 @@ function queueRevision(queuedTasks) {
   return queuedTasks[0]?.queueRevision ?? 0;
 }
 
-function applyQueuedTasks(queuedTasks) {
-  const full = state.details.get(state.selectedId);
-  if (full) state.details.set(state.selectedId, { ...full, queuedTasks });
-  state.tasks = state.tasks.map((task) => task.id === state.selectedId ? { ...task, queuedCount: queuedTasks.length } : task);
+function applyQueuedTasks(queuedTasks, threadId = state.selectedId) {
+  const full = state.details.get(threadId);
+  if (full) state.details.set(threadId, { ...full, queuedTasks });
+  state.tasks = state.tasks.map((task) => task.id === threadId ? { ...task, queuedCount: queuedTasks.length } : task);
   renderList();
-  renderDetail();
+  if (threadId === state.selectedId) renderDetail();
 }
 
 function renderQueueManager() {
@@ -493,29 +1005,26 @@ function renderQueueManager() {
   $('#modal-kicker').textContent = t('queue.waiting', { count: queuedTasks.length });
   $('#modal-title').textContent = t('queue.title');
   const modalContent = $('#modal-content');
-  modalContent.className = `modal-content queue-manager${queueNotice?.tone === 'progress' ? ' is-busy' : ''}`;
+  modalContent.className = 'modal-content queue-manager';
   modalContent.innerHTML = queuedTasks.length ? `
     <p class="queue-help">${escapeHtml(t('queue.help'))}</p>
     ${queueNotice ? `<div class="queue-notice" data-tone="${escapeHtml(queueNotice.tone)}" role="status">${escapeHtml(queueNotice.text)}</div>` : ''}
     <ol class="queue-manager-list">
       ${queuedTasks.map((message, index) => `
-        <li data-queue-id="${escapeHtml(message.id)}">
+        <li data-queue-id="${escapeHtml(message.id)}" class="${message.optimistic ? 'is-saving' : ''}">
           <span class="queue-rank"><strong>${index + 1}</strong><small>${escapeHtml(t('queue.priority'))}</small></span>
           <button class="queue-copy" type="button" data-action="expand" aria-label="${escapeHtml(t('queue.expand'))}">
             <strong>${escapeHtml(message.text)}</strong>
-            <small>${relativeTime(message.timestamp)} · ${escapeHtml(t('queue.viewFull'))}</small>
+            <small>${message.optimistic ? escapeHtml(t('queue.saving')) : `${relativeTime(message.timestamp)} · ${escapeHtml(t('queue.viewFull'))}`}</small>
           </button>
           <span class="queue-controls">
-            <button type="button" data-action="up" aria-label="${escapeHtml(t('queue.raise'))}" ${index === 0 ? 'disabled' : ''}>
+            <button type="button" data-action="up" aria-label="${escapeHtml(t('queue.raise'))}" ${index === 0 || message.optimistic ? 'disabled' : ''}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 14 5-5 5 5" /></svg>
             </button>
-            <button type="button" data-action="down" aria-label="${escapeHtml(t('queue.lower'))}" ${index === queuedTasks.length - 1 ? 'disabled' : ''}>
+            <button type="button" data-action="down" aria-label="${escapeHtml(t('queue.lower'))}" ${index === queuedTasks.length - 1 || message.optimistic ? 'disabled' : ''}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
             </button>
-            <button class="queue-steer" type="button" data-action="steer" aria-label="${escapeHtml(t('queue.steer'))}">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 2-8 12h7l-1 8 8-12h-7l1-8Z" /></svg>
-            </button>
-            <button class="queue-delete" type="button" data-action="delete" aria-label="${escapeHtml(t('queue.delete'))}">
+            <button class="queue-delete" type="button" data-action="delete" aria-label="${escapeHtml(t('queue.delete'))}" ${message.optimistic ? 'disabled' : ''}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" /></svg>
               <span>${escapeHtml(t('queue.deleteLabel'))}</span>
             </button>
@@ -524,6 +1033,101 @@ function renderQueueManager() {
     </ol>` : `<div class="queue-empty"><span>✓</span><strong>${escapeHtml(t('queue.emptyTitle'))}</strong><p>${escapeHtml(t('queue.emptyBody'))}</p></div>`;
   $('#content-modal').hidden = false;
   document.body.classList.add('modal-open');
+}
+
+function renderTaskManagement() {
+  const task = state.tasks.find((item) => item.id === state.selectedId);
+  if (!task) return;
+  $('#modal-kicker').textContent = t('manage.kicker');
+  $('#modal-title').textContent = task.title;
+  const modalContent = $('#modal-content');
+  modalContent.className = 'modal-content management-menu';
+  modalContent.innerHTML = `<div class="management-actions">
+    ${task.progress.state === 'running' ? `<button class="management-action" type="button" data-action="stop">
+      <span><strong>${escapeHtml(t('manage.stop'))}</strong><small>${escapeHtml(t('manage.stopHint'))}</small></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z" /></svg>
+    </button>` : ''}
+    <button class="management-action" type="button" data-action="archive">
+      <span><strong>${escapeHtml(t('manage.archive'))}</strong><small>${escapeHtml(t('manage.archiveHint'))}</small></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M6 7v12h12V7M9 11h6M5 4h14v3H5z" /></svg>
+    </button>
+    ${task.projectId ? `<button class="management-action" type="button" data-action="delete-project">
+      <span><strong>${escapeHtml(t('manage.projectDelete'))}</strong><small>${escapeHtml(t('manage.projectDeleteHint'))}</small></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13" /></svg>
+    </button>` : ''}
+  </div>`;
+  $('#content-modal').hidden = false;
+  document.body.classList.add('modal-open');
+}
+
+async function stopSelectedTask() {
+  const taskId = state.selectedId;
+  const response = await fetch(api(`/api/tasks/${taskId}/stop`), { method: 'POST' });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(localizedError(payload.error, 'manage.stopFailure'));
+  closeContent();
+  showToast(t('manage.stopped'));
+  await loadTasks();
+  if (state.tasks.some((task) => task.id === taskId)) await loadDetail(taskId);
+  return payload;
+}
+
+async function archiveSelectedTask() {
+  const taskId = state.selectedId;
+  const response = await fetch(api(`/api/tasks/${taskId}/archive`), { method: 'POST' });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(localizedError(payload.error, 'manage.archiveFailure'));
+  state.tasks = state.tasks.filter((task) => task.id !== taskId);
+  state.details.delete(taskId);
+  state.selectedId = null;
+  closeContent();
+  detailPane.classList.remove('is-open');
+  history.replaceState(null, '', location.pathname + location.search);
+  renderList();
+  renderDetail();
+  showToast(t('manage.archived'));
+  return payload;
+}
+
+async function deleteSelectedProject() {
+  const task = state.tasks.find((item) => item.id === state.selectedId);
+  if (!task?.projectId) throw new Error(t('manage.projectDeleteFailure'));
+  const response = await fetch(api(`/api/projects/${task.projectId}`), {
+    method: 'DELETE',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: task.project }),
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(localizedError(payload.error, 'manage.projectDeleteFailure'));
+  closeContent();
+  await loadTasks();
+  if (state.tasks.some((item) => item.id === state.selectedId)) await loadDetail(state.selectedId);
+  showToast(t('manage.projectDeleted'));
+  return payload;
+}
+
+async function handleManagementAction(button) {
+  const action = button.dataset.action;
+  if (action === 'delete-project' && !button.dataset.confirming) {
+    button.dataset.confirming = 'true';
+    button.classList.add('is-confirming');
+    button.querySelector('strong').textContent = t('manage.confirmProject');
+    return false;
+  }
+  const content = $('#modal-content');
+  content.classList.add('is-busy');
+  let succeeded = false;
+  try {
+    if (action === 'stop') await stopSelectedTask();
+    if (action === 'archive') await archiveSelectedTask();
+    if (action === 'delete-project') await deleteSelectedProject();
+    succeeded = true;
+  } catch (error) {
+    const fallback = action === 'stop' ? 'manage.stopFailure' : action === 'archive' ? 'manage.archiveFailure' : 'manage.projectDeleteFailure';
+    showToast(localizedError(error.message, fallback));
+  }
+  content.classList.remove('is-busy');
+  return succeeded;
 }
 
 async function reorderQueue(itemId, direction) {
@@ -559,31 +1163,15 @@ async function deleteQueueItem(itemId) {
   showToast(t('queue.deleted'));
 }
 
-async function steerQueueItem(itemId) {
-  const queuedTasks = state.details.get(state.selectedId)?.queuedTasks || [];
-  queueNotice = { tone: 'progress', text: t('queue.steering') };
-  renderQueueManager();
-  const response = await fetch(api(`/api/tasks/${state.selectedId}/queue/${itemId}/steer`), {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ revision: queueRevision(queuedTasks) }),
-  });
-  const payload = await response.json();
-  if (!response.ok) throw new Error(localizedError(payload.error, 'queue.steerFailure'));
-  queueNotice = { tone: 'success', text: t('queue.steered') };
-  applyQueuedTasks(payload.queuedTasks);
-  renderQueueManager();
-  showToast(t('queue.steeredToast'));
-}
-
 function closeContent() {
   $('#content-modal').hidden = true;
+  $('#content-modal .modal-sheet').classList.remove('activity-sheet');
   document.body.classList.remove('modal-open');
 }
 
 function resizeComposer() {
   const scroller = $('.detail-scroll');
-  const keepAtBottom = scroller && scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop < 32;
+  const keepAtBottom = scroller && scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop <= 8;
   input.style.height = 'auto';
   input.style.height = `${Math.min(input.scrollHeight, 96)}px`;
   if (keepAtBottom) requestAnimationFrame(() => { scroller.scrollTop = scroller.scrollHeight; });
@@ -593,17 +1181,24 @@ $('#message-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const message = input.value.trim();
   if (!message || !state.selectedId) return;
+  const threadId = state.selectedId;
+  const optimisticId = addOptimisticQueueItem(threadId, message);
+  input.value = '';
+  resizeComposer();
   const button = $('#send-button');
   button.disabled = true;
-  $('#composer-hint').textContent = t('composer.sending');
+  $('#composer-hint').textContent = t('composer.saving');
   try {
-    const result = await sendTaskMessage(message);
-    input.value = '';
-    resizeComposer();
-    const started = result.mode === 'started';
-    showToast(t(started ? 'composer.startedToast' : 'composer.queuedToast'));
-    $('#composer-hint').textContent = t(started ? 'composer.startedHint' : 'composer.queuedHint');
+    await sendTaskMessage(message, threadId);
+    showToast(t('composer.queuedToast'));
+    $('#composer-hint').textContent = t('composer.queuedHint');
+    await loadDetail(threadId, { followLatest: true }).catch(() => undefined);
   } catch (error) {
+    removeOptimisticQueueItem(threadId, optimisticId);
+    if (!input.value.trim() && state.selectedId === threadId) {
+      input.value = message;
+      resizeComposer();
+    }
     showToast(localizedError(error.message, 'error.send'));
     $('#composer-hint').textContent = t('composer.failure');
   } finally {
@@ -614,6 +1209,7 @@ $('#message-form').addEventListener('submit', async (event) => {
 input.addEventListener('input', resizeComposer);
 $('#language-button').textContent = languageButtonLabel();
 $('#language-button').addEventListener('click', switchLanguage);
+$('#version-button').addEventListener('click', renderVersionDetails);
 $('#install-help').addEventListener('click', () => showContent(t('install.helpTitle'), t('install.helpBody')));
 $('#install-dismiss').addEventListener('click', () => {
   localStorage.setItem('codex-local-hub-install-dismissed', '1');
@@ -639,7 +1235,7 @@ document.querySelectorAll('.filter').forEach((button) => button.addEventListener
   document.querySelectorAll('.filter').forEach((item) => item.classList.toggle('is-active', item === button));
   renderList();
 }));
-$('#refresh-button').addEventListener('click', () => loadTasks().catch((error) => showToast(error.message)));
+$('#refresh-button').addEventListener('click', refreshTasks);
 $('#delivery-list').addEventListener('click', (event) => {
   const button = event.target.closest('[data-delivery-id]');
   const delivery = state.deliveries.find((item) => item.id === button?.dataset.deliveryId);
@@ -677,10 +1273,33 @@ $('#queue-card').addEventListener('click', () => {
     renderQueueManager();
   }
 });
+$('#task-menu-button').addEventListener('click', renderTaskManagement);
 $('#modal-content').addEventListener('click', async (event) => {
   const button = event.target.closest('[data-action]');
+  if (!button) return;
+  if (button.dataset.action === 'activity-range') {
+    renderActivityDashboard(Number(button.dataset.range));
+    return;
+  }
+  if (button.dataset.action === 'version-refresh') {
+    button.disabled = true;
+    await loadVersion({ force: true }).then(renderVersionDetails).catch((error) => showToast(localizedError(error.message, 'version.updateFailure')));
+    return;
+  }
+  if (button.dataset.action === 'version-update') {
+    await requestPhoneUpdate();
+    return;
+  }
+  if (button.dataset.action === 'report-issue') {
+    reportIssue();
+    return;
+  }
+  if ($('#modal-content').classList.contains('management-menu')) {
+    await handleManagementAction(button);
+    return;
+  }
   const row = button?.closest('[data-queue-id]');
-  if (!button || !row || !$('#modal-content').classList.contains('queue-manager')) return;
+  if (!row || !$('#modal-content').classList.contains('queue-manager')) return;
   const action = button.dataset.action;
   if (action === 'expand') {
     row.classList.toggle('is-expanded');
@@ -697,7 +1316,6 @@ $('#modal-content').addEventListener('click', async (event) => {
   try {
     if (action === 'up') await reorderQueue(row.dataset.queueId, -1);
     if (action === 'down') await reorderQueue(row.dataset.queueId, 1);
-    if (action === 'steer') await steerQueueItem(row.dataset.queueId);
     if (action === 'delete') await deleteQueueItem(row.dataset.queueId);
   } catch (error) {
     await loadDetail(state.selectedId).catch(() => undefined);
@@ -715,29 +1333,38 @@ $('#goal-card').addEventListener('click', () => {
     elapsed: formatDuration(goal.elapsedSeconds),
   }));
 });
-$('#usage-card').addEventListener('click', () => {
-  const limits = state.usage?.limits || [];
-  if (!limits.length) return;
-  const rows = limits.map((limit) => `${t('usage.used', {
-    window: usageWindowLabel(limit),
-    used: limit.usedPercent,
-    remaining: limit.remainingPercent,
-  })}\n${t('usage.reset', { time: formatReset(limit.resetsAt) })}`);
-  showContent(t('usage.title'), `${rows.join('\n\n')}${state.usage.planType ? `\n\n${t('usage.plan', { plan: state.usage.planType })}` : ''}`);
+$('#usage-card').addEventListener('click', async () => {
+  if (!state.activity) await loadActivity();
+  if (!renderActivityDashboard()) showToast(t('activity.loadFailure'));
 });
 $('#modal-close').addEventListener('click', closeContent);
 $('.modal-backdrop').addEventListener('click', closeContent);
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeContent(); });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    markTaskRead(state.tasks.find((task) => task.id === state.selectedId));
+    renderList();
+  }
+});
+$('#new-message-indicator').addEventListener('click', scrollConversationToLatest);
+$('.detail-scroll').addEventListener('scroll', () => {
+  const scroller = $('.detail-scroll');
+  if (scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop <= 8) scrollConversationToLatest();
+}, { passive: true });
 
 async function startDashboard() {
   renderInstallTip();
   registerServiceWorker();
   try {
-    await loadTasks();
+    await Promise.all([loadTasks(), loadProjects()]);
     connectEvents();
     loadUsage();
+    loadVersion().catch(ignoreFailure);
+    loadActivity();
+    loadAccount();
     loadDeliveries();
     setInterval(loadUsage, 60_000);
+    setInterval(loadActivity, 60_000);
     setInterval(loadDeliveries, 5_000);
   } catch (error) {
     setConnection(false, t('connection.offline'));
@@ -753,6 +1380,7 @@ export {
   preferredLanguage,
   stripTokenFromUrl,
   api,
+  ignoreFailure,
   escapeHtml,
   relativeTime,
   localizedProgress,
@@ -769,10 +1397,19 @@ export {
   projectCollapseKey,
   isProjectCollapsed,
   setProjectCollapsed,
+  taskReadKey,
+  updateUnreadPresentation,
+  markTaskRead,
+  isTaskActivelyViewed,
+  syncUnreadTasks,
   renderTaskCard,
   renderList,
   selectTask,
   renderDetail,
+  captureConversationScroll,
+  restoreConversationScroll,
+  messageSignature,
+  scrollConversationToLatest,
   switchLanguage,
   languageButtonLabel,
   shouldShowInstallTip,
@@ -781,11 +1418,30 @@ export {
   updateTasks,
   taskViewChanged,
   loadDetail,
+  loadProjects,
   setConnection,
+  safeIssueDiagnostics,
+  buildIssueUrl,
+  reportIssue,
+  versionStateLabel,
+  renderVersion,
+  renderVersionDetails,
+  loadVersion,
+  waitForRuntimeVersion,
+  requestPhoneUpdate,
   formatReset,
+  formatResetCountdown,
   usageWindowLabel,
+  formatTokenCount,
+  renderTodayTokens,
   renderUsage,
   loadUsage,
+  loadActivity,
+  activityChartGeometry,
+  activityDayLabel,
+  renderActivityDashboard,
+  renderAccount,
+  loadAccount,
   renderDeliveries,
   deliverySignature,
   loadDeliveries,
@@ -793,16 +1449,23 @@ export {
   clearDeliveries,
   showDelivery,
   loadTasks,
+  refreshTasks,
   sendTaskMessage,
+  addOptimisticQueueItem,
+  removeOptimisticQueueItem,
   connectEvents,
   showToast,
   showContent,
   queueRevision,
   applyQueuedTasks,
   renderQueueManager,
+  renderTaskManagement,
+  stopSelectedTask,
+  archiveSelectedTask,
+  deleteSelectedProject,
+  handleManagementAction,
   reorderQueue,
   deleteQueueItem,
-  steerQueueItem,
   closeContent,
   resizeComposer,
   startDashboard,

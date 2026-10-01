@@ -1,6 +1,6 @@
 {
-  "name": "Codex Local Hub",
-  "short_name": "Codex Hub",
+  "name": "Codex Lookout",
+  "short_name": "Lookout",
   "description": "A local-first mobile dashboard for Codex tasks.",
   "start_url": "/",
   "scope": "/",
