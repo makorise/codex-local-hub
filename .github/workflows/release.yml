@@ -51,8 +51,8 @@ jobs:
           npm run package:mac
       - name: Verify installer and checksum
         run: |
-          dmg="dist/Codex-Lookout-$(node -p "require('./package.json').version")-universal.dmg"
-          shasum -a 256 "$dmg" > "$dmg.sha256"
+          dmg="Codex-Lookout-$(node -p "require('./package.json').version")-universal.dmg"
+          (cd dist && shasum -a 256 "$dmg" > "$dmg.sha256" && shasum -a 256 -c "$dmg.sha256")
           codesign --verify --deep --strict --verbose=2 "dist/Codex Local Hub.app"
       - name: Publish stable notarized release
         if: ${{ env.DEVELOPER_ID_APPLICATION != '' && env.APPLE_ID != '' && env.APPLE_TEAM_ID != '' && env.APPLE_APP_SPECIFIC_PASSWORD != '' }}
@@ -73,7 +73,7 @@ jobs:
           version="$(node -p "require('./package.json').version")"
           preview="dist/Codex-Lookout-$version-universal-unsigned-preview.dmg"
           mv "dist/Codex-Lookout-$version-universal.dmg" "$preview"
-          shasum -a 256 "$preview" > "$preview.sha256"
+          (cd dist && shasum -a 256 "${preview#dist/}" > "${preview#dist/}.sha256" && shasum -a 256 -c "${preview#dist/}.sha256")
           assets=("$preview#Unsigned universal DMG preview" "$preview.sha256#DMG preview SHA-256")
           if [[ -f "dist/Codex-Local-Hub-core-$version.zip" ]]; then
             assets+=("dist/Codex-Local-Hub-core-$version.zip#Core hot update" "dist/Codex-Local-Hub-core-$version.zip.sha256#Core SHA-256")

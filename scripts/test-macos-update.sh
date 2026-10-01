@@ -7,6 +7,7 @@ trap '/bin/rm -rf "$test_dir"' EXIT
 
 CORE_VERSION=0.2.3 CORE_MINIMUM_HOST_VERSION=0.2.2 "$project_dir/scripts/package-core.sh" >/dev/null
 core_archive="$project_dir/dist/Codex-Local-Hub-core-0.2.3.zip"
+(cd "$project_dir/dist" && /usr/bin/shasum -a 256 -c "${core_archive:t}.sha256" >/dev/null)
 core_checksum="$(/usr/bin/shasum -a 256 "$core_archive" | /usr/bin/awk '{print $1}')"
 CORE_VERSION=0.2.4 CORE_MINIMUM_HOST_VERSION=0.2.2 "$project_dir/scripts/package-core.sh" >/dev/null
 next_core_archive="$project_dir/dist/Codex-Local-Hub-core-0.2.4.zip"

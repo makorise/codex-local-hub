@@ -15,5 +15,5 @@ cp "$project_dir/public/"* "$stage_dir/public/"
 /usr/bin/printf '{"schemaVersion":1,"version":"%s","minimumHostVersion":"%s"}\n' "$version" "$minimum_host" > "$stage_dir/core-manifest.json"
 /bin/rm -f "$archive" "$archive.sha256"
 (cd "$stage_dir" && /usr/bin/zip -qry "$archive" core-manifest.json src public)
-/usr/bin/shasum -a 256 "$archive" > "$archive.sha256"
+(cd "$dist_dir" && /usr/bin/shasum -a 256 "${archive:t}" > "${archive:t}.sha256")
 echo "$archive"
