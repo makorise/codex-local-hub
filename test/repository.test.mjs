@@ -218,7 +218,7 @@ test('activity summary reports a truthful 30-day work rhythm and safe empty fall
       calls += 1;
       if (calls === 1) {
         assert.match(args[2], /FROM thread_turns/);
-        return { stdout: JSON.stringify([{ date: '2026-09-28', turns: 5, completed_turns: 4, duration_ms: 90_000 }]) };
+        return { stdout: JSON.stringify([{ date: '2026-09-28', turns: 5, task_count: 2, completed_turns: 4, duration_ms: 90_000 }]) };
       }
       assert.match(args[2], /AS project_count/);
       return { stdout: JSON.stringify([{ project_count: 3, task_count: 12, recent_task_count: 7, archived_task_count: 2 }]) };
@@ -226,7 +226,7 @@ test('activity summary reports a truthful 30-day work rhythm and safe empty fall
   });
   const summary = await repository.activitySummary();
   assert.equal(summary.days.length, 30);
-  assert.deepEqual(summary.days.at(-1), { date: '2026-09-28', turns: 5, completedTurns: 4, durationMs: 90_000 });
+  assert.deepEqual(summary.days.at(-1), { date: '2026-09-28', turns: 5, taskCount: 2, completedTurns: 4, durationMs: 90_000 });
   assert.equal(summary.activeDays, 1);
   assert.equal(summary.totalTurns, 5);
   assert.equal(summary.completedTurns, 4);

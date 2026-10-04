@@ -2,6 +2,13 @@
 
 All notable changes to Codex Lookout will be documented in this file.
 
+## 0.2.47 - 2026-10-04
+
+- Added a compact first-success share card to the connected version view, showing privacy-safe daily task progress and estimated waiting time saved.
+- Counts today’s distinct active tasks directly from local Codex turn metadata and never includes task content, account data, IP addresses, or local paths in shared text.
+- Uses the native phone share sheet with a clipboard fallback, with complete Simplified Chinese and English copy.
+- Refined the card across desktop, 390px mobile, and 320px narrow-phone layouts while retaining full line, branch, and function coverage.
+
 ## 0.2.46 - 2026-10-01
 
 - Consolidated the post-0.2.45 phone experience into a stable release: task model labels, compact allowance reset details, and a clearer single status hierarchy.

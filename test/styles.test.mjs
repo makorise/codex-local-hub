@@ -19,6 +19,10 @@ test('task pane has bounded desktop and touch scrolling styles', () => {
   assert.match(styles, /\.account-badge span \{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/);
   assert.match(styles, /\.version-support-actions \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
   assert.match(styles, /\.version-action \{[^}]*display: flex;[^}]*align-items: center;[^}]*justify-content: center;/);
+  assert.match(styles, /\.version-dashboard \{[^}]*grid-auto-rows: max-content;[^}]*align-content: start;/);
+  assert.match(styles, /\.success-share-card \{[^}]*min-height: 66px;[^}]*grid-template-columns: 36px minmax\(0, 1fr\) auto;/);
+  assert.match(styles, /@media \(max-width: 360px\)[\s\S]*\.success-share-card \{[^}]*grid-template-columns: minmax\(0, 1fr\) auto;/);
+  assert.match(styles, /@media \(max-width: 360px\)[\s\S]*\.success-share-mark \{[^}]*display: none;/);
   assert.doesNotMatch(html, /id="success-card"/);
   assert.match(html, /<div class="brand-title-row">[\s\S]*<h1[^>]*>[^<]+<\/h1>[\s\S]*<button id="version-button"/);
   assert.doesNotMatch(html, /<p>[\s\S]*?<button id="version-button"[\s\S]*?<\/p>/);

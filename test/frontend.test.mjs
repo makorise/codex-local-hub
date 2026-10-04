@@ -16,10 +16,10 @@ test('unsupported task creation and steer controls are absent from the phone UI'
   assert.match(css, /\.connection-dot\s*\{[^}]*flex:\s*0 0 7px;/s);
   const mobileCss = css.slice(css.indexOf('@media (max-width: 760px)'));
   assert.match(mobileCss, /\.modal-sheet\s*\{[^}]*max-height:\s*calc\(100dvh - max\(8px, env\(safe-area-inset-top\)\)\);/s);
-  assert.match(html, /styles\.css\?v=49/);
-  assert.match(html, /app\.js\?v=51/);
-  assert.match(serviceWorker, /styles\.css\?v=49/);
-  assert.match(serviceWorker, /app\.js\?v=51/);
+  assert.match(html, /styles\.css\?v=50/);
+  assert.match(html, /app\.js\?v=52/);
+  assert.match(serviceWorker, /styles\.css\?v=50/);
+  assert.match(serviceWorker, /app\.js\?v=52/);
   assert.match(serviceWorker, /['"]\/i18n\.js['"]/);
 });
 
@@ -68,6 +68,7 @@ function activitySummary(overrides = {}) {
     return {
       date: date.toISOString().slice(0, 10),
       turns: index % 4,
+      taskCount: index % 3,
       completedTurns: index % 5,
       durationMs: (index % 5) * 60_000,
     };
@@ -221,6 +222,42 @@ test('frontend renders tasks, details, usage and every queue interaction', async
   assert.equal(document.querySelector('#modal-title').textContent, 'Codex 瞭望台版本');
   assert.match(document.querySelector('.version-card').textContent, /最新正式版/);
   assert.match(document.querySelector('.version-support-actions a').href, /github\.com\/makorise\/codex-local-hub/);
+  assert.match(document.querySelector('.success-share-card').textContent, /Codex Lookout 已连接/);
+  assert.match(document.querySelector('.success-share-card').textContent, /约节省等待/);
+  assert.deepEqual(ui.successShareSnapshot({ days: [{ taskCount: 3, durationMs: 149_999 }] }), { taskCount: 3, savedMinutes: 2 });
+  assert.deepEqual(ui.successShareSnapshot({ days: [{ completedTurns: 2, durationMs: -1 }] }), { taskCount: 2, savedMinutes: 0 });
+  assert.deepEqual(ui.successShareSnapshot({ days: [{ taskCount: -1, completedTurns: 9, durationMs: 'bad' }] }), { taskCount: 0, savedMinutes: 0 });
+  assert.deepEqual(ui.successShareSnapshot({}), { taskCount: 0, savedMinutes: 0 });
+  assert.match(ui.successShareText({ days: [{ taskCount: 3, durationMs: 120_000 }] }), /今日处理 3 个任务 · 约节省等待 2 分钟/);
+  const shared = [];
+  assert.equal(await ui.shareSuccessCard({ navigatorObject: { share: async (value) => shared.push(value) } }), 'shared');
+  assert.match(shared[0].text, /Local-first · Runs on your Mac/);
+  assert.equal(await ui.shareSuccessCard({ navigatorObject: { share: async () => { throw Object.assign(new Error('cancel'), { name: 'AbortError' }); } } }), false);
+  const copied = [];
+  assert.equal(await ui.shareSuccessCard({ navigatorObject: {
+    share: async () => { throw new Error('native unavailable'); },
+    clipboard: { writeText: async (value) => copied.push(value) },
+  } }), 'copied');
+  assert.equal(copied.length, 1);
+  assert.equal(await ui.shareSuccessCard({ navigatorObject: {} }), false);
+  Object.defineProperty(dom.window.navigator, 'share', { configurable: true, value: async () => undefined });
+  document.querySelector('[data-action="share-success"]').click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(document.querySelector('#toast').textContent, /分享卡片已打开/);
+  Object.defineProperty(dom.window.navigator, 'share', { configurable: true, value: undefined });
+  Object.defineProperty(dom.window.navigator, 'clipboard', { configurable: true, value: { writeText: async () => undefined } });
+  document.querySelector('[data-action="share-success"]').click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(document.querySelector('#toast').textContent, /分享文案已复制/);
+  Object.defineProperty(dom.window.navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('denied'); } } });
+  document.querySelector('[data-action="share-success"]').click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(document.querySelector('#toast').textContent, /暂不支持分享/);
+  ui.setConnection(false, '离线');
+  ui.renderVersionDetails();
+  assert.equal(document.querySelector('.success-share-card'), null);
+  ui.setConnection(true, '已同步');
+  ui.renderVersionDetails();
   document.querySelector('[data-action="report-issue"]').click();
   assert.equal(openedUrls.length, 1);
   const issueUrl = new URL(openedUrls[0][0]);

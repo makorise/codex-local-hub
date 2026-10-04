@@ -501,6 +501,36 @@ function versionStateLabel(version = state.version) {
   return t(`version.state.${version?.state || 'unavailable'}`);
 }
 
+function successShareSnapshot(activity = state.activity) {
+  const today = activity?.days?.at(-1) || {};
+  return {
+    taskCount: Math.max(0, Number(today.taskCount ?? today.completedTurns) || 0),
+    savedMinutes: Math.max(0, Math.round((Number(today.durationMs) || 0) / 60_000)),
+  };
+}
+
+function successShareText(activity = state.activity) {
+  const snapshot = successShareSnapshot(activity);
+  return `${t('share.title')}\n${t('share.summary', snapshot)}\n${t('share.foot')}\nhttps://makorise.github.io/codex-local-hub/`;
+}
+
+async function shareSuccessCard({ navigatorObject = window.navigator } = {}) {
+  const share = { title: t('share.title'), text: successShareText() };
+  if (typeof navigatorObject.share === 'function') {
+    try {
+      await navigatorObject.share(share);
+      return 'shared';
+    } catch (error) {
+      if (error?.name === 'AbortError') return false;
+    }
+  }
+  if (typeof navigatorObject.clipboard?.writeText === 'function') {
+    await navigatorObject.clipboard.writeText(share.text);
+    return 'copied';
+  }
+  return false;
+}
+
 function renderVersion() {
   const button = $('#version-button');
   const version = state.version;
@@ -523,9 +553,19 @@ function renderVersionDetails() {
   const latest = version.latestVersion || t('version.unknown');
   const canUpdate = version.state === 'available' && version.canUpdate;
   const requiresDesktop = version.state === 'available' && !version.canUpdate;
+  const shareSnapshot = successShareSnapshot();
+  const shareCard = state.connected ? `<section class="success-share-card" aria-label="${escapeHtml(t('share.aria'))}">
+    <div class="success-share-mark" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="success-share-copy">
+      <strong>${escapeHtml(t('share.title'))}</strong>
+      <span>${escapeHtml(t('share.summary', shareSnapshot))}</span>
+      <small>${escapeHtml(t('share.foot'))}</small>
+    </div>
+    <button type="button" data-action="share-success" aria-label="${escapeHtml(t('share.actionAria'))}">${escapeHtml(t('share.action'))}</button>
+  </section>` : '';
   const modalContent = $('#modal-content');
   modalContent.className = 'modal-content version-dashboard';
-  modalContent.innerHTML = `<section class="version-card">
+  modalContent.innerHTML = `${shareCard}<section class="version-card">
     <span>${escapeHtml(versionStateLabel(version))}</span>
     <strong>${escapeHtml(t(`version.summary.${version.state || 'unavailable'}`))}</strong>
     <div class="version-compare">
@@ -1294,6 +1334,11 @@ $('#modal-content').addEventListener('click', async (event) => {
     reportIssue();
     return;
   }
+  if (button.dataset.action === 'share-success') {
+    const result = await shareSuccessCard().catch(() => false);
+    showToast(t(result === 'shared' ? 'share.shared' : result === 'copied' ? 'share.copied' : 'share.failure'));
+    return;
+  }
   if ($('#modal-content').classList.contains('management-menu')) {
     await handleManagementAction(button);
     return;
@@ -1424,6 +1469,9 @@ export {
   buildIssueUrl,
   reportIssue,
   versionStateLabel,
+  successShareSnapshot,
+  successShareText,
+  shareSuccessCard,
   renderVersion,
   renderVersionDetails,
   loadVersion,

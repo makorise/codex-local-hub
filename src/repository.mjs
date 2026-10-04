@@ -122,7 +122,7 @@ export class CodexRepository {
       return `${year}-${month}-${day}`;
     });
     const start = new Date(`${days[0]}T00:00:00`).getTime();
-    const historySql = `ATTACH DATABASE '${escapeSqlite(this.stateDb)}' AS state_db; SELECT strftime('%Y-%m-%d', ht.started_at, 'unixepoch', 'localtime') AS date, COUNT(*) AS turns, SUM(CASE WHEN ht.status = 'completed' THEN 1 ELSE 0 END) AS completed_turns, SUM(COALESCE(ht.duration_ms, 0)) AS duration_ms FROM thread_turns ht JOIN state_db.threads t ON t.id = ht.thread_id WHERE ht.started_at >= ${Math.floor(start / 1000)} AND t.preview <> '' AND (t.thread_source = 'user' OR (t.thread_source IS NULL AND t.originator = 'Codex Desktop')) GROUP BY date ORDER BY date ASC;`;
+    const historySql = `ATTACH DATABASE '${escapeSqlite(this.stateDb)}' AS state_db; SELECT strftime('%Y-%m-%d', ht.started_at, 'unixepoch', 'localtime') AS date, COUNT(*) AS turns, COUNT(DISTINCT ht.thread_id) AS task_count, SUM(CASE WHEN ht.status = 'completed' THEN 1 ELSE 0 END) AS completed_turns, SUM(COALESCE(ht.duration_ms, 0)) AS duration_ms FROM thread_turns ht JOIN state_db.threads t ON t.id = ht.thread_id WHERE ht.started_at >= ${Math.floor(start / 1000)} AND t.preview <> '' AND (t.thread_source = 'user' OR (t.thread_source IS NULL AND t.originator = 'Codex Desktop')) GROUP BY date ORDER BY date ASC;`;
     let historyRows = [];
     try {
       const { stdout = '' } = await this.execFile('sqlite3', ['-json', this.historyDb, historySql], { maxBuffer: 1024 * 1024 });
@@ -139,6 +139,7 @@ export class CodexRepository {
       return {
         date,
         turns: Math.max(0, Number(row.turns) || 0),
+        taskCount: Math.max(0, Number(row.task_count) || 0),
         completedTurns: Math.max(0, Number(row.completed_turns) || 0),
         durationMs: Math.max(0, Number(row.duration_ms) || 0),
       };
